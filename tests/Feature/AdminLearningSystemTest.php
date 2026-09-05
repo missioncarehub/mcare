@@ -495,7 +495,7 @@ class AdminLearningSystemTest extends TestCase
             'description' => 'A module uploaded by the administrator.',
             'module_file' => UploadedFile::fake()->create('lesson.pdf', 100, 'application/pdf'),
             'is_published' => '1',
-        ])->assertRedirect()->assertSessionHas('saved');
+        ])->assertRedirect(route('admin.learning.modules'))->assertSessionHas('saved');
 
         $module = TrainingModule::query()->where('title', 'Provide Care and Support to Children')->firstOrFail();
         $this->assertEquals('HCS323302', $module->module_code);
@@ -535,6 +535,72 @@ class AdminLearningSystemTest extends TestCase
 
         $this->assertDatabaseMissing('training_modules', ['id' => $module->id]);
         $this->assertFalse(Storage::disk('local')->exists($module->file_path));
+    }
+
+    public function test_module_create_form_posts_to_a_store_path_instead_of_the_list_url(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->assertNotSame(
+            route('admin.learning.modules'),
+            route('admin.learning.modules.store'),
+        );
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('action="'.route('admin.learning.modules.store').'"', false);
+    }
+
+    public function test_saving_a_module_returns_to_the_list_instead_of_a_file_url(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Redirect',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+
+        Storage::disk('local')->put('training-modules/existing.pdf', '%PDF-1.4');
+        $existing = TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'training_batch_id' => $batch->id,
+            'title' => 'Existing preview module',
+            'description' => 'Opened in an iframe before adding another module.',
+            'file_path' => 'training-modules/existing.pdf',
+            'original_file_name' => 'existing.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 8,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules'))
+            ->get(route('admin.learning.modules.content', $existing))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.modules.store'), [])
+            ->assertRedirect(route('admin.learning.modules'))
+            ->assertSessionHasErrors(['trainer_id', 'training_batch_id', 'title', 'description', 'module_file']);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.modules.content', $existing))
+            ->post(route('admin.learning.modules.store'), [
+                'trainer_id' => $trainer->id,
+                'training_batch_id' => $batch->id,
+                'module_code' => 'HCS233302',
+                'title' => 'Provide Care and Support to Children',
+                'description' => 'Added after previewing another module file.',
+                'module_file' => UploadedFile::fake()->create('chapter.pdf', 100, 'application/pdf'),
+                'is_published' => '1',
+            ])
+            ->assertRedirect(route('admin.learning.modules'))
+            ->assertSessionHas('saved');
     }
 
     public function test_admin_module_composer_shows_and_saves_competency_outcomes_like_trainer_classwork(): void

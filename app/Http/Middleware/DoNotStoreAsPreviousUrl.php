@@ -31,7 +31,15 @@ class DoNotStoreAsPreviousUrl
             'admin/payment-scheduling/transactions/*/proof',
             'admin/historical-alumni/*/evidence',
             'admin/accounts/historical-alumni/*/evidence',
+            'admin/learning/modules/*/content',
+            'admin/learning/modules/*/download',
             'account/registrar-signature',
+            'trainer/modules/*/content',
+            'trainer/modules/*/download',
+            'trainer/modules/*/supplementary/*',
+            'trainee/modules/*/content',
+            'trainee/modules/*/download',
+            'trainee/modules/*/supplementary/*',
         ]);
     }
 }

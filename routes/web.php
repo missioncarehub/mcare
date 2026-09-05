@@ -455,6 +455,11 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])
                     ->middleware('permission:modules.manage')
                     ->name('learning.modules');
+                Route::post('/learning/modules/store', [AdminLearningSystemController::class, 'storeModule'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.store');
+                Route::post('/learning/modules', [AdminLearningSystemController::class, 'storeModule'])
+                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation']);
                 Route::get('/learning/modules/{module}/preview', [AdminLearningSystemController::class, 'previewModule'])
                     ->middleware('permission:modules.manage')
                     ->name('learning.modules.preview');
@@ -464,9 +469,6 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/modules/{module}/download', [AdminLearningSystemController::class, 'downloadModule'])
                     ->middleware(['permission:modules.manage', 'throttle:document-downloads'])
                     ->name('learning.modules.download');
-                Route::post('/learning/modules', [AdminLearningSystemController::class, 'storeModule'])
-                    ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
-                    ->name('learning.modules.store');
                 Route::patch('/learning/modules/{module}', [AdminLearningSystemController::class, 'updateModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.update');

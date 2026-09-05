@@ -598,7 +598,8 @@ class AdminLearningSystemController extends Controller
         $module->loadMissing(['batch', 'trainer']);
         $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
 
-        return back()->with('saved', "Module {$module->title} was added.");
+        return $this->redirectToModulesIndex()
+            ->with('saved', "Module {$module->title} was added.");
     }
 
     public function updateModule(
@@ -737,7 +738,27 @@ class AdminLearningSystemController extends Controller
             $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
         }
 
-        return back()->with('saved', "Module {$module->title} was updated.");
+        return $this->redirectToModulesIndex()
+            ->with('saved', "Module {$module->title} was updated.");
+    }
+
+    private function redirectToModulesIndex(): RedirectResponse
+    {
+        return redirect()->to($this->modulesIndexUrl());
+    }
+
+    private function modulesIndexUrl(): string
+    {
+        $index = route('admin.learning.modules');
+        $previous = url()->previous($index);
+        $previousPath = rtrim((string) parse_url($previous, PHP_URL_PATH), '/') ?: '/';
+        $indexPath = rtrim((string) parse_url($index, PHP_URL_PATH), '/') ?: '/';
+
+        if ($previousPath !== $indexPath) {
+            return $index;
+        }
+
+        return $previous;
     }
 
     /**

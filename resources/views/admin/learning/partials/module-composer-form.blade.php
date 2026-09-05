@@ -156,6 +156,6 @@
 
     <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 md:col-span-2 md:flex-row md:justify-end xl:col-span-3">
         <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-        <button class="primary-action" data-action-button>{{ $isEdit ? 'Save changes' : 'Add module' }}</button>
+        <button type="submit" class="primary-action" data-action-button>{{ $isEdit ? 'Save changes' : 'Add module' }}</button>
     </div>
 </form>

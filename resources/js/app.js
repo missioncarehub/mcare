@@ -274,11 +274,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('[data-dashboard-dialog-form]').forEach((form) => {
         form.addEventListener('submit', () => {
-            form.querySelectorAll('[data-action-button]').forEach((button) => {
-                button.disabled = true;
-                button.classList.add('cursor-not-allowed', 'opacity-70');
-                button.textContent = form.dataset.submitLabel || 'Saving...';
-            });
+            window.setTimeout(() => {
+                form.querySelectorAll('[data-action-button]').forEach((button) => {
+                    button.disabled = true;
+                    button.classList.add('cursor-not-allowed', 'opacity-70');
+                    button.textContent = form.dataset.submitLabel || 'Saving...';
+                });
+            }, 0);
         });
     });
 
