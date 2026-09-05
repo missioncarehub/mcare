@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\EnrollmentApplication;
 use App\Models\User;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 
 class StaffVisiblePhoto
@@ -26,6 +27,15 @@ class StaffVisiblePhoto
     {
         $candidates = [];
 
+        // The trainee's own profile photo is the freshest, most deliberate
+        // choice. Prefer it so a photo updated in Account Settings shows in
+        // every admin surface right away, instead of forever showing the old
+        // enrollment ID picture.
+        if ($user && filled($user->profile_photo_path)) {
+            $candidates[] = ['disk' => 'public', 'path' => (string) $user->profile_photo_path];
+            $candidates[] = ['disk' => 'local', 'path' => (string) $user->profile_photo_path];
+        }
+
         if (filled($application?->id_photo_path)) {
             $candidates[] = ['disk' => 'local', 'path' => (string) $application->id_photo_path];
         }
@@ -39,11 +49,6 @@ class StaffVisiblePhoto
 
             if (filled($latestPhoto)) {
                 $candidates[] = ['disk' => 'local', 'path' => (string) $latestPhoto];
-            }
-
-            if (filled($user->profile_photo_path)) {
-                $candidates[] = ['disk' => 'public', 'path' => (string) $user->profile_photo_path];
-                $candidates[] = ['disk' => 'local', 'path' => (string) $user->profile_photo_path];
             }
         }
 
@@ -59,19 +64,21 @@ class StaffVisiblePhoto
     /** @return array{path: string, mime: string, filename: string}|null */
     private function resolve(string $disk, string $path): ?array
     {
+        /** @var FilesystemAdapter $filesystem */
+        $filesystem = Storage::disk($disk);
         $normalized = $this->normalize($path);
 
         foreach (array_unique(array_filter([$normalized, $path])) as $candidate) {
-            if ($candidate === '' || str_contains($candidate, '..') || ! Storage::disk($disk)->exists($candidate)) {
+            if ($candidate === '' || str_contains($candidate, '..') || ! $filesystem->exists($candidate)) {
                 continue;
             }
 
-            $absolute = Storage::disk($disk)->path($candidate);
+            $absolute = $filesystem->path($candidate);
             if (! is_file($absolute)) {
                 continue;
             }
 
-            $mime = Storage::disk($disk)->mimeType($candidate) ?: (mime_content_type($absolute) ?: '');
+            $mime = $filesystem->mimeType($candidate) ?: (mime_content_type($absolute) ?: '');
             $extension = strtolower((string) pathinfo($candidate, PATHINFO_EXTENSION));
             $isImage = str_starts_with((string) $mime, 'image/')
                 || in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);

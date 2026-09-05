@@ -307,6 +307,55 @@ class AdminEnrollmentReviewTest extends TestCase
         $this->assertGreaterThanOrEqual(3, preg_match_all('/\/Subtype\s*\/Image/', $preview->getContent()));
     }
 
+    public function test_enrollment_photo_prefers_the_trainee_uploaded_avatar_over_the_id_photo(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'trainee']);
+
+        // The ID photo taken during enrollment stays on the private disk. When
+        // the trainee later replaces their avatar from Account Settings, admin
+        // views must reflect the new picture instead of the old ID.
+        $idPhotoPath = 'enrollment-documents/'.$applicant->id.'/id-photo.jpg';
+        $this->storeTesdaJpeg($idPhotoPath, 320, 240);
+
+        $publicPath = 'avatars/'.$applicant->id.'/face.png';
+        Storage::disk('public')->put($publicPath, base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+        ));
+        $applicant->forceFill(['profile_photo_path' => $publicPath])->save();
+
+        $applicationWithIdOnly = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Julianne',
+            'last_name' => 'Alipio',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Street',
+            'barangay' => 'Barangay',
+            'city' => 'City',
+            'province' => 'Province',
+            'zip_code' => '1000',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE College',
+            'year_graduated' => 2022,
+            'id_photo_path' => $idPhotoPath,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.photo', $applicationWithIdOnly))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+    }
+
     public function test_enrollment_photo_falls_back_to_the_public_profile_photo(): void
     {
         Storage::fake('local');

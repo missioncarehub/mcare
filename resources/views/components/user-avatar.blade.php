@@ -21,6 +21,20 @@
             : ($resolvedUser ? route('admin.accounts.photo', $resolvedUser, absolute: false) : '');
     }
 
+    // Include a version token so a fresh trainee-uploaded avatar always beats
+    // any previously cached copy of the same admin.enrollments.photo URL.
+    if ($enrollmentPhotoUrl !== '') {
+        $cacheToken = collect([
+            $resolvedUser?->updated_at?->getTimestamp(),
+            $application?->updated_at?->getTimestamp(),
+            $profilePhotoPath !== '' ? substr(sha1($profilePhotoPath), 0, 8) : null,
+        ])->filter()->implode('-');
+
+        if ($cacheToken !== '') {
+            $enrollmentPhotoUrl .= (str_contains($enrollmentPhotoUrl, '?') ? '&' : '?').'v='.$cacheToken;
+        }
+    }
+
     $candidateUrl = trim((string) ($src ?: $enrollmentPhotoUrl ?: $resolvedUser?->profilePhotoUrl() ?? ''));
 
     $isSafeRelativeUrl = \Illuminate\Support\Str::startsWith($candidateUrl, '/')
