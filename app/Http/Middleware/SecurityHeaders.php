@@ -71,7 +71,8 @@ class SecurityHeaders
                 ."frame-src 'self' blob: https://www.facebook.com https://facebook.com; img-src 'self' data: blob: https:; "
                 ."font-src 'self' data: https://fonts.gstatic.com; "
                 ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                ."script-src 'self' 'unsafe-inline'; connect-src 'self' https:; upgrade-insecure-requests"
+                ."script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; "
+                ."connect-src 'self' https:; upgrade-insecure-requests"
             );
 
             // Only advertise HSTS when the current production request is really HTTPS.

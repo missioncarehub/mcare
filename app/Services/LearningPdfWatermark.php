@@ -12,6 +12,12 @@ use Throwable;
 
 class LearningPdfWatermark
 {
+    /**
+     * Hostinger shared PHP often has 128–256 MB. Live FPDI stamping keeps the
+     * whole document in memory, so larger lesson PDFs must be served as-is.
+     */
+    public const MAX_LIVE_STAMP_BYTES = 4194304;
+
     public function isPdf(?string $originalName = null, ?string $mime = null, ?string $storagePath = null): bool
     {
         $extension = strtolower(pathinfo((string) ($originalName ?: $storagePath), PATHINFO_EXTENSION));
@@ -46,30 +52,35 @@ class LearningPdfWatermark
             'X-Content-Type-Options' => 'nosniff',
         ];
 
-        if ($this->isPdf($filename, $mime, $storagePath)) {
-            $stamped = $this->stampAbsolutePath(Storage::disk('local')->path($storagePath));
+        $absolutePath = Storage::disk('local')->path($storagePath);
+        $size = is_file($absolutePath) ? (int) filesize($absolutePath) : 0;
+        $isPdf = $this->isPdf($filename, $mime, $storagePath);
 
-            if (is_string($stamped) && $stamped !== '') {
-                return response()->streamDownload(function () use ($stamped): void {
-                    echo $stamped;
-                }, $filename, [
-                    ...$headers,
-                    'Content-Type' => 'application/pdf',
-                ], $disposition);
-            }
-
+        if ($isPdf) {
             $headers['Content-Type'] = 'application/pdf';
         }
 
-        return response()->file(Storage::disk('local')->path($storagePath), [
-            ...$headers,
-            'Accept-Ranges' => 'bytes',
-        ]);
+        $headers['Accept-Ranges'] = 'bytes';
+
+        if ($isPdf && $size > 0 && $size <= self::MAX_LIVE_STAMP_BYTES) {
+            $stampedPath = $this->stampToTemporaryFile($absolutePath);
+
+            if (is_string($stampedPath) && is_file($stampedPath)) {
+                return response()->file($stampedPath, $headers)->deleteFileAfterSend(true);
+            }
+        }
+
+        return response()->file($absolutePath, $headers);
     }
 
-    private function stampAbsolutePath(string $absolutePath): ?string
+    private function stampToTemporaryFile(string $absolutePath): ?string
     {
         if (! is_file($absolutePath)) {
+            return null;
+        }
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'mcare-wm-');
+        if ($tempPath === false) {
             return null;
         }
 
@@ -87,10 +98,18 @@ class LearningPdfWatermark
                 $pdf->paintWatermark();
             }
 
-            $output = $pdf->Output('S');
+            $pdf->Output('F', $tempPath);
 
-            return is_string($output) && $output !== '' ? $output : null;
+            if (! is_file($tempPath) || filesize($tempPath) < 8) {
+                @unlink($tempPath);
+
+                return null;
+            }
+
+            return $tempPath;
         } catch (Throwable $exception) {
+            @unlink($tempPath);
+
             Log::warning('Learning PDF watermark could not be applied.', [
                 'path_basename' => basename($absolutePath),
                 'error' => $exception->getMessage(),

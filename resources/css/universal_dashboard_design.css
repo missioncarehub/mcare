@@ -3913,7 +3913,7 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
     pointer-events: none;
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 2;
     display: grid;
     place-items: center;
     overflow: hidden;
@@ -4040,6 +4040,7 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 }
 
 .universal-dashboard .lms-module-pdf-stage [data-pdf-page-wrapper] {
+    position: relative;
     display: block;
     width: max-content;
     max-width: none;

@@ -50,6 +50,8 @@ class SecurityHardeningTest extends TestCase
         $this->assertStringContainsString("form-action 'self'", $policy);
         $this->assertStringContainsString("frame-ancestors 'none'", $policy);
         $this->assertStringContainsString("object-src 'none'", $policy);
+        $this->assertStringContainsString("worker-src 'self' blob:", $policy);
+        $this->assertStringContainsString("script-src 'self' 'unsafe-inline' blob:", $policy);
     }
 
     public function test_admin_login_is_throttled_after_repeated_failures(): void

@@ -6,6 +6,52 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
+let pdfWorkerReady = null;
+
+const configurePdfWorker = () => {
+    if (pdfWorkerReady) {
+        return pdfWorkerReady;
+    }
+
+    pdfWorkerReady = fetch(pdfWorker, { credentials: 'same-origin' })
+        .then((response) => {
+            if (!response.ok) {
+                return;
+            }
+
+            return response.text().then((source) => {
+                const blob = new Blob([source], { type: 'text/javascript' });
+                pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+            });
+        })
+        .catch(() => {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+        });
+
+    return pdfWorkerReady;
+};
+
+const loadPdfDocument = async (url) => {
+    await configurePdfWorker();
+
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/pdf' },
+    });
+
+    if (!response.ok) {
+        throw new Error(`pdf-http-${response.status}`);
+    }
+
+    const data = await response.arrayBuffer();
+    const header = new TextDecoder().decode(data.slice(0, 5));
+    if (!header.startsWith('%PDF')) {
+        throw new Error('pdf-invalid-body');
+    }
+
+    return pdfjsLib.getDocument({ data }).promise;
+};
+
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
 const adminSidebarCollapsedStorageKey = 'mcare-admin-sidebar-collapsed';
 const trainerSidebarCollapsedStorageKey = 'mcare-trainer-sidebar-collapsed';
@@ -636,19 +682,21 @@ document.addEventListener('DOMContentLoaded', () => {
         container.addEventListener('contextmenu', (event) => event.preventDefault());
         container.addEventListener('dragstart', (event) => event.preventDefault());
 
-        const loadingTask = pdfjsLib.getDocument({
-            url: url,
-            withCredentials: true,
-        });
-
-        loadingTask.promise.then((pdf) => {
+        loadPdfDocument(url).then((pdf) => {
             pdfDoc = pdf;
             if (totalPagesEl) totalPagesEl.textContent = String(pdf.numPages);
             fitCurrentPage();
-        }).catch(() => {
-            if (loadingEl) {
-                loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">Unable to load document in canvas viewer. <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
+        }).catch((error) => {
+            if (!loadingEl) {
+                return;
             }
+
+            const missing = String(error?.message || '').includes('pdf-http-404');
+            const message = missing
+                ? 'The lesson file is not on this server. Re-upload the module on Hostinger.'
+                : 'Unable to load document in canvas viewer.';
+
+            loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">${message} <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
         });
 
         if (containerWrapper && 'ResizeObserver' in window) {

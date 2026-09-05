@@ -65,6 +65,38 @@ class LearningPdfWatermarkTest extends TestCase
         $this->assertTrue($this->pdfContains($downloaded, '/Subtype /Image'));
         $this->assertFalse($this->pdfContains($downloaded, 'maria.santos@gmail.com'));
         $this->assertFalse($this->pdfContains($downloaded, 'MCARE Mission Care Training Center'));
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertSee('pdf-page-watermark', false);
+    }
+
+    public function test_large_lesson_pdfs_are_served_without_live_stamping(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $path = "training-modules/{$trainer->id}/chapter.pdf";
+        Storage::disk('local')->put(
+            $path,
+            $this->samplePdf().str_repeat(' ', LearningPdfWatermark::MAX_LIVE_STAMP_BYTES + 1)
+        );
+        $module = $this->lmsModule($trainer, $batch, [
+            'title' => 'Large chapter PDF',
+            'file_path' => $path,
+            'original_file_name' => 'chapter.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => LearningPdfWatermark::MAX_LIVE_STAMP_BYTES + 1,
+        ]);
+        ['user' => $trainee] = $this->lmsTrainee($batch);
+
+        $view = $this->actingAs($trainee)->get(route('trainee.modules.content', $module));
+        $view->assertOk();
+        $viewed = $this->responseBody($view);
+
+        $this->assertStringContainsString('%PDF', $viewed);
+        $this->assertFalse($this->pdfContains($viewed, '/Subtype /Image'));
     }
 
     public function test_non_pdf_uploads_are_not_rewritten_by_the_watermarker(): void
