@@ -4040,6 +4040,7 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 }
 
 .universal-dashboard .lms-module-pdf-stage [data-pdf-page-wrapper] {
+    position: relative;
     display: block;
     width: max-content;
     max-width: none;

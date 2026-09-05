@@ -62,7 +62,11 @@ class LearningPdfWatermark
 
         $headers['Accept-Ranges'] = 'bytes';
 
-        if ($isPdf && $size > 0 && $size <= self::MAX_LIVE_STAMP_BYTES) {
+        if ($isPdf
+            && $disposition === HeaderUtils::DISPOSITION_ATTACHMENT
+            && $size > 0
+            && $size <= self::MAX_LIVE_STAMP_BYTES
+        ) {
             $stampedPath = $this->stampToTemporaryFile($absolutePath);
 
             if (is_string($stampedPath) && is_file($stampedPath)) {

@@ -31,25 +31,39 @@ const configurePdfWorker = () => {
     return pdfWorkerReady;
 };
 
+const bufferLooksLikePdf = (data) => {
+    const prefix = new TextDecoder('latin1').decode(data.slice(0, 1024));
+
+    return prefix.includes('%PDF');
+};
+
 const loadPdfDocument = async (url) => {
     await configurePdfWorker();
 
-    const response = await fetch(url, {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/pdf' },
-    });
+    try {
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/pdf,*/*' },
+        });
 
-    if (!response.ok) {
-        throw new Error(`pdf-http-${response.status}`);
+        if (!response.ok) {
+            throw new Error(`pdf-http-${response.status}`);
+        }
+
+        const data = await response.arrayBuffer();
+        if (data.byteLength > 4 && bufferLooksLikePdf(data)) {
+            return await pdfjsLib.getDocument({ data }).promise;
+        }
+    } catch (error) {
+        if (String(error?.message || '').startsWith('pdf-http-')) {
+            throw error;
+        }
     }
 
-    const data = await response.arrayBuffer();
-    const header = new TextDecoder().decode(data.slice(0, 5));
-    if (!header.startsWith('%PDF')) {
-        throw new Error('pdf-invalid-body');
-    }
-
-    return pdfjsLib.getDocument({ data }).promise;
+    return pdfjsLib.getDocument({
+        url,
+        withCredentials: true,
+    }).promise;
 };
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';

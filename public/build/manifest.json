@@ -4,7 +4,7 @@
     "src": "node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
   },
   "resources/css/app.css": {
-    "file": "assets/app-B2h4urt9.css",
+    "file": "assets/app-RwIm2uvV.css",
     "name": "app",
     "names": [
       "app.css"
@@ -13,7 +13,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-DU3-vZEr.js",
+    "file": "assets/app-CdAhqjmV.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,

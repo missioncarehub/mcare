@@ -151,6 +151,7 @@
                                 <div data-pdf-scroll-sizer>
                                     <div data-pdf-page-wrapper>
                                         <canvas class="block bg-white" data-pdf-canvas></canvas>
+                                        <img class="pdf-page-watermark" src="{{ $watermarkImageUrl }}" alt="" draggable="false">
                                     </div>
                                 </div>
                                 <div class="lms-module-pdf-loading" data-pdf-loading>

@@ -55,8 +55,13 @@ class LearningPdfWatermarkTest extends TestCase
         $viewed = $this->responseBody($view);
 
         $this->assertStringContainsString('%PDF', $viewed);
-        $this->assertTrue($this->pdfContains($viewed, '/Subtype /Image'));
+        $this->assertFalse($this->pdfContains($viewed, '/Subtype /Image'));
         $this->assertFalse($this->pdfContains($viewed, 'maria.santos@gmail.com'));
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $module))
+            ->assertOk()
+            ->assertSee('pdf-page-watermark', false);
 
         $download = $this->actingAs($trainee)->get(route('trainee.modules.download', $module));
         $download->assertOk();
