@@ -40,30 +40,31 @@ const bufferLooksLikePdf = (data) => {
 const loadPdfDocument = async (url) => {
     await configurePdfWorker();
 
-    try {
-        const response = await fetch(url, {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/pdf,*/*' },
-        });
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/pdf,*/*' },
+    });
 
-        if (!response.ok) {
-            throw new Error(`pdf-http-${response.status}`);
-        }
-
-        const data = await response.arrayBuffer();
-        if (data.byteLength > 4 && bufferLooksLikePdf(data)) {
-            return await pdfjsLib.getDocument({ data }).promise;
-        }
-    } catch (error) {
-        if (String(error?.message || '').startsWith('pdf-http-')) {
-            throw error;
-        }
+    if (!response.ok) {
+        const error = new Error(`pdf-http-${response.status}`);
+        error.status = response.status;
+        throw error;
     }
 
-    return pdfjsLib.getDocument({
-        url,
-        withCredentials: true,
-    }).promise;
+    const data = await response.arrayBuffer();
+    if (data.byteLength <= 4 || !bufferLooksLikePdf(data)) {
+        const error = new Error('pdf-invalid-body');
+        error.contentType = response.headers.get('content-type') || 'unknown';
+        error.byteLength = data.byteLength;
+        throw error;
+    }
+
+    try {
+        return await pdfjsLib.getDocument({ data }).promise;
+    } catch (parseError) {
+        parseError.stage = 'pdfjs-parse';
+        throw parseError;
+    }
 };
 
 const dashboardThemeStorageKey = 'mcare-dashboard-theme';
@@ -696,21 +697,55 @@ document.addEventListener('DOMContentLoaded', () => {
         container.addEventListener('contextmenu', (event) => event.preventDefault());
         container.addEventListener('dragstart', (event) => event.preventDefault());
 
+        const swapToNativePdfViewer = (note) => {
+            const pageWrapper = container.querySelector('[data-pdf-page-wrapper]');
+            const toolbar = container.querySelector('.lms-module-pdf-toolbar');
+            if (toolbar) toolbar.style.display = 'none';
+            if (loadingEl) loadingEl.style.display = 'none';
+
+            if (pageWrapper) {
+                pageWrapper.innerHTML = `
+                    <iframe
+                        src="${url}#toolbar=0&navpanes=0"
+                        title="Lesson document"
+                        class="block h-[75vh] w-full min-w-[320px] border-0 bg-white"
+                        loading="lazy"
+                    ></iframe>
+                    ${note ? `<p class="mt-2 text-center text-xs text-slate-300">${note}</p>` : ''}
+                `;
+            }
+        };
+
         loadPdfDocument(url).then((pdf) => {
             pdfDoc = pdf;
             if (totalPagesEl) totalPagesEl.textContent = String(pdf.numPages);
             fitCurrentPage();
         }).catch((error) => {
-            if (!loadingEl) {
+            const status = error?.status;
+            const contentType = error?.contentType;
+            const detail = status
+                ? `HTTP ${status}`
+                : contentType
+                    ? `content-type ${contentType}`
+                    : (error?.message || 'canvas viewer error');
+
+            if (status === 404 || status === 403 || status === 429) {
+                if (loadingEl) {
+                    const label = status === 404
+                        ? 'The lesson file is not on this server yet. Re-upload the module on Hostinger.'
+                        : status === 403
+                            ? 'This lesson is no longer available on your account.'
+                            : 'You opened this lesson too many times in a short window. Wait a minute and reload.';
+
+                    loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">${label}<br><span class="text-xs text-slate-400">${detail}</span></div>`;
+                }
                 return;
             }
 
-            const missing = String(error?.message || '').includes('pdf-http-404');
-            const message = missing
-                ? 'The lesson file is not on this server. Re-upload the module on Hostinger.'
-                : 'Unable to load document in canvas viewer.';
-
-            loadingEl.innerHTML = `<div class="p-6 text-center text-sm text-red-300">${message} <a href="${url}" target="_blank" class="underline font-bold text-white">Open file directly</a></div>`;
+            // Any other failure (pdf.js parse error, worker blocked, corrupted
+            // bytes) falls back to the browser's built-in PDF renderer so the
+            // trainee can still read the lesson.
+            swapToNativePdfViewer(`Canvas viewer fallback active (${detail}).`);
         });
 
         if (containerWrapper && 'ResizeObserver' in window) {

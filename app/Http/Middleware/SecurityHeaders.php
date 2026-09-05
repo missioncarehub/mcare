@@ -20,7 +20,8 @@ class SecurityHeaders
         $isEmbeddableContent = $request->routeIs(
             'trainer.modules.content',
             'trainee.modules.content',
-            'admin.enrollments.documents.content'
+            'admin.enrollments.documents.content',
+            'admin.learning.modules.content'
         );
 
         // Prevent browsers from guessing a different MIME type than the server sent.
