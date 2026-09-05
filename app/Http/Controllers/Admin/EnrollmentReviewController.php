@@ -349,9 +349,26 @@ class EnrollmentReviewController extends Controller
         ]);
         $disposition = $validated['disposition'] ?? 'inline';
 
+        // Shared PHP hosts (Hostinger) often enable zlib.output_compression at
+        // the server level. When that fires on a PDF, the browser gets a body
+        // that no longer matches Content-Length and Chrome shows
+        // "Failed to load PDF document". Turn it off for this response and
+        // ask any proxy in front to leave the bytes alone. PHPUnit relies on
+        // its own outer buffer so we only clean nested ones.
+        @ini_set('zlib.output_compression', 'Off');
+        if (! app()->runningUnitTests()) {
+            while (ob_get_level() > 1) {
+                @ob_end_clean();
+            }
+        }
+
         $enrollmentApplication->loadMissing('batch');
         $pdf = $pdfService->generate($enrollmentApplication);
         $filename = $pdfService->filename($enrollmentApplication);
+        $fallbackFilename = str($filename)
+            ->ascii()
+            ->replaceMatches('/[^A-Za-z0-9._-]/', '-')
+            ->toString();
 
         AdminActivityLog::record($request->user(), 'enrollment.tesda-form.generated', $enrollmentApplication, [
             'disposition' => $disposition,
@@ -360,10 +377,20 @@ class EnrollmentReviewController extends Controller
 
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                $disposition === 'attachment'
+                    ? HeaderUtils::DISPOSITION_ATTACHMENT
+                    : HeaderUtils::DISPOSITION_INLINE,
+                $filename,
+                $fallbackFilename
+            ),
             'Content-Length' => (string) strlen($pdf),
+            'Content-Transfer-Encoding' => 'binary',
+            'Content-Encoding' => 'identity',
+            'Accept-Ranges' => 'none',
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 
