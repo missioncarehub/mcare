@@ -94,6 +94,81 @@ const applyDashboardTheme = (theme) => {
 
 applyDashboardTheme(readDashboardTheme());
 
+// Sidebar collapse must survive back/forward cache restores and any errors
+// thrown by unrelated DOMContentLoaded logic (e.g. the PDF viewer on lesson
+// pages). Registering the click handler on `document` with delegation means
+// the button keeps working even if it is re-rendered by a navigation swap,
+// and re-applying the state on `pageshow` keeps bfcache-restored pages in
+// sync so users no longer need Ctrl+Shift+R for the toggle to respond.
+const resolveOfficialSidebarKey = () => {
+    const shell = document.querySelector(
+        '.universal-dashboard[data-dashboard-role="admin"], '
+        + '.universal-dashboard[data-dashboard-role="trainer"], '
+        + '.universal-dashboard[data-dashboard-role="trainee"]',
+    );
+    const role = shell?.dataset.dashboardRole;
+
+    return {
+        shell,
+        storageKey: (role && officialSidebarStorageKeys[role]) || adminSidebarCollapsedStorageKey,
+    };
+};
+
+const applyOfficialSidebarCollapsed = (collapsed) => {
+    document.documentElement.classList.toggle('is-admin-sidebar-collapsed', collapsed);
+    document.querySelectorAll('[data-dashboard-sidebar-collapse]').forEach((button) => {
+        button.setAttribute('aria-expanded', String(!collapsed));
+        const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        button.setAttribute('aria-label', label);
+        button.title = label;
+    });
+};
+
+const syncOfficialSidebarFromStorage = () => {
+    const { shell, storageKey } = resolveOfficialSidebarKey();
+    if (!shell) return;
+
+    let collapsed = document.documentElement.classList.contains('is-admin-sidebar-collapsed');
+    try {
+        collapsed = window.localStorage.getItem(storageKey) === '1';
+    } catch (error) {
+        // Fall back to whatever the inline layout script decided.
+    }
+
+    applyOfficialSidebarCollapsed(collapsed);
+};
+
+// Delegated click handler survives bfcache restores and dynamic DOM swaps.
+document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const trigger = target.closest('[data-dashboard-sidebar-collapse]');
+    if (!trigger) return;
+
+    const { shell, storageKey } = resolveOfficialSidebarKey();
+    if (!shell) return;
+
+    const collapsed = !document.documentElement.classList.contains('is-admin-sidebar-collapsed');
+    applyOfficialSidebarCollapsed(collapsed);
+
+    try {
+        window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+    } catch (error) {
+        // Preference persistence is optional when storage is blocked.
+    }
+});
+
+// Initial sync fires as soon as the DOM is parsed enough for the shell to
+// exist. `DOMContentLoaded` guarantees the button is present, but we still
+// re-sync on `pageshow` so a page restored from bfcache never shows a stale
+// collapsed/expanded state.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncOfficialSidebarFromStorage, { once: true });
+} else {
+    syncOfficialSidebarFromStorage();
+}
+window.addEventListener('pageshow', syncOfficialSidebarFromStorage);
+
 document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
     attachPhilippineAddressLookups();
@@ -799,40 +874,9 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.toggleAttribute('aria-hidden', isInaccessible);
     };
 
-    const officialShell = document.querySelector('.universal-dashboard[data-dashboard-role="admin"], .universal-dashboard[data-dashboard-role="trainer"], .universal-dashboard[data-dashboard-role="trainee"]');
-    const sidebarCollapseButtons = document.querySelectorAll('[data-dashboard-sidebar-collapse]');
-    const sidebarCollapsedStorageKey = officialSidebarStorageKeys[officialShell?.dataset.dashboardRole] ?? adminSidebarCollapsedStorageKey;
-    const applyAdminSidebarCollapsed = (collapsed) => {
-        document.documentElement.classList.toggle('is-admin-sidebar-collapsed', collapsed);
-        sidebarCollapseButtons.forEach((button) => {
-            button.setAttribute('aria-expanded', String(!collapsed));
-            const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-            button.setAttribute('aria-label', label);
-            button.title = label;
-        });
-    };
-
-    if (officialShell && sidebarCollapseButtons.length > 0) {
-        let collapsed = false;
-        try {
-            collapsed = window.localStorage.getItem(sidebarCollapsedStorageKey) === '1';
-        } catch (error) {
-            collapsed = document.documentElement.classList.contains('is-admin-sidebar-collapsed');
-        }
-
-        applyAdminSidebarCollapsed(collapsed);
-        sidebarCollapseButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                collapsed = !document.documentElement.classList.contains('is-admin-sidebar-collapsed');
-                applyAdminSidebarCollapsed(collapsed);
-                try {
-                    window.localStorage.setItem(sidebarCollapsedStorageKey, collapsed ? '1' : '0');
-                } catch (error) {
-                    // Preference persistence is optional when storage is blocked.
-                }
-            });
-        });
-    }
+    // The sidebar collapse toggle is now wired at module top-level via
+    // event delegation (see the `syncOfficialSidebarFromStorage` block above)
+    // so it survives bfcache restores and unrelated init errors.
 
     syncSidebarAccessibility();
     desktopDashboardMedia.addEventListener?.('change', syncSidebarAccessibility);
