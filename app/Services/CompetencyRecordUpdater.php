@@ -6,9 +6,11 @@ use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\TraineeCompetencyRecord;
+use App\Models\TraineeOutcomeResult;
 use App\Models\TrainingModule;
 use App\Models\TrainingSubmoduleProgress;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class CompetencyRecordUpdater
@@ -100,23 +102,39 @@ class CompetencyRecordUpdater
 
         $record->fill($attributes)->save();
 
+        $outcomeIds = $unit->outcomes->pluck('id')->all();
+
+        // Preload existing outcome results in one query so the upsert loop
+        // becomes a set of targeted UPDATEs / INSERTs instead of the previous
+        // updateOrCreate() which fired two round-trips per outcome. $record
+        // was just persisted above, so it always exists at this point.
+        $existingResults = $record->outcomeResults()
+            ->whereIn('competency_outcome_id', $outcomeIds)
+            ->get()
+            ->keyBy('competency_outcome_id');
+
         foreach ($unit->outcomes as $outcome) {
             $status = $outcomeStatuses->get((string) $outcome->id);
-            $record->outcomeResults()->updateOrCreate(
-                ['competency_outcome_id' => $outcome->id],
-                [
-                    // Manual trainer records are shared unit/outcome records,
-                    // not attributable to one learning module.
-                    'training_module_id' => null,
-                    'status' => $status,
-                    'assessed_by_id' => $status === TraineeCompetencyRecord::STATUS_NOT_ASSESSED
-                        ? null
-                        : $assessor->id,
-                    'assessed_at' => $status === TraineeCompetencyRecord::STATUS_NOT_ASSESSED
-                        ? null
-                        : now(),
-                ],
-            );
+            $isAssessed = $status !== TraineeCompetencyRecord::STATUS_NOT_ASSESSED;
+            $resultAttributes = [
+                // Manual trainer records are shared unit/outcome records,
+                // not attributable to one learning module.
+                'training_module_id' => null,
+                'status' => $status,
+                'assessed_by_id' => $isAssessed ? $assessor->id : null,
+                'assessed_at' => $isAssessed ? now() : null,
+            ];
+
+            /** @var TraineeOutcomeResult|null $existing */
+            $existing = $existingResults->get($outcome->id);
+
+            if ($existing) {
+                $existing->fill($resultAttributes)->save();
+            } else {
+                $record->outcomeResults()->create(array_merge($resultAttributes, [
+                    'competency_outcome_id' => $outcome->id,
+                ]));
+            }
         }
 
         $this->syncClassworkProgress($application, $unit, $record, $assessor);
@@ -128,6 +146,13 @@ class CompetencyRecordUpdater
     /**
      * Push competency-board results onto the matching published classwork so
      * the trainee portal does not stay on "Awaiting trainer evaluation".
+     *
+     * On shared hosting (Hostinger) the trainer save felt sluggish because
+     * this method used to issue N per-module SELECT/UPDATE round-trips and
+     * always re-ran assignProgress()/ensureStructure() (which is ~15 more
+     * queries per module). We now batch-load the parent + child progress
+     * rows and only fall back to assignProgress() when a trainee is actually
+     * missing submodule rows.
      */
     private function syncClassworkProgress(
         EnrollmentApplication $application,
@@ -135,7 +160,6 @@ class CompetencyRecordUpdater
         TraineeCompetencyRecord $record,
         User $assessor,
     ): void {
-        $results = $record->outcomeResults()->get()->keyBy('competency_outcome_id');
         $modules = TrainingModule::query()
             ->with('submodules')
             ->where('is_published', true)
@@ -150,19 +174,70 @@ class CompetencyRecordUpdater
             })
             ->get();
 
-        foreach ($modules as $module) {
-            $parent = ModuleProgress::query()
+        if ($modules->isEmpty()) {
+            return;
+        }
+
+        /** @var Collection<int, ModuleProgress> $parents */
+        $parents = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('training_module_id', $modules->pluck('id'))
+            ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('training_module_id');
+
+        if ($parents->isEmpty()) {
+            return;
+        }
+
+        $results = $record->outcomeResults()->get()->keyBy('competency_outcome_id');
+
+        // Bulk-load every submodule progress row this save could touch so the
+        // per-submodule loop below never hits the database on its own.
+        $submoduleIds = $modules
+            ->flatMap(fn (TrainingModule $module) => $module->submodules->pluck('id'))
+            ->unique()
+            ->values();
+
+        /** @var Collection<int, TrainingSubmoduleProgress> $childProgressBySubmodule */
+        $childProgressBySubmodule = $submoduleIds->isEmpty()
+            ? collect()
+            : TrainingSubmoduleProgress::query()
                 ->where('enrollment_application_id', $application->id)
-                ->where('training_module_id', $module->id)
-                ->where('status', '!=', ModuleProgress::STATUS_LOCKED)
+                ->whereIn('training_submodule_id', $submoduleIds)
                 ->lockForUpdate()
-                ->first();
+                ->get()
+                ->keyBy('training_submodule_id');
+
+        foreach ($modules as $module) {
+            $parent = $parents->get($module->id);
 
             if (! $parent) {
                 continue;
             }
 
-            $this->submodules->assignProgress($parent);
+            // Only run the (expensive) defensive structure sync if the trainee
+            // is actually missing a submodule progress row for this module.
+            // ensureStructure() re-checks every catalog outcome and touches
+            // TrainingSubmodule + TrainingSubmoduleProgress rows, so skipping
+            // it saves ~15 round-trips per module on every trainer save.
+            $missingChildren = $module->submodules->contains(
+                fn ($submodule) => ! $childProgressBySubmodule->has($submodule->id),
+            );
+
+            if ($missingChildren) {
+                $this->submodules->assignProgress($parent);
+                $refreshed = TrainingSubmoduleProgress::query()
+                    ->where('enrollment_application_id', $application->id)
+                    ->whereIn('training_submodule_id', $module->submodules->pluck('id'))
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('training_submodule_id');
+                foreach ($refreshed as $submoduleId => $childRow) {
+                    $childProgressBySubmodule->put($submoduleId, $childRow);
+                }
+            }
 
             foreach ($module->submodules as $submodule) {
                 $resultStatus = $submodule->competency_outcome_id
@@ -188,11 +263,7 @@ class CompetencyRecordUpdater
                     continue;
                 }
 
-                $child = TrainingSubmoduleProgress::query()
-                    ->where('enrollment_application_id', $application->id)
-                    ->where('training_submodule_id', $submodule->id)
-                    ->lockForUpdate()
-                    ->first();
+                $child = $childProgressBySubmodule->get($submodule->id);
 
                 if (! $child) {
                     continue;
