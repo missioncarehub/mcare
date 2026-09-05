@@ -65,11 +65,6 @@ class LearningPdfWatermarkTest extends TestCase
         $this->assertTrue($this->pdfContains($downloaded, '/Subtype /Image'));
         $this->assertFalse($this->pdfContains($downloaded, 'maria.santos@gmail.com'));
         $this->assertFalse($this->pdfContains($downloaded, 'MCARE Mission Care Training Center'));
-
-        $this->actingAs($trainee)
-            ->get(route('trainee.modules.show', $module))
-            ->assertOk()
-            ->assertSee('pdf-page-watermark', false);
     }
 
     public function test_large_lesson_pdfs_are_served_without_live_stamping(): void

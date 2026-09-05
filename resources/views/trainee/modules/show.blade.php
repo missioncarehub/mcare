@@ -112,9 +112,11 @@
 
             <div id="lesson-document-panel" data-lesson-document-panel @unless($lessonDocumentOpen) hidden @endunless>
                 <section class="lms-module-viewer protected-module-content" data-protected-module-viewer>
-                    <div class="lms-module-watermark" aria-hidden="true">
-                        <x-learning-watermark :src="$watermarkImageUrl" />
-                    </div>
+                    @unless($previewKind === 'pdf')
+                        <div class="lms-module-watermark" aria-hidden="true">
+                            <x-learning-watermark :src="$watermarkImageUrl" />
+                        </div>
+                    @endunless
 
                     @if($previewKind === 'video')
                         <video class="lms-module-media" controls controlsList="nodownload noremoteplayback" disablePictureInPicture preload="metadata">
@@ -149,7 +151,6 @@
                                 <div data-pdf-scroll-sizer>
                                     <div data-pdf-page-wrapper>
                                         <canvas class="block bg-white" data-pdf-canvas></canvas>
-                                        <img class="pdf-page-watermark" src="{{ $watermarkImageUrl }}" alt="" draggable="false">
                                     </div>
                                 </div>
                                 <div class="lms-module-pdf-loading" data-pdf-loading>
