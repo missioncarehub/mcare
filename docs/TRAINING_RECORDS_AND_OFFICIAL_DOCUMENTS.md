@@ -14,29 +14,27 @@
 
 ```powershell
 composer install
-npm ci --ignore-scripts
-npx puppeteer browsers install chrome-headless-shell
 php artisan migrate
 php artisan queue:work --queue=default --tries=2 --timeout=600
 ```
 
-Set the approved browser executable in the server environment:
+Official COTC and TOR PDFs are generated in PHP with FPDF by default when Node.js or Chrome is not available. That is the path used on shared hosting such as Hostinger. Optional Chromium rendering still works when Node, npm, and Chrome or Edge are installed:
 
 ```dotenv
-BROWSERSHOT_CHROME_PATH="C:\path\to\chrome-headless-shell.exe"
+OFFICIAL_DOCUMENT_PDF_ENGINE=auto
 OFFICIAL_DOCUMENT_DISK=local
 OFFICIAL_DOCUMENT_EXPORT_EXPIRY_HOURS=24
 MCARE_TRAINER_SIGNATORY="Maricris N. Collao"
 MCARE_REGISTRAR_SIGNATORY="Salvacion A. Collao"
 ```
 
-On Windows, MCARE automatically detects an installed Microsoft Edge or Google Chrome executable when `BROWSERSHOT_CHROME_PATH` is blank. Set the variable explicitly on Linux, containers, or managed servers.
+Set `OFFICIAL_DOCUMENT_PDF_ENGINE=fpdf` to force the PHP engine. Set `browsershot` only on machines that have Node.js and a browser binary. On Windows, MCARE detects Microsoft Edge or Google Chrome when `BROWSERSHOT_CHROME_PATH` is blank.
 
 Use Supervisor, systemd, or the hosting platform's worker service in production instead of leaving `queue:work` in a terminal. Keep the document disk private. For multiple application servers or heavier download traffic, switch `OFFICIAL_DOCUMENT_DISK` to an S3-compatible private disk and return short-lived signed links.
 
 ## Security and Scaling Decisions
 
-- PDFs are rendered from server-controlled Blade templates; users do not submit HTML.
+- PDFs are rendered from server-controlled templates; users do not submit HTML.
 - Source records are locked after generation and every generation, release, reissue, and download is logged.
 - The trainee route consumes a COTC download atomically while holding a database lock, preventing parallel requests from obtaining extra copies.
 - Admin batch TOR exports process trainees in chunks of 25, use unique export identifiers, and expire automatically.

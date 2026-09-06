@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\OfficialDocumentRenderer;
 use App\Services\BrowsershotOfficialDocumentRenderer;
+use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -19,7 +20,15 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Keep PDF generation replaceable so queue jobs and tests do not depend on a web controller.
-        $this->app->bind(OfficialDocumentRenderer::class, BrowsershotOfficialDocumentRenderer::class);
+        $this->app->bind(OfficialDocumentRenderer::class, function ($app) {
+            return match (strtolower((string) config('official_documents.pdf_engine', 'auto'))) {
+                'browsershot' => $app->make(BrowsershotOfficialDocumentRenderer::class),
+                'fpdf' => $app->make(FpdfOfficialDocumentRenderer::class),
+                default => BrowsershotOfficialDocumentRenderer::environmentIsReady()
+                    ? $app->make(BrowsershotOfficialDocumentRenderer::class)
+                    : $app->make(FpdfOfficialDocumentRenderer::class),
+            };
+        });
     }
 
     /**

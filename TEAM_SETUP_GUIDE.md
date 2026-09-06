@@ -521,24 +521,22 @@ Keep the Laravel server and ngrok running for the webhook. A browser return from
 
 ## 12. Official COTC/TOR document rendering
 
-On Windows, MCARE attempts to detect Microsoft Edge or Google Chrome automatically. Keep the default private document settings:
+MCARE generates COTC and TOR PDFs in PHP when Node.js or Chrome is missing, including shared hosting. Keep the default private document settings:
 
 ```dotenv
+OFFICIAL_DOCUMENT_PDF_ENGINE=auto
 OFFICIAL_DOCUMENT_DISK=local
 OFFICIAL_DOCUMENT_TEMPLATE_VERSION=1.0
 OFFICIAL_DOCUMENT_EXPORT_EXPIRY_HOURS=24
 ```
 
-The queue worker from Section 7 must be running. If Chrome/Edge is not detected or Puppeteer reports that its browser is missing, install the compatible headless browser:
-
-```powershell
-npx puppeteer browsers install chrome-headless-shell
-```
-
-If necessary, set the exact executable in `.env`:
+The queue worker from Section 7 must be running. Chromium rendering is optional. On Windows, Microsoft Edge or Google Chrome is detected automatically if you set `OFFICIAL_DOCUMENT_PDF_ENGINE=browsershot`. If necessary:
 
 ```dotenv
+OFFICIAL_DOCUMENT_PDF_ENGINE=browsershot
 BROWSERSHOT_CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
+BROWSERSHOT_NODE_BINARY="C:\Program Files\nodejs\node.exe"
+BROWSERSHOT_NPM_BINARY="C:\Program Files\nodejs\npm.cmd"
 ```
 
 Run `php artisan optimize:clear` and restart the queue worker afterward. See [docs/TRAINING_RECORDS_AND_OFFICIAL_DOCUMENTS.md](docs/TRAINING_RECORDS_AND_OFFICIAL_DOCUMENTS.md) for the workflow and release rules.

@@ -36,5 +36,6 @@
         <env name="SEMAPHORE_SENDER_NAME" value="MCARE"/>
         <env name="GROQ_API_KEY" value="testing-groq-key"/>
         <env name="GROQ_MODEL" value="llama-3.3-70b-versatile"/>
+        <env name="OFFICIAL_DOCUMENT_PDF_ENGINE" value="fpdf"/>
     </php>
 </phpunit>

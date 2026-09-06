@@ -151,13 +151,17 @@ class OfficialDocumentManager
 
                 return $locked->fresh();
             });
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (Throwable $exception) {
             OfficialDocument::query()->whereKey($document->id)->update([
                 'status' => OfficialDocument::STATUS_FAILED,
                 'generation_error' => str($exception->getMessage())->limit(2000)->toString(),
             ]);
 
-            throw $exception;
+            throw ValidationException::withMessages([
+                'document' => 'The official document could not be generated. '.$this->publicRenderError($exception),
+            ]);
         }
     }
 
@@ -293,5 +297,17 @@ class OfficialDocumentManager
             $document->training_batch_id ?? 0,
             strtolower($document->document_number),
         );
+    }
+
+    private function publicRenderError(Throwable $exception): string
+    {
+        $message = $exception->getMessage();
+
+        if (str_contains($message, 'command not found')
+            || str_contains($message, 'Browser PDF rendering needs Node.js')) {
+            return 'This server cannot run the browser PDF engine. Official documents now use the PHP PDF engine after deploy, or set OFFICIAL_DOCUMENT_PDF_ENGINE=fpdf.';
+        }
+
+        return str($message)->limit(240)->toString();
     }
 }
