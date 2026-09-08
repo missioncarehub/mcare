@@ -57,6 +57,19 @@ class FpdfOfficialDocumentRendererTest extends TestCase
         $this->assertGreaterThan(0, preg_match_all('/\/Subtype\s*\/Image/', $pdf) ?: 0);
     }
 
+    public function test_cotc_pdf_uses_a_landscape_letter_page(): void
+    {
+        $pdf = app(FpdfOfficialDocumentRenderer::class)->render($this->document(OfficialDocument::TYPE_COTC));
+
+        $this->assertSame(1, preg_match('/\/MediaBox\s*\[\s*0(?:\.00)?\s+0(?:\.00)?\s+([\d.]+)\s+([\d.]+)\s*\]/', $pdf, $matches));
+        $width = (float) $matches[1];
+        $height = (float) $matches[2];
+
+        $this->assertGreaterThan($height, $width);
+        $this->assertEqualsWithDelta(792.0, $width, 1.0);
+        $this->assertEqualsWithDelta(612.0, $height, 1.0);
+    }
+
     public function test_tor_pdf_contains_the_transcript_heading_and_competency_row(): void
     {
         $pdf = app(FpdfOfficialDocumentRenderer::class)->render($this->document(OfficialDocument::TYPE_TOR));

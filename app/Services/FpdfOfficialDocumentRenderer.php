@@ -36,8 +36,6 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
 
     private function renderCotc(OfficialDocument $document): FPDF
     {
-        $pageWidth = 279.4;
-        $pageHeight = 215.9;
         $application = $document->application;
         $organization = config('official_documents.organization', []);
         $fullName = $this->latin(mb_strtoupper($this->fullName($application)));
@@ -50,7 +48,11 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         ));
         $documentLine = $this->latin($document->document_number.' | Version '.$document->version);
 
-        $pdf = new FPDF('P', 'mm', [$pageWidth, $pageHeight]);
+        // FPDF stores custom sizes as portrait and only swaps when orientation is L.
+        // 'P' with [279.4, 215.9] therefore becomes a 215.9mm-wide page and clips the competency column.
+        $pdf = new FPDF('L', 'mm', 'Letter');
+        $pageWidth = $pdf->GetPageWidth();
+        $pageHeight = $pdf->GetPageHeight();
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();

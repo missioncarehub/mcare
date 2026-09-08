@@ -34,7 +34,7 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
 
         match ($document->type) {
             OfficialDocument::TYPE_TOR => $browsershot->format('A4')->margins(0, 0, 0, 0),
-            OfficialDocument::TYPE_COTC => $browsershot->paperSize(279.4, 215.9, 'mm')->margins(0, 0, 0, 0),
+            OfficialDocument::TYPE_COTC => $browsershot->format('Letter')->landscape()->margins(0, 0, 0, 0),
         };
 
         $this->applyConfiguredBinaries($browsershot);

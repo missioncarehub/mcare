@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: 279.4mm 215.9mm; margin: 0; }
+        @page { size: Letter landscape; margin: 0; }
         * { box-sizing: border-box; }
         html, body { width: 279.4mm; height: 215.9mm; margin: 0; }
         body { background: #fff; color: #050505; font-family: Georgia, 'Times New Roman', serif; }
