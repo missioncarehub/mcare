@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: Letter landscape; margin: 0; }
+        @page { size: 11in 8.5in; margin: 0; }
         * { box-sizing: border-box; }
-        html, body { width: 279.4mm; height: 215.9mm; margin: 0; }
+        html, body { width: 11in; height: 8.5in; margin: 0; }
         body { background: #fff; color: #050505; font-family: Georgia, 'Times New Roman', serif; }
-        .page { position: relative; width: 279.4mm; height: 215.9mm; overflow: hidden; background: #fff center / 100% 100% no-repeat; }
+        .page { position: relative; width: 11in; height: 8.5in; overflow: visible; background: #fff center / 100% 100% no-repeat; }
         .dynamic-name { position: absolute; top: 91mm; left: 14mm; display: flex; width: 178.5mm; height: 15.5mm; align-items: flex-end; justify-content: center; border-bottom: .35mm solid #cf62ea; background: #fffcff; padding: 0 3mm 2.2mm; font-size: 25pt; font-weight: 700; line-height: 1; text-align: center; text-transform: uppercase; white-space: nowrap; }
         .dynamic-name.is-long { font-size: 20pt; }
         .dynamic-date { position: absolute; top: 137mm; left: 28mm; display: flex; width: 163mm; height: 11.5mm; align-items: center; justify-content: center; background: #fffcff; font-size: 11pt; line-height: 1.2; text-align: center; white-space: nowrap; }

@@ -43,6 +43,8 @@ class OfficialDocumentManager
 
         if ($document->status === OfficialDocument::STATUS_QUEUED) {
             $document = $this->generateNow($document);
+        } elseif ($document->type === OfficialDocument::TYPE_COTC) {
+            $document = $this->refreshClippedCotcPdf($document);
         }
 
         AdminActivityLog::record($admin, 'admin.official-document.generated', $document, [
@@ -90,6 +92,51 @@ class OfficialDocumentManager
         ]);
 
         return $document;
+    }
+
+    public function refreshClippedCotcPdf(OfficialDocument $document): OfficialDocument
+    {
+        if ($document->type !== OfficialDocument::TYPE_COTC) {
+            return $document;
+        }
+
+        if (! in_array($document->status, [
+            OfficialDocument::STATUS_GENERATED,
+            OfficialDocument::STATUS_RELEASED,
+            OfficialDocument::STATUS_DOWNLOADED,
+        ], true)) {
+            return $document;
+        }
+
+        if (! filled($document->file_path)
+            || ! Storage::disk($document->storage_disk)->exists($document->file_path)) {
+            return $document;
+        }
+
+        $pdf = Storage::disk($document->storage_disk)->get($document->file_path);
+        if (! is_string($pdf) || ! $this->cotcPdfIsClippedPortrait($pdf)) {
+            return $document;
+        }
+
+        $status = $document->status;
+        $releasedAt = $document->released_at;
+        $downloadedAt = $document->downloaded_at;
+        $downloadCount = $document->download_count;
+
+        $document->update([
+            'status' => OfficialDocument::STATUS_QUEUED,
+            'generation_error' => null,
+        ]);
+
+        $generated = $this->generateNow($document->fresh());
+        $generated->update([
+            'status' => $status,
+            'released_at' => $releasedAt,
+            'downloaded_at' => $downloadedAt,
+            'download_count' => $downloadCount,
+        ]);
+
+        return $generated->fresh();
     }
 
     public function generateNow(OfficialDocument $document): OfficialDocument
@@ -287,6 +334,15 @@ class OfficialDocumentManager
         return validator(['type' => $type], [
             'type' => ['required', Rule::in(OfficialDocument::supportedTypes())],
         ])->validate()['type'];
+    }
+
+    private function cotcPdfIsClippedPortrait(string $pdf): bool
+    {
+        if (! preg_match('/\/MediaBox\s*\[\s*[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)\s*\]/', $pdf, $matches)) {
+            return false;
+        }
+
+        return ((float) $matches[1] + 1) < (float) $matches[2];
     }
 
     private function documentPath(OfficialDocument $document): string

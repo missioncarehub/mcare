@@ -106,8 +106,9 @@ class CertificationController extends Controller
         return back()->with('saved', 'COTC released. The trainee now has one download.');
     }
 
-    public function preview(OfficialDocument $officialDocument): StreamedResponse
+    public function preview(OfficialDocument $officialDocument, OfficialDocumentManager $manager): StreamedResponse
     {
+        $officialDocument = $manager->refreshClippedCotcPdf($officialDocument);
         $this->assertAvailable($officialDocument);
         $stream = Storage::disk($officialDocument->storage_disk)->readStream($officialDocument->file_path);
         abort_unless(is_resource($stream), 404);
@@ -139,8 +140,9 @@ class CertificationController extends Controller
         return back()->with('saved', strtoupper($document->type).' reissued successfully as '.$document->document_number.'.');
     }
 
-    public function download(Request $request, OfficialDocument $officialDocument): StreamedResponse
+    public function download(Request $request, OfficialDocument $officialDocument, OfficialDocumentManager $manager): StreamedResponse
     {
+        $officialDocument = $manager->refreshClippedCotcPdf($officialDocument);
         $this->assertAvailable($officialDocument);
 
         OfficialDocumentDownload::create([

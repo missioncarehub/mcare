@@ -21,12 +21,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Keep PDF generation replaceable so queue jobs and tests do not depend on a web controller.
         $this->app->bind(OfficialDocumentRenderer::class, function ($app) {
-            return match (strtolower((string) config('official_documents.pdf_engine', 'auto'))) {
+            return match (strtolower((string) config('official_documents.pdf_engine', 'fpdf'))) {
                 'browsershot' => $app->make(BrowsershotOfficialDocumentRenderer::class),
-                'fpdf' => $app->make(FpdfOfficialDocumentRenderer::class),
-                default => BrowsershotOfficialDocumentRenderer::environmentIsReady()
-                    ? $app->make(BrowsershotOfficialDocumentRenderer::class)
-                    : $app->make(FpdfOfficialDocumentRenderer::class),
+                default => $app->make(FpdfOfficialDocumentRenderer::class),
             };
         });
     }

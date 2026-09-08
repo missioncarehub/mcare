@@ -5,8 +5,8 @@ return [
     'template_version' => env('OFFICIAL_DOCUMENT_TEMPLATE_VERSION', '2.0'),
     'download_name_prefix' => env('OFFICIAL_DOCUMENT_PREFIX', 'MCARE'),
     'batch_export_expiry_hours' => (int) env('OFFICIAL_DOCUMENT_EXPORT_EXPIRY_HOURS', 24),
-    // auto: Chrome/Node when both exist, otherwise PHP/FPDF. Use fpdf on shared hosting.
-    'pdf_engine' => env('OFFICIAL_DOCUMENT_PDF_ENGINE', 'auto'),
+    // auto and fpdf both use PHP/FPDF so COTC stays landscape even when Chrome/Node are installed.
+    'pdf_engine' => env('OFFICIAL_DOCUMENT_PDF_ENGINE', 'fpdf'),
 
     'browsershot' => [
         'node_binary' => env('BROWSERSHOT_NODE_BINARY'),

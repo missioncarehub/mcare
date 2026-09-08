@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\OfficialDocumentDownload;
+use App\Services\OfficialDocumentManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,9 @@ class CertificateController extends Controller
     public function download(
         Request $request,
         OfficialDocument $officialDocument,
+        OfficialDocumentManager $manager,
     ): StreamedResponse|RedirectResponse {
+        $officialDocument = $manager->refreshClippedCotcPdf($officialDocument);
         $applicationId = EnrollmentApplication::query()
             ->where('user_id', $request->user()->id)
             ->where('status', EnrollmentApplication::STATUS_APPROVED)

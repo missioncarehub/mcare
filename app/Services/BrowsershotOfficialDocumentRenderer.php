@@ -30,11 +30,17 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
 
         $browsershot = Browsershot::html($html)
             ->showBackground()
-            ->allowFileAccess();
+            ->allowFileAccess()
+            ->emulateMedia('print');
 
         match ($document->type) {
             OfficialDocument::TYPE_TOR => $browsershot->format('A4')->margins(0, 0, 0, 0),
-            OfficialDocument::TYPE_COTC => $browsershot->format('Letter')->landscape()->margins(0, 0, 0, 0),
+            OfficialDocument::TYPE_COTC => $browsershot
+                ->windowSize(1056, 816)
+                ->format('Letter')
+                ->landscape()
+                ->margins(0, 0, 0, 0)
+                ->setOption('preferCSSPageSize', true),
         };
 
         $this->applyConfiguredBinaries($browsershot);

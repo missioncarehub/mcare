@@ -48,71 +48,71 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         ));
         $documentLine = $this->latin($document->document_number.' | Version '.$document->version);
 
-        // FPDF stores custom sizes as portrait and only swaps when orientation is L.
-        // 'P' with [279.4, 215.9] therefore becomes a 215.9mm-wide page and clips the competency column.
-        $pdf = new FPDF('L', 'mm', 'Letter');
-        $pageWidth = $pdf->GetPageWidth();
-        $pageHeight = $pdf->GetPageHeight();
+        $pdf = new LandscapeLetterPdf;
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();
+
+        $pageWidth = $pdf->GetPageWidth();
+        $pageHeight = $pdf->GetPageHeight();
+        $scale = min($pageWidth / LandscapeLetterPdf::WIDTH_MM, $pageHeight / LandscapeLetterPdf::HEIGHT_MM);
+        $drawWidth = LandscapeLetterPdf::WIDTH_MM * $scale;
+        $drawHeight = LandscapeLetterPdf::HEIGHT_MM * $scale;
+        $originX = ($pageWidth - $drawWidth) / 2;
+        $originY = ($pageHeight - $drawHeight) / 2;
+
         $pdf->Image(
-            $this->preparedJpeg(public_path('assets/cotc-official-template.png'), $pageWidth, $pageHeight),
-            0,
-            0,
-            $pageWidth,
-            $pageHeight,
+            $this->preparedJpeg(public_path('assets/cotc-official-template.png'), $drawWidth, $drawHeight),
+            $originX,
+            $originY,
+            $drawWidth,
+            $drawHeight,
             'JPG',
         );
 
-        $nameWidth = 178.5;
-        $nameHeight = 15.5;
-        $nameX = 14.0;
-        $nameY = 91.0;
+        $name = $this->cotcBox($originX, $originY, $scale, 14.0, 91.0, 178.5, 15.5);
         $pdf->SetFillColor(255, 252, 255);
-        $pdf->Rect($nameX, $nameY, $nameWidth, $nameHeight, 'F');
+        $pdf->Rect($name['x'], $name['y'], $name['w'], $name['h'], 'F');
         $pdf->SetDrawColor(207, 98, 234);
-        $pdf->SetLineWidth(0.35);
-        $pdf->Line($nameX, $nameY + $nameHeight, $nameX + $nameWidth, $nameY + $nameHeight);
+        $pdf->SetLineWidth(0.35 * $scale);
+        $pdf->Line($name['x'], $name['y'] + $name['h'], $name['x'] + $name['w'], $name['y'] + $name['h']);
         $this->writeFitted(
             $pdf,
-            $nameX + 3,
-            $nameY,
-            $nameWidth - 6,
-            $nameHeight - 2.2,
+            $name['x'] + (3 * $scale),
+            $name['y'],
+            $name['w'] - (6 * $scale),
+            $name['h'] - (2.2 * $scale),
             $fullName,
             'Times',
             'B',
-            mb_strlen($fullName) > 30 ? 20 : 25,
+            (mb_strlen($fullName) > 30 ? 20 : 25) * $scale,
             'C',
             'B',
-            11,
+            11 * $scale,
         );
 
-        $dateWidth = 163.0;
-        $dateHeight = 11.5;
-        $dateX = 28.0;
-        $dateY = 137.0;
+        $date = $this->cotcBox($originX, $originY, $scale, 28.0, 137.0, 163.0, 11.5);
         $pdf->SetFillColor(255, 252, 255);
-        $pdf->Rect($dateX, $dateY, $dateWidth, $dateHeight, 'F');
-        $this->writeFitted($pdf, $dateX, $dateY, $dateWidth, $dateHeight, $dateLine, 'Times', '', 11, 'C', 'M', 8);
+        $pdf->Rect($date['x'], $date['y'], $date['w'], $date['h'], 'F');
+        $this->writeFitted($pdf, $date['x'], $date['y'], $date['w'], $date['h'], $dateLine, 'Times', '', 11 * $scale, 'C', 'M', 8 * $scale);
 
+        $number = $this->cotcBox($originX, $originY, $scale, LandscapeLetterPdf::WIDTH_MM - 70, LandscapeLetterPdf::HEIGHT_MM - 10.5, 62, 5);
         $pdf->SetFillColor(255, 252, 255);
-        $pdf->Rect($pageWidth - 70, $pageHeight - 10.5, 62, 5, 'F');
+        $pdf->Rect($number['x'], $number['y'], $number['w'], $number['h'], 'F');
         $pdf->SetTextColor(71, 85, 105);
         $this->writeFitted(
             $pdf,
-            $pageWidth - 70,
-            $pageHeight - 10.5,
-            62,
-            5,
+            $number['x'],
+            $number['y'],
+            $number['w'],
+            $number['h'],
             $documentLine,
             'Helvetica',
             '',
-            5.5,
+            5.5 * $scale,
             'R',
             'M',
-            5,
+            5 * $scale,
         );
         $pdf->SetTextColor(0, 0, 0);
 
@@ -398,6 +398,19 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         }
 
         return implode("\n", $lines)."\n\n1.00-3.00 Competent\n4.00-5.00 Not Yet Competent";
+    }
+
+    /**
+     * @return array{x: float, y: float, w: float, h: float}
+     */
+    private function cotcBox(float $originX, float $originY, float $scale, float $x, float $y, float $width, float $height): array
+    {
+        return [
+            'x' => $originX + ($x * $scale),
+            'y' => $originY + ($y * $scale),
+            'w' => $width * $scale,
+            'h' => $height * $scale,
+        ];
     }
 
     private function writeFitted(

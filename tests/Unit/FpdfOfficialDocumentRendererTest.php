@@ -25,17 +25,11 @@ class FpdfOfficialDocumentRendererTest extends TestCase
         $this->assertInstanceOf(FpdfOfficialDocumentRenderer::class, app(OfficialDocumentRenderer::class));
     }
 
-    public function test_auto_engine_uses_fpdf_when_browsershot_binaries_are_missing(): void
+    public function test_auto_engine_uses_fpdf(): void
     {
-        config([
-            'official_documents.pdf_engine' => 'auto',
-            'official_documents.browsershot.node_binary' => __DIR__.'/missing-node.exe',
-            'official_documents.browsershot.npm_binary' => __DIR__.'/missing-npm.cmd',
-            'official_documents.browsershot.chrome_path' => __DIR__.'/missing-chrome.exe',
-        ]);
+        config(['official_documents.pdf_engine' => 'auto']);
         $this->app->forgetInstance(OfficialDocumentRenderer::class);
 
-        $this->assertFalse(BrowsershotOfficialDocumentRenderer::environmentIsReady());
         $this->assertInstanceOf(FpdfOfficialDocumentRenderer::class, app(OfficialDocumentRenderer::class));
     }
 

@@ -403,6 +403,56 @@ class TrainingRecordsTest extends TestCase
         $this->assertDatabaseCount('official_documents', 1);
     }
 
+    public function test_admin_preview_rewrites_a_clipped_portrait_cotc(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']));
+        $portrait = new \FPDF('P', 'mm', 'Letter');
+        $portrait->AddPage();
+        $broken = $portrait->Output('S');
+        $this->assertSame(1, preg_match('/\/MediaBox\s*\[\s*0(?:\.00)?\s+0(?:\.00)?\s+([\d.]+)\s+([\d.]+)\s*\]/', $broken, $matches));
+        $this->assertLessThan((float) $matches[2], (float) $matches[1]);
+
+        $path = 'official-documents/cotc/'.$application->training_batch_id.'/mcare-cotc-2026-00003-v1.pdf';
+        Storage::disk('local')->put($path, $broken);
+        $document = OfficialDocument::create([
+            'enrollment_application_id' => $application->id,
+            'training_batch_id' => $application->training_batch_id,
+            'type' => OfficialDocument::TYPE_COTC,
+            'version' => 1,
+            'document_number' => 'MCARE-COTC-2026-00003-V1',
+            'status' => OfficialDocument::STATUS_RELEASED,
+            'storage_disk' => 'local',
+            'file_path' => $path,
+            'generated_by_id' => $admin->id,
+            'released_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.learning.documents.preview', $document))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+
+        $rewritten = $response->streamedContent();
+        $this->assertSame(1, preg_match('/\/MediaBox\s*\[\s*0(?:\.00)?\s+0(?:\.00)?\s+([\d.]+)\s+([\d.]+)\s*\]/', $rewritten, $rewrittenMatches));
+        $this->assertGreaterThan((float) $rewrittenMatches[2], (float) $rewrittenMatches[1]);
+        $this->assertEqualsWithDelta(792.0, (float) $rewrittenMatches[1], 1.0);
+        $this->assertEqualsWithDelta(612.0, (float) $rewrittenMatches[2], 1.0);
+        $this->assertSame(OfficialDocument::STATUS_RELEASED, $document->refresh()->status);
+        $foundName = str_contains($rewritten, 'RECORD TRAINEE');
+        if (! $foundName && preg_match_all('/stream\r?\n(.+?)\r?\nendstream/s', $rewritten, $streams)) {
+            foreach ($streams[1] as $stream) {
+                $decoded = @gzuncompress($stream);
+                if (is_string($decoded) && str_contains($decoded, 'RECORD TRAINEE')) {
+                    $foundName = true;
+                    break;
+                }
+            }
+        }
+        $this->assertTrue($foundName);
+    }
+
     public function test_trainer_can_open_batch_progress_and_achievement_charts(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);
