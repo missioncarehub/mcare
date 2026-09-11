@@ -105,7 +105,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->get(route('trainee.modules.index'))
             ->assertOk()
             ->assertSee('Catch-up')
-            ->assertSee('Missed — opens after');
+            ->assertSee('Locked — CORE-002');
     }
 
     public function test_late_enrollee_can_take_missed_module_after_finishing_current_path(): void
@@ -200,8 +200,8 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->assertOk()
             ->assertSee('Earlier Code Published Second')
             ->assertSee('Later Code Published First')
-            ->assertSee('Locked until NCII-101 has a trainer grade')
-            ->assertSee('Open Module')
+            ->assertSee('Locked — NCII-101')
+            ->assertSee('Open')
             ->assertSee('Locked')
             ->assertSee('aria-valuenow="0"', false)
             ->assertDontSee('width: 10%', false);
@@ -267,7 +267,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $firstModule))
             ->assertOk()
-            ->assertSee('face-to-face')
+            ->assertSee('Awaiting trainer evaluation.')
             ->assertDontSee('Mark Submodule as Done');
 
         $this->actingAs($trainer)
@@ -330,7 +330,7 @@ class RollingEnrollmentModuleReleaseTest extends TestCase
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
             ->assertDontSee('Mark Submodule as Done')
-            ->assertSee('Your trainer records this grade after the face-to-face session.');
+            ->assertSee('Awaiting trainer evaluation.');
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.submodules.progress', [$module, $submodule]), ['action' => 'submit'])

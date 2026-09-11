@@ -183,6 +183,20 @@
             transition-delay: 0ms;
         }
 
+    html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header .dashboard-brand {
+        justify-content: center;
+        flex: 0 0 auto;
+    }
+
         html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar .dashboard-brand-title,
         html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar .dashboard-brand-subtitle,
         html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar .dashboard-menu-label,
@@ -261,8 +275,40 @@
     }
 
     .universal-dashboard .dashboard-nav-link {
-        @apply flex min-h-11 h-11 w-full max-w-full items-center justify-start gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 overflow-x-hidden hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
+        @apply relative flex min-h-11 h-11 w-full max-w-full items-center justify-start gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 outline-none transition duration-150 overflow-x-hidden hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-1;
         box-sizing: border-box;
+    }
+
+    .universal-dashboard .dashboard-nav-badge {
+        margin-left: auto;
+        display: inline-flex;
+        min-width: 1.15rem;
+        height: 1.15rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0.3rem;
+        border-radius: 999px;
+        background: #6d28d9;
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 800;
+        font-style: normal;
+        line-height: 1;
+    }
+
+    .universal-dashboard .dashboard-nav-badge.is-mobile {
+        position: absolute;
+        top: 0.2rem;
+        right: 0.45rem;
+        margin-left: 0;
+        min-width: 0.95rem;
+        height: 0.95rem;
+        padding: 0 0.22rem;
+        font-size: 0.58rem;
+    }
+
+    .universal-dashboard .dashboard-mobile-link {
+        position: relative;
     }
 
     .universal-dashboard .dashboard-nav-link span {
@@ -313,8 +359,12 @@
         backdrop-filter: none;
     }
 
+    .universal-dashboard .dashboard-sidebar-header {
+        @apply flex min-h-11 items-center justify-between gap-2 border-b border-slate-100 pb-3;
+    }
+
     .universal-dashboard .dashboard-sidebar-collapse {
-        @apply hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
+        @apply hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-purple-500 lg:inline-flex;
     }
 
     .universal-dashboard .dashboard-sidebar-collapse-collapsed {
@@ -1330,6 +1380,17 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-topbar {
     color: #f1f5f9 !important;
 }
 
+html.is-admin-sidebar-collapsed .universal-dashboard .dashboard-nav-badge {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.35rem;
+    margin-left: 0;
+    min-width: 0.9rem;
+    height: 0.9rem;
+    padding: 0 0.2rem;
+    font-size: 0.55rem;
+}
+
 html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-sidebar-collapse {
     background-color: #111827 !important;
     border-color: #334155 !important;
@@ -1420,6 +1481,23 @@ html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-p
     background-color: #2e1065 !important;
     border-color: #581c87 !important;
     color: #e9d5ff !important;
+}
+
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-purple-100 {
+    background-color: #2e1065 !important;
+    border-color: #581c87 !important;
+    color: #e9d5ff !important;
+}
+
+html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-amber-100 {
+    background-color: #451a03 !important;
+    border-color: #78350f !important;
+    color: #fde68a !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .text-indigo-700,
+html[data-dashboard-theme="dark"] .universal-dashboard .text-amber-700 {
+    color: #c4b5fd !important;
 }
 
 html[data-dashboard-theme="dark"] :is(.universal-dashboard, .account-page) .bg-amber-50 {
@@ -3635,6 +3713,10 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 }
 
 .universal-dashboard .lms-topic-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
     padding: 18px 20px;
     border-bottom: 1px solid var(--lms-border);
 }
@@ -3649,6 +3731,11 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
 .universal-dashboard .lms-topic-heading span {
     color: var(--lms-muted);
     font-size: 0.75rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    min-width: max-content;
 }
 
 .universal-dashboard .lms-trainee-classwork-list {
@@ -3694,6 +3781,13 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
     color: var(--lms-text);
     font-size: 0.95rem;
     font-weight: 900;
+}
+
+.universal-dashboard .lms-classwork-topic {
+    margin: 4px 0 0;
+    color: var(--lms-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
 .universal-dashboard .lms-classwork-main > p {
@@ -4048,6 +4142,35 @@ html[data-dashboard-theme="dark"] .universal-dashboard .dashboard-context-link.i
     line-height: 0;
 }
 
+.universal-dashboard .lms-module-pdf-stage [data-pdf-page-wrapper].is-native-fallback {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: auto !important;
+}
+
+.universal-dashboard .lms-module-pdf-fallback {
+    display: block;
+    width: 100%;
+    min-width: 320px;
+    height: 75vh;
+    border: 0;
+    background: #fff;
+}
+
+.universal-dashboard .lms-module-pdf-stage [data-pdf-page-wrapper] .pdf-page-watermark,
+.universal-dashboard [data-pdf-page-wrapper] .pdf-page-watermark {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 72%;
+    height: 72%;
+    margin: auto;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.42;
+}
+
 canvas[data-pdf-canvas] {
     display: block;
     flex-shrink: 0;
@@ -4157,6 +4280,14 @@ canvas[data-pdf-canvas] {
 .universal-dashboard .lms-module-outcome {
     align-items: stretch;
     flex-direction: column;
+}
+
+.universal-dashboard .lms-module-outcome h3 {
+    color: #0f172a;
+}
+
+.universal-dashboard .lms-module-outcome .lms-eyebrow {
+    color: #5b21b6;
 }
 
 .universal-dashboard .lms-module-outcome.is-complete {
@@ -4865,6 +4996,104 @@ html[data-dashboard-theme="dark"] .universal-dashboard .lms-status-chip.is-red {
     color: #fca5a5;
 }
 
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-file-list li,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-quiz-list li {
+    background: var(--lms-surface) !important;
+    border-color: var(--lms-border);
+    color: var(--lms-text);
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome.is-complete {
+    background: #12352f !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome.is-complete h3,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome.is-complete .lms-eyebrow {
+    color: #ecfdf5 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome.is-remediation {
+    background: #332616 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome.is-locked,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-trainee-classwork-card.is-locked {
+    background: #1d293d !important;
+    opacity: 1;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome h3,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome .lms-eyebrow,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-classwork-title-line h3,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-classwork-title-line h3 a {
+    color: #f8fafc !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-outcome-copy,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-classwork-topic {
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-notice {
+    background: #332616 !important;
+    color: #fde68a !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-review {
+    background: #2a2143 !important;
+    color: #ddd6fe !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-success {
+    background: #12352f !important;
+    color: #6ee7b7 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-danger {
+    background: #3a2027 !important;
+    color: #fca5a5 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-lesson-document-toolbar {
+    background: var(--lms-surface-soft) !important;
+    color: var(--lms-text);
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-lesson-document-toolbar .lms-eyebrow {
+    color: #e9d5ff !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-notice strong,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-review strong,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-success strong,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-banner.is-danger strong {
+    color: inherit !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-lesson-document-copy,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-byline,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-compact-progress span {
+    color: #cbd5e1 !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-compact-progress strong {
+    color: #e9d5ff !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-back,
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-lesson-document-toggle {
+    background: var(--lms-surface) !important;
+    border-color: var(--lms-border);
+    color: var(--lms-text) !important;
+}
+
+html[data-dashboard-theme="dark"] .universal-dashboard .lms-module-stat-row > div {
+    background: var(--lms-surface) !important;
+    border-color: var(--lms-border);
+    color: var(--lms-text);
+}
+
 @media (max-width: 1180px) {
     .universal-dashboard .lms-module-grid,
     .universal-dashboard .lms-quiz-grid,
@@ -5092,7 +5321,7 @@ html[data-dashboard-theme="dark"] .universal-dashboard .lms-status-chip.is-red {
         grid-template-columns: auto minmax(0, 1fr);
     }
 
-    .universal-dashboard .lms-trainee-classwork-card > .secondary-action {
+    .universal-dashboard .lms-trainee-classwork-card > :is(.secondary-action, .primary-action) {
         grid-column: 1 / -1;
         width: 100%;
     }

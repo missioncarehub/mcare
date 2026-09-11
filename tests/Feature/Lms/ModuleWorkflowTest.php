@@ -54,8 +54,8 @@ class ModuleWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('trainee.modules.show', $assessed))
             ->assertOk()
-            ->assertSee('Required Submodules')
-            ->assertSee('face-to-face')
+            ->assertSee('Submodules')
+            ->assertSee('Trainer records Competent or Not yet competent.')
             ->assertDontSee('Mark Submodule as Done')
             ->assertDontSee('data-module-progress-form', false);
     }
@@ -81,7 +81,7 @@ class ModuleWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Your trainer records this grade after the face-to-face session.')
+            ->assertSee('Awaiting trainer evaluation.')
             ->assertSee('data-pdf-canvas-viewer', false)
             ->assertDontSee('Mark Submodule as Done');
 
@@ -97,13 +97,12 @@ class ModuleWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Competency unit evaluated and completed.')
+            ->assertSee('Completed.')
             ->assertSee('Show lesson document')
             ->assertSee('data-pdf-canvas-viewer', false)
             ->assertSee('data-lesson-document-toggle', false)
-            ->assertSee('Quiz & Activity Average (This Module)', false)
+            ->assertSee('Quiz average')
             ->assertSee('88.0%')
-            ->assertSee('Separate from the official overall course grade.')
             ->assertDontSee('The lesson document and downloads are closed');
 
         $this->actingAs($user)
@@ -222,8 +221,9 @@ class ModuleWorkflowTest extends TestCase
         $this->actingAs($completedUser)
             ->get(route('trainee.modules.index'))
             ->assertOk()
-            ->assertSee('✓ Completed — Basic Caregiving')
-            ->assertSee('View Completion');
+            ->assertSee('Completed')
+            ->assertSee('Basic Caregiving')
+            ->assertSee('Review');
 
         $this->actingAs($completedUser)
             ->get(route('trainee.quizzes.show', $newQuiz))

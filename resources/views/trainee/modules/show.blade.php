@@ -26,7 +26,7 @@
     <article class="lms-module-workspace">
         <header class="lms-module-workspace-header">
             <div class="lms-module-workspace-meta">
-                <p class="lms-eyebrow">Protected learning viewer</p>
+                <p class="lms-eyebrow">Lesson</p>
                 @if($module->module_code)
                     <span class="lms-status-chip is-purple font-mono">{{ $module->module_code }}</span>
                 @endif
@@ -43,7 +43,7 @@
                 <div>
                     <h1>{{ $module->title }}</h1>
                     @if($module->topic)
-                        <p class="lms-module-topic">Learning Outcome / Topic: {{ $module->topic }}</p>
+                        <p class="lms-module-topic">{{ $module->topic }}</p>
                     @endif
                     <p class="lms-module-byline">
                         <x-user-avatar :user="$module->trainer" :name="$module->trainer?->name ?? 'MCARE Trainer'" class="lms-module-trainer-avatar" />
@@ -54,10 +54,10 @@
                     </p>
                 </div>
                 @if(!$module->requiresEvaluation())
-                    <p class="lms-module-guide">Learning material only — no Mark as Done required</p>
+                    <p class="lms-module-guide">Learning material only</p>
                 @else
                     <a href="#submodules" class="lms-module-guide is-link">
-                        {{ $progress->isTrainerValidated() ? 'All required submodules completed' : ($progress->needsRemediation() ? 'Remediate Not yet competent outcomes below ↓' : 'Face-to-face outcomes are listed below ↓') }}
+                        {{ $progress->isTrainerValidated() ? 'Outcomes completed' : ($progress->needsRemediation() ? 'Remediate outcomes below' : 'Outcomes below') }}
                     </a>
                 @endif
             </div>
@@ -75,25 +75,24 @@
 
         @if($progress->isTrainerValidated())
             <div class="lms-module-banner is-success">
-                <strong>Competency unit evaluated and completed.</strong>
+                <strong>Completed.</strong>
                 Validated by {{ $progress->evaluator?->name ?? 'MCARE Trainer' }}
-                on {{ $progress->evaluated_at?->format('M d, Y g:i A') ?? $progress->completed_at?->format('M d, Y') ?? 'recorded date' }}.
-                The protected lesson document stays available below. Use Show or Hide to review it.
+                on {{ $progress->evaluated_at?->format('M d, Y') ?? $progress->completed_at?->format('M d, Y') ?? 'recorded date' }}.
             </div>
         @elseif($progress->status === \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION)
             <div class="lms-module-banner is-review">
-                <strong>Submitted for Trainer Evaluation.</strong>
-                All required submodules are submitted. The main module result is calculated automatically while the trainer reviews each competency outcome.
+                <strong>Submitted.</strong>
+                Your trainer is reviewing the outcomes.
             </div>
         @elseif($progress->needsRemediation())
             <div class="lms-module-banner is-danger" role="status">
                 <strong>Not yet competent.</strong>
-                Remediate the marked submodule(s) below. The next classwork module stays locked until this unit is Competent.
+                Remediate the marked outcomes to unlock the next module.
             </div>
         @else
             <div class="lms-module-banner is-notice">
-                <strong>Protected Content.</strong>
-                This learning material is watermarked for {{ $traineeName }} ({{ $application->email }}). Unauthorized copying or redistribution is strictly monitored.
+                <strong>Protected content.</strong>
+                Watermarked for {{ $traineeName }}.
             </div>
         @endif
 
@@ -102,7 +101,7 @@
             <div class="lms-lesson-document-toolbar">
                 <div>
                     <p class="lms-eyebrow">Protected content</p>
-                    <p class="lms-lesson-document-copy">Watermarked lesson document for {{ $traineeName }}</p>
+                    <p class="lms-lesson-document-copy">Watermarked for {{ $traineeName }}</p>
                 </div>
                 <button type="button" class="lms-lesson-document-toggle" data-lesson-document-toggle aria-controls="lesson-document-panel" aria-expanded="{{ $lessonDocumentOpen ? 'true' : 'false' }}">
                     <x-dashboard-icon name="book-open" class="h-4 w-4" />
@@ -191,9 +190,9 @@
             <section id="submodules" class="lms-module-section">
                 <div class="lms-module-section-heading">
                     <div>
-                        <p class="lms-eyebrow">Competency outcomes</p>
-                        <h2>Required Submodules</h2>
-                        <p>These outcomes are demonstrated in face-to-face class. Your trainer records Competent or Not yet competent. A Not yet competent outcome must be remediated before later outcomes or the next classwork module can open.</p>
+                        <p class="lms-eyebrow">Outcomes</p>
+                        <h2>Submodules</h2>
+                        <p>Trainer records Competent or Not yet competent.</p>
                     </div>
                     <span class="lms-status-chip is-purple">
                         {{ $submoduleProgressById->filter(fn ($item) => $item->isTrainerValidated())->count() }} / {{ $submodules->where('is_required', true)->count() }} competent
@@ -225,22 +224,25 @@
                                 </span>
                             </div>
 
-                            <p class="lms-module-outcome-copy">
-                                @if($childLocked)
-                                    Locked until {{ $childBlocker?->title ?? 'the previous submodule' }} is Competent. You can still take this outcome's quiz.
-                                @elseif($childNyc)
-                                    Not yet competent. Your trainer will reassess this outcome in a face-to-face session.
-                                @elseif($childCompleted)
-                                    Trainer validated this outcome as Competent.
-                                @elseif($childHasClasswork)
-                                    Optional classwork: {{ $childSummary['passed_count'] ?? 0 }} / {{ $childSummary['required_count'] ?? 0 }} passed
-                                    @if(($childSummary['average_score'] ?? null) !== null)
-                                        · Best average {{ number_format((float) $childSummary['average_score'], 1) }}%
+                            @if($childLocked)
+                                <p class="lms-module-outcome-copy">
+                                    Locked until {{ $childBlocker?->title ?? 'the previous outcome' }} is Competent.
+                                </p>
+                            @elseif($childNyc)
+                                <p class="lms-module-outcome-copy">
+                                    Not yet competent. Needs class reassessment.
+                                </p>
+                            @elseif(! $childCompleted)
+                                <p class="lms-module-outcome-copy">
+                                    Awaiting trainer evaluation.
+                                    @if($childHasClasswork)
+                                        Optional classwork: {{ $childSummary['passed_count'] ?? 0 }}/{{ $childSummary['required_count'] ?? 0 }} passed
+                                        @if(($childSummary['average_score'] ?? null) !== null)
+                                            · {{ number_format((float) $childSummary['average_score'], 1) }}%
+                                        @endif
                                     @endif
-                                @else
-                                    Await your trainer's face-to-face evaluation. There is no Mark as Done on this outcome.
-                                @endif
-                            </p>
+                                </p>
+                            @endif
 
                             @if($childQuizzes->isNotEmpty())
                                 <div class="lms-module-inline-actions">
@@ -253,18 +255,6 @@
                             @if($childProgress?->evaluation_remarks)
                                 <p class="lms-module-outcome-copy"><strong>Trainer feedback:</strong> {{ $childProgress->evaluation_remarks }}</p>
                             @endif
-
-                            <div class="lms-module-outcome-actions">
-                                @if($childLocked)
-                                    <span>Finish remediation on the Not yet competent outcome first.</span>
-                                @elseif($childCompleted)
-                                    <span>Trainer validated as Competent</span>
-                                @elseif($childNyc)
-                                    <span>Await face-to-face reassessment from your trainer.</span>
-                                @else
-                                    <span>Your trainer records this grade after the face-to-face session.</span>
-                                @endif
-                            </div>
                         </article>
                     @empty
                         <p class="lms-module-banner is-notice">No competency outcomes are attached to this module yet.</p>
@@ -274,20 +264,19 @@
         @endif
 
         <section id="assessments" class="lms-module-section">
-            <h2>Module Assessments & Performance Outcome</h2>
+            <h2>Assessments</h2>
 
             <div class="lms-module-stat-row">
                 <div>
-                    <span>Quiz & Activity Average (This Module)</span>
-                    <strong>{{ $assessmentAverage !== null ? number_format((float) $assessmentAverage, 1).'%' : 'No submitted score yet' }}</strong>
-                    <small>Separate from the official overall course grade.</small>
+                    <span>Quiz average</span>
+                    <strong>{{ $assessmentAverage !== null ? number_format((float) $assessmentAverage, 1).'%' : 'No score yet' }}</strong>
                 </div>
                 <div>
-                    <span>Practical Demonstration Rating</span>
-                    <strong>{{ $progress?->practicalRatingLabel() ?? 'Pending F2F Demo' }}</strong>
+                    <span>Practical demo</span>
+                    <strong>{{ $progress?->practicalRatingLabel() ?? 'Pending demo' }}</strong>
                 </div>
                 <div>
-                    <span>Module Competency Outcome</span>
+                    <span>Competency outcome</span>
                     <strong>{{ $isCompetent ? 'Competent (Passed)' : ($progress?->competency_outcome === 'not_yet_competent' ? 'For Remediation' : 'In Progress') }}</strong>
                 </div>
             </div>
@@ -299,7 +288,7 @@
             @endif
 
             @if($quizzes->isNotEmpty())
-                <h3 class="lms-module-subheading">Online Assessments ({{ $quizzes->count() }})</h3>
+                <h3 class="lms-module-subheading">Online assessments ({{ $quizzes->count() }})</h3>
                 <ul class="lms-module-quiz-list">
                     @foreach($quizzes as $quiz)
                         @php
@@ -310,7 +299,7 @@
                         <li>
                             <div>
                                 <strong>{{ $quiz->title }}</strong>
-                                <span>{{ $quiz->questions->count() }} Questions · Passing Score: {{ number_format($quiz->passing_score_percent, 0) }}% · Time Limit: {{ $quiz->time_limit_minutes ? $quiz->time_limit_minutes.' mins' : 'Unlimited' }}</span>
+                                <span>{{ $quiz->questions->count() }} questions · {{ number_format($quiz->passing_score_percent, 0) }}% to pass{{ $quiz->time_limit_minutes ? ' · '.$quiz->time_limit_minutes.' min' : '' }}</span>
                                 @if($bestAttempt)
                                     <span class="{{ $hasPassed ? 'is-pass' : 'is-retry' }}">Best Score: {{ number_format($bestAttempt->score_percent, 1) }}% ({{ $hasPassed ? 'Passed' : 'Needs Retake' }})</span>
                                 @endif

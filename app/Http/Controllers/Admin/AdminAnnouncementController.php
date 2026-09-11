@@ -79,12 +79,14 @@ class AdminAnnouncementController extends Controller
         $recipients = match ($announcement->target_type) {
             AdminAnnouncement::TARGET_USER => User::query()->whereKey($announcement->target_user_id)->get(),
             AdminAnnouncement::TARGET_BATCH => User::query()
+                ->where('role', 'trainee')
                 ->whereHas('enrollmentApplication', fn ($q) => $q
                     ->where('status', EnrollmentApplication::STATUS_APPROVED)
                     ->where('training_batch_id', $announcement->training_batch_id))
                 ->distinct()
                 ->get(),
             default => User::query()
+                ->where('role', 'trainee')
                 ->whereHas('enrollmentApplication', fn ($q) => $q->where('status', EnrollmentApplication::STATUS_APPROVED))
                 ->distinct()
                 ->get(),

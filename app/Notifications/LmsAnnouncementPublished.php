@@ -3,24 +3,14 @@
 namespace App\Notifications;
 
 use App\Models\TrainerAnnouncement;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class LmsAnnouncementPublished extends Notification implements ShouldQueue
+class LmsAnnouncementPublished extends Notification
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    public int $timeout = 60;
-
     public function __construct(
         public TrainerAnnouncement $announcement,
-    ) {
-        $this->onQueue('mail');
-    }
+    ) {}
 
     /** @return list<string> */
     public function via(object $notifiable): array

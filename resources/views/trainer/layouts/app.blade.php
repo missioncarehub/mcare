@@ -56,7 +56,7 @@
     @endphp
 
     <aside id="trainer-dashboard-sidebar" class="dashboard-sidebar" data-dashboard-sidebar>
-        <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
+        <div class="dashboard-sidebar-header">
             <div class="dashboard-brand flex-1 min-w-0">
                 <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0">
@@ -64,6 +64,7 @@
                     <span class="dashboard-brand-subtitle">Trainer Portal</span>
                 </span>
             </div>
+            <x-dashboard-sidebar-collapse sidebar-id="trainer-dashboard-sidebar" />
         </div>
 
         <nav class="dashboard-nav" aria-label="Trainer navigation">
@@ -120,22 +121,6 @@
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="dashboard-topbar-start flex min-w-0 items-center gap-3">
-                    <button
-                        type="button"
-                        class="dashboard-sidebar-collapse"
-                        data-dashboard-sidebar-collapse
-                        aria-controls="trainer-dashboard-sidebar"
-                        aria-expanded="true"
-                        aria-label="Collapse sidebar"
-                        title="Collapse sidebar"
-                    >
-                        <span class="dashboard-sidebar-collapse-expanded">
-                            <x-dashboard-icon name="chevron-left" />
-                        </span>
-                        <span class="dashboard-sidebar-collapse-collapsed">
-                            <x-dashboard-icon name="chevron-right" />
-                        </span>
-                    </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training and Assessment Center</p>
                         <h1 class="dashboard-header-title">

@@ -546,6 +546,27 @@ body.auth-page .auth-google-button:hover {
     margin-top: 0.25rem;
 }
 
+html:has(body.application-status-page) {
+    min-height: 100dvh;
+}
+
+body.application-status-page {
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+}
+
+body.application-status-page .enrollment-main {
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+body.application-status-page .auth-footer {
+    margin-top: auto;
+    flex-shrink: 0;
+    width: 100%;
+}
+
 :is(body.auth-page, body.enrollment-page) .landing-colophon-note {
     margin-top: 0.35rem;
     font-size: 0.75rem;
@@ -1377,22 +1398,6 @@ body.enrollment-page :is(
     body.application-page .application-number-link-after-card .secondary-action {
         display: flex;
         width: 100%;
-    }
-
-    body.application-status-page {
-        display: flex;
-        min-height: 100dvh;
-        flex-direction: column;
-    }
-
-    body.application-status-page .enrollment-main {
-        flex: 1 1 auto;
-        padding-bottom: 5rem;
-    }
-
-    body.application-status-page .auth-footer {
-        margin-top: auto;
-        flex-shrink: 0;
     }
 }
 

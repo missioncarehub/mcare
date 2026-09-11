@@ -152,6 +152,10 @@ class LmsResponsiveRenderingTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('trainer.modules.show', $module))
             ->assertOk()
+            ->assertSee('lms-module-back', false)
+            ->assertSee('Back to Classwork')
+            ->assertDontSee('Classwork and trainer evaluation required')
+            ->assertDontSee('Learning Materials & Files')
             ->assertSee('data-module-file-preview', false)
             ->assertSee('data-pdf-fit-mode="page"', false);
 
@@ -188,8 +192,13 @@ class LmsResponsiveRenderingTest extends TestCase
         );
         $this->assertStringContainsString('syncHorizontalPan', $script);
         $this->assertStringContainsString('containerWrapper.scrollLeft', $script);
+        $this->assertStringContainsString('/vendor/pdfjs/pdf.worker.min.js', $script);
+        $this->assertStringContainsString('watermarkHtml', $script);
+        $this->assertStringNotContainsString('pdf.worker.min.mjs?url', $script);
+        $this->assertFileExists(public_path('vendor/pdfjs/pdf.worker.min.js'));
         $this->assertStringContainsString('data-pdf-scroll-sizer', $traineeShow);
-        $this->assertStringContainsString('data-pdf-scroll-sizer', $preview);
+        $this->assertStringContainsString('pdf-page-watermark', $traineeShow);
+        $this->assertStringContainsString('pdf-page-watermark', $preview);
         $this->assertStringNotContainsString('items-start justify-center overflow-auto', $preview);
     }
 }

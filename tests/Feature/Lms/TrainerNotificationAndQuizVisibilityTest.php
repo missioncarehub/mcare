@@ -9,6 +9,7 @@ use App\Notifications\LmsModulePublished;
 use App\Notifications\LmsQuizPublished;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesLmsTestData;
@@ -19,7 +20,7 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
     use CreatesLmsTestData;
     use RefreshDatabase;
 
-    public function test_trainer_announcement_dispatches_queued_mail_notification(): void
+    public function test_trainer_announcement_notifies_trainees(): void
     {
         Notification::fake();
 
@@ -37,9 +38,33 @@ class TrainerNotificationAndQuizVisibilityTest extends TestCase
         ])->assertRedirect(route('trainer.stream'));
 
         Notification::assertSentTo($student, LmsAnnouncementPublished::class, function ($notification) use ($student) {
-            return $notification->via($student) === ['database', 'mail']
-                && $notification->queue === 'mail';
+            return $notification->via($student) === ['database', 'mail'];
         });
+    }
+
+    public function test_trainer_announcement_writes_inbox_notification_immediately(): void
+    {
+        Mail::fake();
+
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $student] = $this->lmsTrainee($batch);
+
+        $this->actingAs($trainer)->post(route('trainer.announcements.store'), [
+            'training_batch_id' => $batch->id,
+            'kind' => 'announcement',
+            'audience' => 'trainees',
+            'title' => 'Bring your workbook',
+            'message' => 'Please bring the caregiving workbook tomorrow.',
+            'is_published' => '1',
+        ])->assertRedirect(route('trainer.stream'));
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $student->id,
+            'notifiable_type' => $student->getMorphClass(),
+            'type' => LmsAnnouncementPublished::class,
+        ]);
+        $this->assertSame(1, $student->unreadNotifications()->count());
     }
 
     public function test_trainer_module_dispatches_queued_mail_notification(): void

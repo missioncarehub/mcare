@@ -149,10 +149,15 @@ class CareerOpportunity extends Model
     public function graduateSmsMessage(): string
     {
         $parts = [
-            'MCARE Career Hub: '.$this->listingTitle(),
-            'Salary '.($this->estimated_salary ?: 'see Career Hub'),
-            'Start '.($this->estimated_start_date?->format('M d, Y') ?? 'TBA'),
+            'Dear Alumni, we have a job offer for you: '.$this->listingTitle(),
+            'Salary: '.($this->estimated_salary ?: 'see Career Hub'),
+            'Start: '.($this->estimated_start_date?->format('M d, Y') ?? 'TBA'),
         ];
+
+        $employer = trim((string) $this->employer);
+        if ($employer !== '' && $employer !== 'MCARE-Coordinated Placement') {
+            $parts[] = 'Employer: '.$employer;
+        }
 
         $care = array_values(array_filter([
             filled($this->patient_gender) ? $this->patientGenderLabel() : null,
@@ -161,10 +166,10 @@ class CareerOpportunity extends Model
         ]));
 
         if ($care !== []) {
-            $parts[] = implode(', ', $care);
+            $parts[] = 'Patient: '.implode(', ', $care);
         }
 
-        $parts[] = 'Open Career Hub for details.';
+        $parts[] = 'Please open the MCARE Career Hub for details: https://mcarehub.com';
 
         return implode('. ', $parts);
     }

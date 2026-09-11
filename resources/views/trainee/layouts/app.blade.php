@@ -23,6 +23,12 @@
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
         $isGraduate = auth()->user()?->isGraduate() ?? false;
+        $unreadAnnouncementCount = auth()->user()?->unreadNotifications()
+            ->whereIn('type', [
+                \App\Notifications\AdminAnnouncementNotification::class,
+                \App\Notifications\LmsAnnouncementPublished::class,
+            ])
+            ->count() ?? 0;
         $traineeStreamHref = \Illuminate\Support\Facades\Route::has('trainee.stream')
             ? route('trainee.stream')
             : route('trainee.dashboard');
@@ -31,7 +37,7 @@
             ['label' => 'Grades', 'short' => 'Grades', 'icon' => 'fa-chart-column', 'href' => route('trainee.grades'), 'active' => request()->routeIs('trainee.grades')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ] : [
-            ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream')],
+            ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream'), 'badge' => $unreadAnnouncementCount],
             ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*', 'trainee.quizzes.*', 'trainee.quiz-attempts.*')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ];
@@ -59,7 +65,7 @@
     @endphp
 
     <aside id="trainee-dashboard-sidebar" class="dashboard-sidebar" data-dashboard-sidebar>
-        <div class="flex min-h-11 items-center border-b border-slate-100 pb-3">
+        <div class="dashboard-sidebar-header">
             <div class="dashboard-brand flex-1 min-w-0">
                 <img src="{{ asset('assets/images/logoicon.png') }}" alt="MCARE Hub" class="dashboard-brand-mark">
                 <span class="min-w-0">
@@ -67,6 +73,7 @@
                     <span class="dashboard-brand-subtitle">Trainee Portal</span>
                 </span>
             </div>
+            <x-dashboard-sidebar-collapse sidebar-id="trainee-dashboard-sidebar" />
         </div>
 
         <nav class="dashboard-nav" aria-label="Trainee navigation">
@@ -77,6 +84,9 @@
                         <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                             <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                             <span>{{ $item['label'] }}</span>
+                            @if(($item['badge'] ?? 0) > 0)
+                                <b class="dashboard-nav-badge">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}</b>
+                            @endif
                         </a>
                     @endforeach
                 </div>
@@ -88,6 +98,9 @@
                         <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="trainee-{{ str($item['label'])->slug() }}" class="{{ $navItem }} {{ $item['active'] ? 'is-active' : '' }}" @if($item['active']) aria-current="page" @endif>
                             <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                             <span>{{ $item['label'] }}</span>
+                            @if(($item['badge'] ?? 0) > 0)
+                                <b class="dashboard-nav-badge">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}</b>
+                            @endif
                         </a>
                     @endforeach
                 </div>
@@ -117,22 +130,6 @@
         <header class="dashboard-topbar">
             <div class="dashboard-topbar-inner">
                 <div class="flex min-w-0 items-center gap-3">
-                    <button
-                        type="button"
-                        class="dashboard-sidebar-collapse"
-                        data-dashboard-sidebar-collapse
-                        aria-controls="trainee-dashboard-sidebar"
-                        aria-expanded="true"
-                        aria-label="Collapse sidebar"
-                        title="Collapse sidebar"
-                    >
-                        <span class="dashboard-sidebar-collapse-expanded">
-                            <x-dashboard-icon name="chevron-left" />
-                        </span>
-                        <span class="dashboard-sidebar-collapse-collapsed">
-                            <x-dashboard-icon name="chevron-right" />
-                        </span>
-                    </button>
                     <div class="min-w-0">
                         <p class="dashboard-header-kicker">Mission Care Training and Assessment Center</p>
                         <h1 class="dashboard-header-title">

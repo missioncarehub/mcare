@@ -122,6 +122,7 @@ class TraineePortalTest extends TestCase
             ->assertSee('TESDA-Accredited Training and Assessment Center')
             ->assertSee('data-dashboard-sidebar-collapse', false)
             ->assertSee('id="trainee-dashboard-sidebar"', false)
+            ->assertSee('dashboard-sidebar-header', false)
             ->assertDontSee('dashboard-gradient', false)
             ->assertSee('href="'.route('trainee.payments').'"', false)
             ->assertDontSee('href="'.route('payment.show').'"', false);
@@ -134,7 +135,7 @@ class TraineePortalTest extends TestCase
         $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
 
         foreach ([
-            'trainee.modules.index' => 'Learning materials',
+            'trainee.modules.index' => 'Modules',
             'trainee.schedule' => 'Class calendar',
             'trainee.payments' => 'Payment summary',
             'trainee.documents' => 'Submitted registration files',
@@ -209,7 +210,7 @@ class TraineePortalTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Protected learning viewer')
+            ->assertSee('Protected content')
             ->assertSee('data-protected-module-viewer', false)
             ->assertSee('data-pdf-canvas-viewer', false)
             ->assertSee('data-pdf-canvas', false)

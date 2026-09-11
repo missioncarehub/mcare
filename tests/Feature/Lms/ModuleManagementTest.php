@@ -300,7 +300,7 @@ class ModuleManagementTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('Your trainer records this grade after the face-to-face session.')
+            ->assertSee('Awaiting trainer evaluation.')
             ->assertSee('Pending Evaluation')
             ->assertDontSee('Mark Submodule as Done');
 
@@ -400,7 +400,7 @@ class ModuleManagementTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('trainee.modules.index'))
             ->assertOk()
-            ->assertSee('Locked until HCS323301 is Competent')
+            ->assertSee('Locked — finish HCS323301')
             ->assertSee('Needs remediation');
 
         $this->actingAs($trainee)

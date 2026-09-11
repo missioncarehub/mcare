@@ -2,34 +2,13 @@ import './bootstrap';
 import { attachPhilippineAddressLookups } from './philippine-address-lookup';
 import { attachLandingChat } from './landing-chat';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Load the worker from Laravel's public/ folder, not the Vite dev server.
+// Vite injects `import "/@vite/client"` into transformed modules, which
+// crashes pdf.js workers and drops the canvas watermark overlay.
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js';
 
-let pdfWorkerReady = null;
-
-const configurePdfWorker = () => {
-    if (pdfWorkerReady) {
-        return pdfWorkerReady;
-    }
-
-    pdfWorkerReady = fetch(pdfWorker, { credentials: 'same-origin' })
-        .then((response) => {
-            if (!response.ok) {
-                return;
-            }
-
-            return response.text().then((source) => {
-                const blob = new Blob([source], { type: 'text/javascript' });
-                pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-            });
-        })
-        .catch(() => {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
-        });
-
-    return pdfWorkerReady;
-};
+const configurePdfWorker = () => Promise.resolve();
 
 const bufferLooksLikePdf = (data) => {
     const prefix = new TextDecoder('latin1').decode(data.slice(0, 1024));
@@ -447,13 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
             age ? `age ${age}` : '',
         ].filter(Boolean);
         const parts = [
-            `MCARE Career Hub: ${title}`,
-            `Salary ${salary}`,
-            `Start ${startField?.value ? formatCareerSmsDate(startField.value) : 'TBA'}`,
+            `Dear Alumni, we have a job offer for you: ${title}`,
+            `Salary: ${salary}`,
+            `Start: ${startField?.value ? formatCareerSmsDate(startField.value) : 'TBA'}`,
         ];
 
-        if (care.length) parts.push(care.join(', '));
-        parts.push('Open Career Hub for details.');
+        if (care.length) parts.push(`Patient: ${care.join(', ')}`);
+        parts.push('Please open the MCARE Career Hub for details: https://mcarehub.com');
 
         return parts.join('. ');
     };
@@ -777,17 +756,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const toolbar = container.querySelector('.lms-module-pdf-toolbar');
             if (toolbar) toolbar.style.display = 'none';
             if (loadingEl) loadingEl.style.display = 'none';
+            if (!pageWrapper) {
+                return;
+            }
 
-            if (pageWrapper) {
-                pageWrapper.innerHTML = `
-                    <iframe
-                        src="${url}#toolbar=0&navpanes=0"
-                        title="Lesson document"
-                        class="block h-[75vh] w-full min-w-[320px] border-0 bg-white"
-                        loading="lazy"
-                    ></iframe>
-                    ${note ? `<p class="mt-2 text-center text-xs text-slate-300">${note}</p>` : ''}
-                `;
+            const watermark = pageWrapper.querySelector('.pdf-page-watermark');
+            const watermarkHtml = watermark ? watermark.outerHTML : '';
+
+            pageWrapper.classList.add('is-native-fallback');
+            pageWrapper.style.width = '100%';
+            pageWrapper.style.height = 'auto';
+            pageWrapper.style.aspectRatio = 'auto';
+            pageWrapper.innerHTML = `
+                <iframe
+                    src="${url}#toolbar=0&navpanes=0"
+                    title="Lesson document"
+                    class="lms-module-pdf-fallback"
+                    loading="lazy"
+                ></iframe>
+                ${watermarkHtml}
+            `;
+
+            if (note) {
+                console.warn(note);
             }
         };
 

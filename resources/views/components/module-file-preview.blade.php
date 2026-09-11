@@ -41,6 +41,7 @@
                 <div data-pdf-scroll-sizer>
                     <div class="relative inline-block shadow-2xl" data-pdf-page-wrapper>
                         <canvas class="block bg-white shadow-md" data-pdf-canvas></canvas>
+                        <img class="pdf-page-watermark" src="{{ \App\Support\WatermarkedFpdi::publicImageUrl() }}" alt="" draggable="false">
                     </div>
                 </div>
                 <div class="absolute inset-0 flex items-center justify-center bg-slate-950/85 text-white" data-pdf-loading>

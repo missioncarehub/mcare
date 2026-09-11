@@ -16,93 +16,105 @@
 @endphp
 
 <div class="w-full space-y-6" data-trainer-module-hub>
-    <!-- Header -->
-    <header class="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
-                    <a href="{{ route('trainer.resources') }}" class="text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1">
-                        ← Back to Classwork
-                    </a>
-                    @if($module->module_code)
-                        <span class="rounded bg-purple-100 px-2.5 py-0.5 text-xs font-mono font-bold text-purple-900 ring-1 ring-purple-300">
-                            {{ $module->module_code }}
+    <div>
+        <a href="{{ route('trainer.resources') }}" class="lms-module-back">
+            <x-dashboard-icon name="chevron-left" class="h-4 w-4" />
+            Back to Classwork
+        </a>
+
+        <header class="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0 space-y-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if($module->module_code)
+                            <span class="rounded bg-purple-100 px-2.5 py-0.5 text-xs font-mono font-bold text-purple-900 ring-1 ring-purple-300">
+                                {{ $module->module_code }}
+                            </span>
+                        @endif
+                        <span class="rounded bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                            {{ match($module->competency_category) {
+                                'core' => 'Core',
+                                'common' => 'Common',
+                                'basic' => 'Basic',
+                                default => 'Material',
+                            } }}
                         </span>
-                    @endif
-                    <span class="rounded bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
-                        {{ $module->categoryLabel() }}
-                    </span>
-                    @if($module->estimated_hours)
-                        <span class="rounded bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
-                            ⏱ {{ $module->estimated_hours }} Hours
+                        @if($module->estimated_hours)
+                            <span class="rounded bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                                {{ $module->estimated_hours }} hrs
+                            </span>
+                        @endif
+                        <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->delivery_status === 'active' ? 'bg-emerald-100 text-emerald-800' : ($module->delivery_status === 'closed' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700') }}">
+                            {{ match($module->delivery_status) {
+                                'active' => 'Active',
+                                'available' => 'Custom',
+                                'closed' => 'Closed',
+                                default => 'Draft',
+                            } }}
                         </span>
+                        <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->requiresEvaluation() ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800' }}">
+                            {{ $module->requiresEvaluation() ? 'Assessed' : 'Material' }}
+                        </span>
+                    </div>
+
+                    <h1 class="text-2xl font-bold text-stone-950 sm:text-3xl">{{ $module->title }}</h1>
+
+                    @if($module->topic)
+                        <p class="text-sm font-semibold text-purple-800">{{ $module->topic }}</p>
                     @endif
-                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->delivery_status === 'active' ? 'bg-emerald-100 text-emerald-800' : ($module->delivery_status === 'closed' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700') }}">
-                        {{ $module->deliveryStatusLabel() }}
-                    </span>
-                    <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $module->requiresEvaluation() ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800' }}">
-                        {{ $module->completionModeLabel() }}
-                    </span>
+
+                    <p class="text-xs text-stone-500">
+                        <strong class="text-stone-800">{{ $isPrivate ? trim($module->targetTrainee?->first_name.' '.$module->targetTrainee?->last_name).' (Private)' : ($module->batch ? $module->batch->name.' '.$module->batch->year : 'Entire class') }}</strong>
+                        @if($module->available_at) · Opens {{ $module->available_at->format('M d, Y') }} @endif
+                        @if($module->due_at) · Due {{ $module->due_at->format('M d, Y') }} @endif
+                    </p>
                 </div>
 
-                <h1 class="text-2xl font-bold text-stone-950 sm:text-3xl">{{ $module->title }}</h1>
-
-                @if($module->topic)
-                    <p class="text-sm font-semibold text-purple-800">Learning Outcome / Topic: {{ $module->topic }}</p>
-                @endif
-
-                <p class="text-xs text-stone-500">
-                    Assigned to: <strong class="text-stone-800">{{ $isPrivate ? ($module->targetTrainee?->first_name.' '.$module->targetTrainee?->last_name.' (Private)') : ($module->batch ? $module->batch->name.' '.$module->batch->year : 'Entire Class') }}</strong>
-                    · Available: {{ $module->available_at?->format('M d, Y') ?? 'Immediately' }}
-                    @if($module->due_at) · Due: {{ $module->due_at->format('M d, Y g:i A') }} @endif
-                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if($module->delivery_status !== 'closed')
+                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->delivery_status === 'active' ? 'Close this module to future enrollees? Existing assigned trainees will keep access.' : 'Publish this as the current active module? The previous active module will close to new enrollees.' }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="module_code" value="{{ $module->module_code }}">
+                        <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                        <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
+                        <input type="hidden" name="title" value="{{ $module->title }}">
+                        <input type="hidden" name="description" value="{{ $module->description }}">
+                        <input type="hidden" name="topic" value="{{ $module->topic }}">
+                        <input type="hidden" name="estimated_hours" value="{{ $module->estimated_hours }}">
+                        <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
+                        <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
+                        <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
+                        <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
+                        <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
+                        <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
+                        <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
+                        <input type="hidden" name="_return_to_module" value="1">
+                        <button class="secondary-action text-xs">
+                            {{ $module->delivery_status === 'active' ? 'Close to new' : 'Publish' }}
+                        </button>
+                    </form>
+                    @else
+                        <span class="max-w-xs text-xs leading-5 text-amber-800">Closed. Assigned trainees keep access.</span>
+                    @endif
+                </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
-                @if($module->delivery_status !== 'closed')
-                <form method="POST" action="{{ route('trainer.modules.update', $module) }}" data-confirm="{{ $module->delivery_status === 'active' ? 'Close this module to future enrollees? Existing assigned trainees will keep access.' : 'Publish this as the current active module? The previous active module will close to new enrollees.' }}">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="module_code" value="{{ $module->module_code }}">
-                    <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
-                    <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
-                    <input type="hidden" name="title" value="{{ $module->title }}">
-                    <input type="hidden" name="description" value="{{ $module->description }}">
-                    <input type="hidden" name="topic" value="{{ $module->topic }}">
-                    <input type="hidden" name="estimated_hours" value="{{ $module->estimated_hours }}">
-                    <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
-                    <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
-                    <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
-                    <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
-                    <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
-                    <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
-                    <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
-                    <input type="hidden" name="_return_to_module" value="1">
-                    <button class="secondary-action text-xs">
-                        {{ $module->delivery_status === 'active' ? 'Close to New Enrollees' : 'Publish as Active Module' }}
-                    </button>
-                </form>
-                @else
-                    <span class="max-w-xs text-xs leading-5 text-amber-800">Historical delivery: visible only to trainees who were assigned before it closed.</span>
+            <nav class="mt-5 flex flex-wrap gap-2 border-t border-stone-100 pt-4" aria-label="Module Hub sections">
+                <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'materials']) }}#materials" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'materials' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+                    Materials ({{ count($supplementaryList) + 1 }})
+                </a>
+                @if($module->requiresEvaluation())
+                <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']) }}#assessments" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'assessments' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+                    Assessments ({{ $quizzes->count() }})
+                </a>
+                <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']) }}#evaluations" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'evaluations' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
+                    Grades ({{ $trainees->count() }})
+                </a>
                 @endif
-            </div>
-        </div>
-
-        <!-- Section Navigation Tabs -->
-        <nav class="mt-6 flex flex-wrap gap-2 border-t border-stone-100 pt-4" aria-label="Module Hub sections">
-            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'materials']) }}#materials" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'materials' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
-                📖 1. Learning Materials & Files ({{ count($supplementaryList) + 1 }})
-            </a>
-            @if($module->requiresEvaluation())
-            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']) }}#assessments" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'assessments' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
-                📝 2. Assessments ({{ $quizzes->count() }})
-            </a>
-            <a href="{{ route('trainer.modules.show', ['module' => $module, 'tab' => 'evaluations']) }}#evaluations" class="rounded-xl px-4 py-2 text-xs font-bold transition {{ $activeTab === 'evaluations' ? 'bg-purple-700 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200' }}">
-                📊 3. Learner Grades & Competency Matrix ({{ $trainees->count() }})
-            </a>
-            @endif
-        </nav>
-    </header>
+            </nav>
+        </header>
+    </div>
 
     <!-- SECTION 1: LEARNING MATERIALS & PREVIEW -->
     @if($activeTab === 'materials')

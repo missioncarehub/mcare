@@ -18,6 +18,9 @@
         <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="{{ $role }}-mobile-{{ str($item['label'])->slug() }}" class="dashboard-mobile-link {{ ($item['active'] ?? false) ? 'is-active' : '' }}" @if($item['active'] ?? false) aria-current="page" @endif>
             <x-dashboard-icon :name="$item['icon']" />
             <span class="truncate">{{ $item['short'] ?? $item['label'] }}</span>
+            @if(($item['badge'] ?? 0) > 0)
+                <b class="dashboard-nav-badge is-mobile">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}</b>
+            @endif
         </a>
     @endforeach
 

@@ -8,6 +8,8 @@ use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\AdminAnnouncementNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -116,6 +118,77 @@ class AdminAnnouncementTest extends TestCase
             ->assertOk()
             ->assertSee('System Wide Training Notice')
             ->assertSee('Welcome to the second semester modules.');
+    }
+
+    public function test_publishing_writes_the_inbox_notification_immediately(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $this->createApprovedApplication($trainee, $batch);
+
+        $this->actingAs($admin)
+            ->post(route('admin.announcements.store'), [
+                'title' => 'Lab opening hours',
+                'message' => 'Skills lab opens at 7:30 AM.',
+                'kind' => 'announcement',
+                'target_type' => 'all',
+                'send_email' => 1,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $trainee->id,
+            'notifiable_type' => $trainee->getMorphClass(),
+            'type' => AdminAnnouncementNotification::class,
+        ]);
+        $this->assertSame(1, $trainee->unreadNotifications()->count());
+        $this->actingAs($trainee)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertSee('dashboard-nav-badge', false);
+    }
+
+    public function test_trainee_visit_repairs_a_stuck_announcement_delivery(): void
+    {
+        Mail::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $this->createApprovedApplication($trainee, $batch);
+
+        $announcement = AdminAnnouncement::create([
+            'author_id' => $admin->id,
+            'title' => 'Missed inbox notice',
+            'message' => 'This should appear after the next visit.',
+            'kind' => AdminAnnouncement::KIND_ANNOUNCEMENT,
+            'target_type' => AdminAnnouncement::TARGET_ALL,
+            'is_published' => true,
+            'posted_at' => now(),
+        ]);
+
+        DB::table('announcement_deliveries')->insert([
+            'user_id' => $trainee->id,
+            'announcement_type' => 'admin',
+            'announcement_id' => $announcement->id,
+            'delivery_reason' => 'publication',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(0, $trainee->notifications()->count());
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.stream'))
+            ->assertOk();
+
+        $notification = $trainee->fresh()->unreadNotifications()->first();
+        $this->assertNotNull($notification);
+        $this->assertSame($announcement->id, $notification->data['announcement_id']);
     }
 
     private function batch(string $name = 'Batch 1'): TrainingBatch

@@ -131,10 +131,10 @@ class CareerHubTest extends TestCase
             return $request->url() === SemaphoreSmsService::ENDPOINT
                 && $request['apikey'] === 'testing-semaphore-key'
                 && $request['number'] === $number
-                && str_contains((string) $request['message'], 'Home caregiver, Pili')
-                && str_contains((string) $request['message'], 'Salary ₱19,000 / month')
-                && str_contains((string) $request['message'], 'Female, Ambulatory, age 68')
-                && str_contains((string) $request['message'], 'Open Career Hub for details.')
+                && str_contains((string) $request['message'], 'Dear Alumni, we have a job offer for you: Home caregiver, Pili')
+                && str_contains((string) $request['message'], 'Salary: ₱19,000 / month')
+                && str_contains((string) $request['message'], 'Patient: Female, Ambulatory, age 68')
+                && str_contains((string) $request['message'], 'Please open the MCARE Career Hub for details: https://mcarehub.com')
                 && ! isset($request['scheduled']);
         });
     }
@@ -152,7 +152,7 @@ class CareerHubTest extends TestCase
         ]);
 
         $this->assertSame(
-            'MCARE Career Hub: Live-in caregiver, Iriga City. Salary ₱18,000 / month. Start '.$start->format('M d, Y').'. Female, Ambulatory, age 72. Open Career Hub for details.',
+            'Dear Alumni, we have a job offer for you: Live-in caregiver, Iriga City. Salary: ₱18,000 / month. Start: '.$start->format('M d, Y').'. Patient: Female, Ambulatory, age 72. Please open the MCARE Career Hub for details: https://mcarehub.com',
             $opportunity->graduateSmsMessage()
         );
 
@@ -162,7 +162,7 @@ class CareerHubTest extends TestCase
             ->get(route('admin.learning.alumni-jobs'))
             ->assertOk()
             ->assertSee('SMS graduates will receive')
-            ->assertSee('MCARE Career Hub: Career opportunity. Salary see Career Hub. Start TBA. Open Career Hub for details.', false);
+            ->assertSee('Dear Alumni, we have a job offer for you: Career opportunity. Salary: see Career Hub. Start: TBA. Please open the MCARE Career Hub for details: https://mcarehub.com', false);
     }
 
     public function test_scheduled_career_sms_is_handed_to_semaphore_with_the_chosen_datetime(): void

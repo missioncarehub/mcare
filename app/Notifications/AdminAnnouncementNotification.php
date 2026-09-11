@@ -3,20 +3,14 @@
 namespace App\Notifications;
 
 use App\Models\AdminAnnouncement;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class AdminAnnouncementNotification extends Notification implements ShouldQueue
+class AdminAnnouncementNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public AdminAnnouncement $announcement,
-    ) {
-        $this->onQueue('mail');
-    }
+    ) {}
 
     /** @return list<string> */
     public function via(object $notifiable): array
@@ -34,13 +28,17 @@ class AdminAnnouncementNotification extends Notification implements ShouldQueue
     public function toDatabase(object $notifiable): array
     {
         $isPayment = $this->announcement->kind === AdminAnnouncement::KIND_REMINDER;
+        $isGraduate = method_exists($notifiable, 'isGraduate') && $notifiable->isGraduate();
+        $streamUrl = $isGraduate && \Illuminate\Support\Facades\Route::has('trainee.career-hub')
+            ? route('trainee.career-hub')
+            : route('trainee.stream');
 
         return [
             'title' => $this->announcement->title,
             'message' => str($this->announcement->message)->limit(160)->toString(),
             'kind' => $this->announcement->kind,
             'due_date' => $this->announcement->due_date?->format('M d, Y'),
-            'url' => $isPayment ? route('trainee.payments') : route('trainee.stream'),
+            'url' => $isPayment ? route('trainee.payments') : $streamUrl,
             'icon' => $isPayment ? 'credit-card' : 'bell',
             'announcement_id' => $this->announcement->id,
         ];

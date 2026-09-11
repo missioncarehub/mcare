@@ -124,6 +124,15 @@ class AdmissionApplicationTest extends TestCase
             ->assertDontSee('Continue to enrollment');
     }
 
+    public function test_status_page_keeps_the_official_footer_on_the_layout(): void
+    {
+        $this->get(route('applications.status'))
+            ->assertOk()
+            ->assertSee('Check application status')
+            ->assertSee('application-status-page', false)
+            ->assertSee('auth-footer', false);
+    }
+
     public function test_admin_can_approve_an_application_and_unlock_enrollment(): void
     {
         Mail::fake();

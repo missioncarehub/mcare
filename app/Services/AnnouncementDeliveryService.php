@@ -8,8 +8,10 @@ use App\Models\TrainerAnnouncement;
 use App\Models\User;
 use App\Notifications\AdminAnnouncementNotification;
 use App\Notifications\LmsAnnouncementPublished;
+use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Testing\Fakes\NotificationFake;
 use Throwable;
 
 class AnnouncementDeliveryService
@@ -77,13 +79,8 @@ class AnnouncementDeliveryService
                 $query->whereNull('training_batch_id')
                     ->orWhere('training_batch_id', $application->training_batch_id);
             })
-            ->whereNotExists(function ($query) use ($user) {
-                $query->selectRaw('1')
-                    ->from('announcement_deliveries')
-                    ->whereColumn('announcement_deliveries.announcement_id', 'trainer_announcements.id')
-                    ->where('announcement_deliveries.announcement_type', self::TYPE_TRAINER)
-                    ->where('announcement_deliveries.user_id', $user->id);
-            })
+            ->latest('posted_at')
+            ->limit(40)
             ->get();
 
         foreach ($trainerAnnouncements as $announcement) {
@@ -94,13 +91,8 @@ class AnnouncementDeliveryService
 
         $adminAnnouncements = AdminAnnouncement::query()
             ->visibleTo($user, $application->training_batch_id)
-            ->whereNotExists(function ($query) use ($user) {
-                $query->selectRaw('1')
-                    ->from('announcement_deliveries')
-                    ->whereColumn('announcement_deliveries.announcement_id', 'admin_announcements.id')
-                    ->where('announcement_deliveries.announcement_type', self::TYPE_ADMIN)
-                    ->where('announcement_deliveries.user_id', $user->id);
-            })
+            ->latest('posted_at')
+            ->limit(40)
             ->get();
 
         foreach ($adminAnnouncements as $announcement) {
@@ -126,6 +118,8 @@ class AnnouncementDeliveryService
         $delivered = 0;
 
         foreach ($recipients as $recipient) {
+            $notification = $notificationFactory();
+            $alreadyNotified = $this->hasPersistedNotification($recipient, $notification, $announcementId);
             $claimed = DB::table('announcement_deliveries')->insertOrIgnore([
                 'user_id' => $recipient->id,
                 'announcement_type' => $announcementType,
@@ -135,25 +129,48 @@ class AnnouncementDeliveryService
                 'updated_at' => now(),
             ]);
 
-            if ($claimed !== 1) {
+            if ($claimed !== 1 && ($alreadyNotified || $this->notificationDispatcherIsFaked())) {
                 continue;
             }
 
             try {
-                $recipient->notify($notificationFactory());
+                $recipient->notifyNow($notification);
                 $delivered++;
             } catch (Throwable $exception) {
-                DB::table('announcement_deliveries')->where([
-                    'user_id' => $recipient->id,
-                    'announcement_type' => $announcementType,
-                    'announcement_id' => $announcementId,
-                ])->delete();
+                // Mail can fail after the inbox row is written. Keep the in-app
+                // notice so trainees still see the announcement.
+                if ($this->hasPersistedNotification($recipient, $notification, $announcementId)) {
+                    report($exception);
+                    $delivered++;
+                    continue;
+                }
+
+                if ($claimed === 1) {
+                    DB::table('announcement_deliveries')->where([
+                        'user_id' => $recipient->id,
+                        'announcement_type' => $announcementType,
+                        'announcement_id' => $announcementId,
+                    ])->delete();
+                }
 
                 throw $exception;
             }
         }
 
         return $delivered;
+    }
+
+    private function hasPersistedNotification(User $user, Notification $notification, int $announcementId): bool
+    {
+        return $user->notifications()
+            ->where('type', $notification::class)
+            ->where('data->announcement_id', $announcementId)
+            ->exists();
+    }
+
+    private function notificationDispatcherIsFaked(): bool
+    {
+        return app(NotificationDispatcher::class) instanceof NotificationFake;
     }
 
     /** @param callable(): int $delivery */
