@@ -9,14 +9,50 @@
         'id-photo' => ['label' => 'ID Photo', 'path' => $application->id_photo_path],
         'signature' => ['label' => 'E-Signature', 'path' => $application->signature_path],
     ];
+    $programName = $application->trainingProgram?->name ?? $application->program ?? 'Caregiving NC II';
+    $batchLabel = $application->batch ? $application->batch->name.' '.$application->batch->year : 'Batch to be assigned';
+    $cotcReady = (bool) $cotc?->isDownloadableByTrainee();
+    $cotcStateLabel = $cotc ? str($cotc->status)->headline() : 'Not issued';
 @endphp
 <section class="space-y-6">
     <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">My documents</p><h1 class="dashboard-section-title mt-2 text-3xl">Training and registration records</h1></header>
 
-    <article class="dashboard-panel">
+    {{-- Path: resources/views/trainee/documents.blade.php | Label: Program card gate for Certificate of Training Completion --}}
+    <article class="dashboard-panel" data-cotc-panel>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="dashboard-section-kicker">My program</p>
+                <h2 class="mt-2 text-xl font-bold text-slate-950">{{ $programName }}</h2>
+                <p class="mt-1 text-sm text-slate-600">{{ $batchLabel }}</p>
+                <p class="mt-3 text-xs font-semibold text-slate-500">
+                    Certificate of Training Completion:
+                    <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 {{ $cotcReady ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-50 text-slate-600 ring-slate-100' }}">{{ $cotcStateLabel }}</span>
+                </p>
+            </div>
+            <div class="shrink-0">
+                <button
+                    type="button"
+                    class="primary-action"
+                    data-cotc-view-toggle
+                    aria-expanded="false"
+                    aria-controls="cotc-details"
+                >View certificate details</button>
+            </div>
+        </div>
+    </article>
+
+    <article
+        id="cotc-details"
+        class="dashboard-panel hidden"
+        data-cotc-details
+        aria-hidden="true"
+    >
+        <div class="flex items-center justify-between gap-3">
+            <p class="dashboard-section-kicker">Certificate of Training Completion</p>
+            <button type="button" class="text-xs font-bold text-purple-700 hover:text-purple-900" data-cotc-hide>Hide</button>
+        </div>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-2xl">
-                <p class="dashboard-section-kicker">Certificate of Training Completion</p>
                 <h2 class="mt-2 text-xl font-bold text-slate-950">Caregiving NC II COTC</h2>
                 @if($cotc)
                     <p class="mt-2 text-sm text-slate-600">Document {{ $cotc->document_number }} · {{ str($cotc->status)->headline() }}</p>
@@ -64,4 +100,29 @@
         @endforeach
     </div>
 </section>
+
+<script>
+// Path: resources/views/trainee/documents.blade.php | Label: Toggle COTC details from program card
+(function () {
+    const toggle = document.querySelector('[data-cotc-view-toggle]');
+    const details = document.querySelector('[data-cotc-details]');
+    const hideBtn = document.querySelector('[data-cotc-hide]');
+    if (!toggle || !details) {
+        return;
+    }
+    const setOpen = (open) => {
+        details.classList.toggle('hidden', !open);
+        details.setAttribute('aria-hidden', open ? 'false' : 'true');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.textContent = open ? 'Hide certificate details' : 'View certificate details';
+        if (open) {
+            details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+    toggle.addEventListener('click', () => setOpen(details.classList.contains('hidden')));
+    if (hideBtn) {
+        hideBtn.addEventListener('click', () => setOpen(false));
+    }
+})();
+</script>
 @endsection

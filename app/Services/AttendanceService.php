@@ -109,16 +109,28 @@ class AttendanceService
             $excused = $attendances->where('status', TraineeAttendance::STATUS_EXCUSED)->count();
 
             $totalSessions = $present + $late + $absent + $excused;
+            // Path: app/Services/AttendanceService.php | Label: Do not inflate rate for newly enrolled trainees
+            // A newly enrolled trainee with no records should show "no data" (—), not a phantom 100%.
             $rate = $totalSessions > 0
                 ? round((($present + $late) / $totalSessions) * 100, 1)
-                : 100.0;
+                : null;
 
-            $totalRates += $rate;
+            if ($rate !== null) {
+                $totalRates += $rate;
+            }
 
+            $enrolledFrom = $this->attendanceEligibleFrom($trainee);
             $dateStatusMap = [];
             foreach ($distinctDates as $dateStr) {
                 $att = $attendances->first(fn ($a) => (is_string($a->attendance_date) ? $a->attendance_date : $a->attendance_date?->toDateString()) === $dateStr);
-                $dateStatusMap[$dateStr] = $att?->status ?? '-';
+                if ($att) {
+                    $dateStatusMap[$dateStr] = $att->status;
+                } elseif ($enrolledFrom && Carbon::parse($dateStr)->lt($enrolledFrom)) {
+                    // Trainee was not yet enrolled on this date — clearly mark it instead of counting as absent.
+                    $dateStatusMap[$dateStr] = 'not_enrolled';
+                } else {
+                    $dateStatusMap[$dateStr] = '-';
+                }
             }
 
             $summaryTrainees[] = [
@@ -132,14 +144,16 @@ class AttendanceService
                 'excused' => $excused,
                 'total_sessions' => $totalSessions,
                 'attendance_rate' => $rate,
-                'is_compliant' => $rate >= 80.0,
+                'is_compliant' => $rate === null ? null : $rate >= 80.0,
                 'by_date' => $dateStatusMap,
+                'enrolled_from' => $enrolledFrom?->toDateString(),
             ];
         }
 
-        $averageRate = count($summaryTrainees) > 0
-            ? round($totalRates / count($summaryTrainees), 1)
-            : 100.0;
+        $traineesWithRate = collect($summaryTrainees)->filter(fn ($t) => $t['attendance_rate'] !== null)->count();
+        $averageRate = $traineesWithRate > 0
+            ? round($totalRates / $traineesWithRate, 1)
+            : null;
 
         return [
             'total_days' => $totalDays,
@@ -147,6 +161,19 @@ class AttendanceService
             'trainees' => $summaryTrainees,
             'average_rate' => $averageRate,
         ];
+    }
+
+    // Path: app/Services/AttendanceService.php | Label: Date from which a trainee counts for attendance
+    // Uses the earliest of learning_started_at, reviewed_at (admin approval), then created_at.
+    public function attendanceEligibleFrom(EnrollmentApplication $application): ?Carbon
+    {
+        $candidates = collect([
+            $application->learning_started_at,
+            $application->reviewed_at,
+            $application->created_at,
+        ])->filter();
+
+        return $candidates->isEmpty() ? null : $candidates->sort()->first()->copy()->startOfDay();
     }
 
     /**
@@ -213,8 +240,8 @@ class AttendanceService
                     $t['absent'],
                     $t['excused'],
                     $t['total_sessions'],
-                    $t['attendance_rate'].'%',
-                    $t['is_compliant'] ? 'Compliant' : 'At Risk (<80%)',
+                    $t['attendance_rate'] !== null ? $t['attendance_rate'].'%' : 'No data',
+                    $t['is_compliant'] === null ? 'Newly enrolled' : ($t['is_compliant'] ? 'Compliant' : 'At Risk (<80%)'),
                 ];
 
                 foreach ($summary['dates'] as $date) {

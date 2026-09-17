@@ -30,6 +30,10 @@ class AdmissionApplicationReviewController extends Controller
 
         if (array_key_exists($selectedStatus, $statuses)) {
             $query->where('status', $selectedStatus);
+        } else {
+            // Default view hides already-approved applicants. They stay reachable
+            // through the "Approved" quick-filter card above the table.
+            $query->where('status', '!=', AdmissionApplication::STATUS_APPROVED);
         }
 
         if ($search !== '') {

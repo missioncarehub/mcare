@@ -74,40 +74,58 @@ class AdmissionApplicationController extends Controller
             ? TrainingProgram::query()->active()->find($validated['training_program_id'])
             : TrainingProgram::query()->active()->orderBy('name')->first();
 
-        $admission = AdmissionApplication::query()->create([
-            'application_number' => AdmissionApplication::generateNumber(),
-            'first_name' => $validated['first_name'],
-            'middle_name' => $validated['middle_name'] ?? null,
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'contact_number' => $validated['contact_number'],
-            'schedule_preference' => $validated['schedule_preference'] ?? null,
-            'educational_attainment' => $validated['educational_attainment'],
-            'notes' => $validated['notes'] ?? null,
-            'training_program_id' => $program?->id,
-            'program' => $program?->name ?: 'Caregiving NC II',
-            'status' => AdmissionApplication::STATUS_PENDING,
-            'privacy_consent_at' => now(),
-        ]);
+        // Path: app/Http/Controllers/AdmissionApplicationController.php | Label: Applicant-facing error handler
+        // Wrap the write path in try/catch so applicants see a clear notice instead of a raw 500
+        // when the DB, notifier, or mailer is misconfigured. Duplicate email is already handled
+        // separately via the "unique" rule above.
+        try {
+            $admission = AdmissionApplication::query()->create([
+                'application_number' => AdmissionApplication::generateNumber(),
+                'first_name' => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'contact_number' => $validated['contact_number'],
+                'schedule_preference' => $validated['schedule_preference'] ?? null,
+                'educational_attainment' => $validated['educational_attainment'],
+                'notes' => $validated['notes'] ?? null,
+                'training_program_id' => $program?->id,
+                'program' => $program?->name ?: 'Caregiving NC II',
+                'status' => AdmissionApplication::STATUS_PENDING,
+                'privacy_consent_at' => now(),
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()
+                ->route('applications.create')
+                ->withInput($request->except(['privacy_consent']))
+                ->with('application_error', 'We could not save your application because of a temporary system error. Please try again in a few moments. If it keeps failing, contact MCARE support.');
+        }
 
         $request->session()->put('applications.submitted_id', $admission->id);
 
-        AdminActivityLog::record(null, 'admission.submitted', $admission, [
-            'application_number' => $admission->application_number,
-            'email' => $admission->email,
-        ]);
-
-        $notifier->notify(
-            title: 'New training application',
-            message: $admission->fullName().' submitted application '.$admission->application_number.'.',
-            url: route('admin.applications.show', $admission),
-            icon: 'clipboard-list',
-            event: 'admission.submitted',
-            context: [
-                'admission_application_id' => $admission->id,
+        try {
+            AdminActivityLog::record(null, 'admission.submitted', $admission, [
                 'application_number' => $admission->application_number,
-            ],
-        );
+                'email' => $admission->email,
+            ]);
+
+            $notifier->notify(
+                title: 'New training application',
+                message: $admission->fullName().' submitted application '.$admission->application_number.'.',
+                url: route('admin.applications.show', $admission),
+                icon: 'clipboard-list',
+                event: 'admission.submitted',
+                context: [
+                    'admission_application_id' => $admission->id,
+                    'application_number' => $admission->application_number,
+                ],
+            );
+        } catch (Throwable $exception) {
+            // Never fail the applicant flow if admin notifier or activity log breaks.
+            report($exception);
+        }
 
         try {
             Mail::to($admission->email)->send(new AdmissionApplicationReceivedMail($admission));

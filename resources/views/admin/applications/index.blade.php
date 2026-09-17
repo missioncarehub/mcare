@@ -7,15 +7,33 @@
             'approved' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
             'denied' => 'bg-red-50 text-red-700 ring-red-100',
         ];
+        $appCardIcons = [
+            'pending' => ['icon' => 'clipboard-list', 'tone' => 'bg-amber-50 text-amber-700 ring-amber-100'],
+            'approved' => ['icon' => 'circle-check', 'tone' => 'bg-emerald-50 text-emerald-700 ring-emerald-100'],
+            'denied' => ['icon' => 'xmark', 'tone' => 'bg-red-50 text-red-700 ring-red-100'],
+        ];
+        $stageBadge = [
+            'complete' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+            'in_progress' => 'bg-amber-50 text-amber-700 ring-amber-100',
+            'pending' => 'bg-slate-50 text-slate-500 ring-slate-100',
+            'blocked' => 'bg-red-50 text-red-700 ring-red-100',
+        ];
+        $stateLabels = [
+            'complete' => 'Done',
+            'in_progress' => 'In progress',
+            'pending' => 'Pending',
+            'blocked' => 'Blocked',
+        ];
+        $activeCount = (int) ($counts['pending'] ?? 0) + (int) ($counts['denied'] ?? 0);
     @endphp
 
     <div class="space-y-6">
-        @php $appCardIcons = ['pending' => ['icon' => 'clipboard-list', 'tone' => 'bg-amber-50 text-amber-700 ring-amber-100'], 'approved' => ['icon' => 'circle-check', 'tone' => 'bg-emerald-50 text-emerald-700 ring-emerald-100'], 'denied' => ['icon' => 'xmark', 'tone' => 'bg-red-50 text-red-700 ring-red-100']]; @endphp
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <a href="{{ route('admin.applications.index') }}" class="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-purple-300 hover:shadow-sm @if($selectedStatus === '') ring-2 ring-purple-500 border-purple-300 bg-purple-50/20 @endif">
                 <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">Total applications</span>
-                    <span class="mt-2 block font-display text-2xl font-extrabold text-slate-900">{{ $totalApplications }}</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 group-hover:text-purple-700">Needs review</span>
+                    <span class="mt-2 block font-display text-2xl font-extrabold text-slate-900">{{ $activeCount }}</span>
+                    <span class="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Approved are hidden by default · {{ $totalApplications }} total</span>
                 </div>
                 <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="clipboard-list" /></span>
             </a>
@@ -56,13 +74,19 @@
                         <th class="px-4 py-3">Applicant</th>
                         <th class="px-4 py-3">Program</th>
                         <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Current stage</th>
                         <th class="px-4 py-3">Submitted</th>
                         <th class="px-4 py-3 text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($admissions as $admission)
-                        @php($hasEnrollment = $admission->enrollment !== null)
+                        @php
+                            $hasEnrollment = $admission->enrollment !== null;
+                            $currentStage = $admission->currentStage();
+                            $stages = $admission->progressStages();
+                            $completeCount = collect($stages)->where('state', 'complete')->count();
+                        @endphp
                         <tr>
                             <td class="px-4 py-3 font-bold text-slate-950">{{ $admission->application_number }}</td>
                             <td class="px-4 py-3">
@@ -72,6 +96,11 @@
                             <td class="px-4 py-3 text-slate-700">{{ $admission->program }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 {{ $badgeClasses[$admission->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">{{ $admission->statusLabel() }}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <p class="text-xs font-bold text-slate-900">{{ $currentStage['label'] }}</p>
+                                <span class="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 {{ $stageBadge[$currentStage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">{{ $stateLabels[$currentStage['state']] ?? ucfirst($currentStage['state']) }}</span>
+                                <p class="mt-1 text-[10px] font-semibold text-slate-500">{{ $completeCount }}/{{ count($stages) }} steps complete</p>
                             </td>
                             <td class="px-4 py-3 text-slate-600">{{ $admission->created_at?->format('M d, Y') }}</td>
                             <td class="px-4 py-3">
@@ -93,7 +122,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-14 text-center text-slate-500">No applications match these filters.</td>
+                            <td colspan="7" class="px-4 py-14 text-center text-slate-500">No applications match these filters.</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -96,6 +96,23 @@
             </div>
         @endif
 
+        {{-- Path: resources/views/trainee/modules/show.blade.php | Label: Mark as done submits for trainer evaluation --}}
+        @php
+            $canMarkAsDone = $module->requiresEvaluation()
+                && ! $progress->isTrainerValidated()
+                && $progress->status !== \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION
+                && ! $module->submodules()->where('is_required', true)->exists();
+        @endphp
+        @if($canMarkAsDone)
+            <form method="POST" action="{{ route('trainee.modules.progress', $module) }}" class="lms-module-mark-done" data-confirm="Mark this module as done and send it to your trainer for evaluation? You will not be able to edit it after this.">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="action" value="submit">
+                <button type="submit" class="primary-action">Mark this module as done</button>
+                <p class="mt-1 text-xs text-slate-500">Your trainer sees this submission on their Trainees page and Competency Records.</p>
+            </form>
+        @endif
+
         @php $lessonDocumentOpen = ! $progress->isTrainerValidated(); @endphp
         <div data-lesson-document data-lesson-document-open="{{ $lessonDocumentOpen ? 'true' : 'false' }}">
             <div class="lms-lesson-document-toolbar">

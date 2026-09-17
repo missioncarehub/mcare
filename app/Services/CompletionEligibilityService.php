@@ -18,6 +18,7 @@ class CompletionEligibilityService
     /**
      * @return array{
      *   eligible: bool,
+     *   graduated: bool,
      *   checks: array<string, array{passed: bool, label: string, detail: string}>,
      *   counts: array<string, int>
      * }
@@ -116,6 +117,7 @@ class CompletionEligibilityService
 
         return [
             'eligible' => collect($checks)->every(fn ($check) => $check['passed']),
+            'graduated' => $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED,
             'checks' => $checks,
             'counts' => [
                 'units' => $unitCount,
@@ -128,6 +130,52 @@ class CompletionEligibilityService
                 'passed_quizzes' => $passedQuizzes,
             ],
         ];
+    }
+
+    /**
+     * TOR issue / preview / download requires both graduation and a full
+     * completion-check pass. Graduating early does not skip unfinished checks.
+     */
+    public function canIssueTor(EnrollmentApplication $application, ?array $evaluation = null): bool
+    {
+        $evaluation ??= $this->evaluate($application);
+
+        return $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED
+            && (bool) ($evaluation['eligible'] ?? false);
+    }
+
+    public function torIssuanceMessage(EnrollmentApplication $application, ?array $evaluation = null): string
+    {
+        $evaluation ??= $this->evaluate($application);
+        $missing = [];
+
+        if ($application->learning_status !== EnrollmentApplication::LEARNING_GRADUATED) {
+            $missing[] = 'the trainee is graduated';
+        }
+
+        if (! ($evaluation['eligible'] ?? false)) {
+            $blocked = collect($evaluation['checks'] ?? [])
+                ->where('passed', false)
+                ->pluck('label')
+                ->filter()
+                ->implode(', ');
+            $missing[] = $blocked !== ''
+                ? 'all completion checks have passed (still waiting: '.$blocked.')'
+                : 'all completion checks have passed';
+        }
+
+        return 'A Transcript of Records cannot be issued, previewed, or downloaded until '.$this->joinRequirements($missing).'.';
+    }
+
+    private function joinRequirements(array $parts): string
+    {
+        if (count($parts) <= 1) {
+            return $parts[0] ?? 'the required validations are complete';
+        }
+
+        $last = array_pop($parts);
+
+        return implode(', ', $parts).' and '.$last;
     }
 
     /** @return array{passed: bool, label: string, detail: string} */

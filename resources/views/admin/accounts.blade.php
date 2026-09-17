@@ -191,7 +191,7 @@
             @csrf
             <div><label for="trainer-name" class="form-label">Full name</label><input id="trainer-name" name="name" value="{{ old('name') }}" class="form-field" required autofocus>@error('name', 'trainer')<p class="form-error">{{ $message }}</p>@enderror</div>
             <div><label for="trainer-email" class="form-label">Email</label><input id="trainer-email" name="email" type="email" value="{{ old('email') }}" class="form-field" required>@error('email', 'trainer')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <p class="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-xs leading-5 text-slate-600">MCARE will generate a unique temporary password and email it to this address using SMTP. The trainer must verify the email before signing in.</p>
+            <p class="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-xs leading-5 text-slate-600">MCARE will generate a unique temporary password and email it to this address. The trainer must verify the email before signing in.</p>
             <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action">Create trainer</button></div>
         </form>
     </dialog>
@@ -249,7 +249,7 @@
             </div>
             <label class="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><input type="checkbox" name="onsite_payment_received" value="1" @checked(old('onsite_payment_received')) class="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-600" required><span><strong class="block">Payment and receipt verified</strong>I confirm the amount was received onsite and the official receipt number above is accurate.</span></label>
             <div><label for="trainee-onsite-notes" class="form-label">Verification notes</label><textarea id="trainee-onsite-notes" name="onsite_verification_notes" rows="3" class="form-field" required placeholder="Record who presented the originals, relevant document references, and payment context.">{{ old('onsite_verification_notes') }}</textarea>@error('onsite_verification_notes', 'trainee')<p class="form-error">{{ $message }}</p>@enderror</div>
-            <p class="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-xs leading-5 text-slate-600">MCARE will generate a unique temporary password and email it to the trainee using SMTP. They must verify the email before signing in.</p>
+            <p class="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-xs leading-5 text-slate-600">MCARE will generate a unique temporary password and email it to the trainee. They must verify the email before signing in.</p>
             <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button><button type="submit" data-action-button class="primary-action">Verify intake and create trainee</button></div>
         </form>
     </dialog>

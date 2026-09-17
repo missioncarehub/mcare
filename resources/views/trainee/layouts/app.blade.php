@@ -23,6 +23,8 @@
         $navItem = 'dashboard-nav-link';
         $traineeName = auth()->user()?->name ?? 'Trainee';
         $isGraduate = auth()->user()?->isGraduate() ?? false;
+        // Path: resources/views/trainee/layouts/app.blade.php | Label: Hide LMS links until admin approves the enrollment
+        $isApprovedTrainee = auth()->user()?->hasApprovedEnrollment() ?? false;
         $unreadAnnouncementCount = auth()->user()?->unreadNotifications()
             ->whereIn('type', [
                 \App\Notifications\AdminAnnouncementNotification::class,
@@ -36,11 +38,14 @@
             ['label' => 'Career Hub', 'short' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('trainee.career-hub'), 'active' => request()->routeIs('trainee.career-hub')],
             ['label' => 'Grades', 'short' => 'Grades', 'icon' => 'fa-chart-column', 'href' => route('trainee.grades'), 'active' => request()->routeIs('trainee.grades')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
-        ] : [
+        ] : ($isApprovedTrainee ? [
             ['label' => 'Stream', 'short' => 'Stream', 'icon' => 'fa-bell', 'href' => $traineeStreamHref, 'active' => request()->routeIs('trainee.stream'), 'badge' => $unreadAnnouncementCount],
             ['label' => 'Classwork', 'short' => 'Classwork', 'icon' => 'fa-book-open', 'href' => route('trainee.modules.index'), 'active' => request()->routeIs('trainee.modules.*', 'trainee.quizzes.*', 'trainee.quiz-attempts.*')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
-        ];
+        ] : [
+            // Path: resources/views/trainee/layouts/app.blade.php | Label: Pre-approval nav (no LMS / classwork)
+            ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
+        ]);
         $traineeSecondaryNav = $isGraduate ? [
             ['label' => 'Home', 'icon' => 'fa-house', 'href' => route('trainee.dashboard'), 'active' => request()->routeIs('trainee.dashboard')],
             ['label' => 'Documents', 'icon' => 'fa-folder-open', 'href' => route('trainee.documents'), 'active' => request()->routeIs('trainee.documents')],
@@ -52,7 +57,7 @@
         $traineeAllNav = collect(array_merge($traineePrimaryNav, $traineeSecondaryNav))->keyBy('label');
         $traineeMobileLabels = $isGraduate
             ? ['Home', 'Career Hub', 'Grades', 'Documents']
-            : ['Home', 'Stream', 'Classwork'];
+            : ($isApprovedTrainee ? ['Home', 'Stream', 'Classwork'] : ['Home', 'Payments', 'Documents']);
         $traineeMobilePrimary = collect($traineeMobileLabels)
             ->map(fn (string $label) => $traineeAllNav->get($label))
             ->filter()

@@ -27,7 +27,7 @@ class OfficialDocumentManager
         User $admin,
     ): OfficialDocument {
         $type = $this->validatedType($type);
-        $this->assertEligible($application);
+        $this->assertEligible($application, $type);
 
         $document = DB::transaction(function () use ($application, $type, $admin): OfficialDocument {
             $current = $this->currentDocumentQuery($application, $type)
@@ -64,7 +64,7 @@ class OfficialDocumentManager
         string $reason,
     ): OfficialDocument {
         $type = $this->validatedType($type);
-        $this->assertEligible($application);
+        $this->assertEligible($application, $type);
 
         $document = DB::transaction(function () use ($application, $type, $admin, $reason): OfficialDocument {
             $current = $this->currentDocumentQuery($application, $type)
@@ -216,7 +216,7 @@ class OfficialDocumentManager
         EnrollmentApplication $application,
         User $admin,
     ): ?OfficialDocument {
-        if (! $this->eligibility->evaluate($application)['eligible']) {
+        if (! $this->eligibility->canIssueTor($application)) {
             return null;
         }
 
@@ -307,13 +307,19 @@ class OfficialDocumentManager
             ->latest('version');
     }
 
-    private function assertEligible(EnrollmentApplication $application): void
+    private function assertEligible(EnrollmentApplication $application, string $type): void
     {
-        if ($application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) {
+        $eligibility = $this->eligibility->evaluate($application);
+
+        if ($type === OfficialDocument::TYPE_TOR) {
+            if (! $this->eligibility->canIssueTor($application, $eligibility)) {
+                throw ValidationException::withMessages([
+                    'eligibility' => $this->eligibility->torIssuanceMessage($application, $eligibility),
+                ]);
+            }
+
             return;
         }
-
-        $eligibility = $this->eligibility->evaluate($application);
 
         if ($eligibility['eligible']) {
             return;

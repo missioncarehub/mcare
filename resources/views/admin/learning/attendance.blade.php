@@ -178,10 +178,11 @@
                     <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
                         <div class="flex items-start justify-between gap-3">
                             <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Batch Average Attendance</p>
-                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $summary['average_rate'] >= 80 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }} ring-1"><x-dashboard-icon name="chart-column" /></span>
+                            @php($avgRate = $summary['average_rate'])
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $avgRate === null ? 'bg-slate-50 text-slate-600 ring-slate-100' : ($avgRate >= 80 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100') }} ring-1"><x-dashboard-icon name="chart-column" /></span>
                         </div>
-                        <p class="mt-2 text-3xl font-extrabold {{ $summary['average_rate'] >= 80 ? 'text-emerald-700' : 'text-amber-700' }}">
-                            {{ $summary['average_rate'] }}%
+                        <p class="mt-2 text-3xl font-extrabold {{ $avgRate === null ? 'text-slate-500' : ($avgRate >= 80 ? 'text-emerald-700' : 'text-amber-700') }}">
+                            {{ $avgRate === null ? '—' : $avgRate.'%' }}
                         </p>
                         <p class="mt-1 text-xs text-slate-500">TESDA standard benchmark: 80%</p>
                     </div>
@@ -246,11 +247,15 @@
                                         <td class="py-3.5 px-3 text-center font-semibold text-rose-700">{{ $t['absent'] }}</td>
                                         <td class="py-3.5 px-3 text-center font-semibold text-blue-700">{{ $t['excused'] }}</td>
                                         <td class="py-3.5 px-3 text-center font-medium text-slate-500">{{ $t['total_sessions'] }}</td>
-                                        <td class="py-3.5 px-4 text-center font-bold {{ $t['attendance_rate'] >= 80 ? 'text-emerald-700' : 'text-amber-700' }}">
-                                            {{ $t['attendance_rate'] }}%
+                                        <td class="py-3.5 px-4 text-center font-bold {{ $t['attendance_rate'] === null ? 'text-slate-500' : ($t['attendance_rate'] >= 80 ? 'text-emerald-700' : 'text-amber-700') }}">
+                                            {{ $t['attendance_rate'] === null ? '—' : $t['attendance_rate'].'%' }}
                                         </td>
                                         <td class="py-3.5 px-4 text-center">
-                                            @if($t['is_compliant'])
+                                            @if($t['is_compliant'] === null)
+                                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                                    Newly enrolled
+                                                </span>
+                                            @elseif($t['is_compliant'])
                                                 <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
                                                     Compliant
                                                 </span>

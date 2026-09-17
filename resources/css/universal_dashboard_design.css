@@ -184,9 +184,9 @@
         }
 
     html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header {
-        flex-direction: column;
+        grid-template-columns: auto;
+        justify-items: center;
         align-items: center;
-        justify-content: center;
         gap: 0.5rem;
         padding-left: 0;
         padding-right: 0;
@@ -360,7 +360,7 @@
     }
 
     .universal-dashboard .dashboard-sidebar-header {
-        @apply flex min-h-11 items-center justify-between gap-2 border-b border-slate-100 pb-3;
+        @apply grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-100 pb-3;
     }
 
     .universal-dashboard .dashboard-sidebar-collapse {

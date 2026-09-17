@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Trainer;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
+use App\Models\ModuleProgress;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
 use App\Services\CompetencyCatalogService;
 use App\Services\CompetencyRecordUpdater;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -95,13 +98,55 @@ class CompetencyRecordController extends Controller
         $enrollmentApplication->load(['batch', 'user', 'competencyRecords.outcomeResults']);
 
         $units = $this->unitsForBatch((int) $enrollmentApplication->training_batch_id);
+        $evaluableUnitIds = $this->evaluableUnitIdsFor($enrollmentApplication, $units);
 
         return view('trainer.competencies.edit', [
             'trainee' => $enrollmentApplication,
             'unitsByCategory' => $this->catalog()->groupByCategory($units),
             'recordsByUnit' => $enrollmentApplication->competencyRecords->keyBy('competency_unit_id'),
             'statuses' => TraineeCompetencyRecord::statuses(),
+            'evaluableUnitIds' => $evaluableUnitIds,
         ]);
+    }
+
+    // Path: app/Http/Controllers/Trainer/CompetencyRecordController.php | Label: Gate evaluation on trainee "Mark as done"
+    // A competency unit becomes evaluable for a trainee once at least one of the trainee's
+    // assigned modules that maps to that unit has been marked as done (awaiting evaluation)
+    // or already trainer-validated (completed / competent). Units whose modules are still
+    // locked or in progress are hidden from the evaluation form until the trainee submits.
+    private function evaluableUnitIdsFor(EnrollmentApplication $application, Collection $units): Collection
+    {
+        $unitIds = $units->pluck('id')->all();
+        if (empty($unitIds)) {
+            return collect();
+        }
+
+        $moduleUnitMap = TrainingModule::query()
+            ->assignedTo($application)
+            ->whereIn('competency_unit_id', $unitIds)
+            ->pluck('competency_unit_id', 'id');
+
+        if ($moduleUnitMap->isEmpty()) {
+            return collect();
+        }
+
+        $doneStatuses = [
+            ModuleProgress::STATUS_AWAITING_EVALUATION,
+            ModuleProgress::STATUS_COMPLETED,
+            ModuleProgress::STATUS_NEEDS_REMEDIATION,
+        ];
+
+        $doneModuleIds = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->whereIn('training_module_id', $moduleUnitMap->keys())
+            ->whereIn('status', $doneStatuses)
+            ->pluck('training_module_id');
+
+        return $doneModuleIds
+            ->map(fn ($moduleId) => (int) $moduleUnitMap->get($moduleId))
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     public function chart(Request $request, TrainingBatch $trainingBatch, string $chart): View
@@ -171,6 +216,35 @@ class CompetencyRecordController extends Controller
             ]);
         }
 
+        // Path: app/Http/Controllers/Trainer/CompetencyRecordController.php | Label: Server-side "Mark as done" gate
+        // Refuse evaluations for units where none of the trainee's mapped modules have been marked
+        // as done. This mirrors the disabled UI so a hand-crafted POST cannot bypass it.
+        $evaluableUnitIds = $this->evaluableUnitIdsFor(
+            $enrollmentApplication,
+            $deliveredUnits->values(),
+        )->all();
+        $locked = TraineeCompetencyRecord::query()
+            ->where('enrollment_application_id', $enrollmentApplication->id)
+            ->whereNotNull('locked_at')
+            ->pluck('competency_unit_id')
+            ->all();
+        $blocked = collect($validated['records'])
+            ->reject(function (array $payload) use ($evaluableUnitIds, $locked): bool {
+                $unitId = (int) $payload['unit_id'];
+                if (in_array($unitId, $evaluableUnitIds, true) || in_array($unitId, $locked, true)) {
+                    return true;
+                }
+                // Allow rows that are still "not_assessed" (skip / draft) to pass through untouched.
+                return ($payload['status'] ?? null) === TraineeCompetencyRecord::STATUS_NOT_ASSESSED
+                    && blank($payload['percentage_score'] ?? null)
+                    && blank($payload['notes'] ?? null);
+            });
+        if ($blocked->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'records' => 'You can only evaluate a competency after the trainee has marked its module as done. Ask them to submit their pending modules first.',
+            ]);
+        }
+
         DB::transaction(function () use (
             $request,
             $enrollmentApplication,
@@ -237,6 +311,21 @@ class CompetencyRecordController extends Controller
             if ($trainees->count() !== $traineeIds->count()) {
                 throw ValidationException::withMessages([
                     'trainee_ids' => 'Every selected trainee must be approved and assigned to the selected batch.',
+                ]);
+            }
+
+            // Path: app/Http/Controllers/Trainer/CompetencyRecordController.php | Label: Bulk update mark-as-done gate
+            $unitCollection = collect([$unit]);
+            $blockedNames = collect();
+            foreach ($trainees as $trainee) {
+                $evaluableUnitIds = $this->evaluableUnitIdsFor($trainee, $unitCollection);
+                if (! $evaluableUnitIds->contains((int) $unit->id)) {
+                    $blockedNames->push(trim("{$trainee->first_name} {$trainee->last_name}") ?: 'Trainee #'.$trainee->id);
+                }
+            }
+            if ($blockedNames->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'trainee_ids' => 'These trainees have not marked the related module as done yet: '.$blockedNames->implode(', '),
                 ]);
             }
 

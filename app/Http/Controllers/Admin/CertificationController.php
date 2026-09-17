@@ -44,11 +44,8 @@ class CertificationController extends Controller
             ->orderBy('first_name')
             ->get()
             ->transform(function ($application) use ($eligibility) {
-                $isGraduated = $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
                 $eval = $eligibility->evaluate($application);
-                if ($isGraduated) {
-                    $eval['eligible'] = true;
-                }
+                $eval['can_issue_tor'] = $eligibility->canIssueTor($application, $eval);
                 $application->completion_eligibility = $eval;
 
                 return $application;
@@ -106,8 +103,12 @@ class CertificationController extends Controller
         return back()->with('saved', 'COTC released. The trainee now has one download.');
     }
 
-    public function preview(OfficialDocument $officialDocument, OfficialDocumentManager $manager): StreamedResponse
-    {
+    public function preview(
+        OfficialDocument $officialDocument,
+        OfficialDocumentManager $manager,
+        CompletionEligibilityService $eligibility,
+    ): StreamedResponse {
+        $this->assertTorIssuable($officialDocument, $eligibility);
         $officialDocument = $manager->refreshClippedCotcPdf($officialDocument);
         $this->assertAvailable($officialDocument);
         $stream = Storage::disk($officialDocument->storage_disk)->readStream($officialDocument->file_path);
@@ -140,8 +141,13 @@ class CertificationController extends Controller
         return back()->with('saved', strtoupper($document->type).' reissued successfully as '.$document->document_number.'.');
     }
 
-    public function download(Request $request, OfficialDocument $officialDocument, OfficialDocumentManager $manager): StreamedResponse
-    {
+    public function download(
+        Request $request,
+        OfficialDocument $officialDocument,
+        OfficialDocumentManager $manager,
+        CompletionEligibilityService $eligibility,
+    ): StreamedResponse {
+        $this->assertTorIssuable($officialDocument, $eligibility);
         $officialDocument = $manager->refreshClippedCotcPdf($officialDocument);
         $this->assertAvailable($officialDocument);
 
@@ -162,6 +168,21 @@ class CertificationController extends Controller
             $officialDocument->file_path,
             $officialDocument->document_number.'.pdf',
             ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    private function assertTorIssuable(OfficialDocument $officialDocument, CompletionEligibilityService $eligibility): void
+    {
+        if ($officialDocument->type !== OfficialDocument::TYPE_TOR) {
+            return;
+        }
+
+        $officialDocument->loadMissing('application');
+        abort_unless($officialDocument->application, 404);
+        abort_unless(
+            $eligibility->canIssueTor($officialDocument->application),
+            403,
+            $eligibility->torIssuanceMessage($officialDocument->application),
         );
     }
 

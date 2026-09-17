@@ -5,7 +5,7 @@
     <header class="border-b border-stone-200 pb-6">
         <p class="dashboard-section-kicker">Trainees</p>
         <h1 class="dashboard-section-title mt-2 text-3xl">Approved learner roster</h1>
-        <p class="mt-2 text-stone-600">Your roster is limited to the current batch assigned by the administrator. Review tuition payment status, downpayment clearance, LMS progress, and export summaries.</p>
+        <p class="mt-2 text-stone-600">Your roster is limited to the current batch assigned by the administrator. Review LMS module progress and training state, and export summaries.</p>
     </header>
 
     <form method="GET" action="{{ route('trainer.trainees') }}" class="dashboard-panel grid gap-4 md:grid-cols-4">
@@ -38,24 +38,19 @@
     </form>
 
     <div class="dashboard-table-wrap overflow-x-auto">
-        <table class="dashboard-table w-full min-w-[62rem]">
+        <table class="dashboard-table w-full min-w-[52rem]">
             <thead>
                 <tr>
                     <th>Trainee</th>
                     <th>Batch / Schedule</th>
                     <th>Module progress</th>
-                    <th>Tuition & Payment</th>
                     <th>Training state</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($trainees as $trainee)
                     @php
-                        $totalFee = (float) ($trainee->total_program_fee ?? 22000.00);
-                        $totalPaid = (float) ($trainee->total_paid_amount ?? 0.00);
-                        $balance = $trainee->remainingBalance();
-                        $isDownpaymentSatisfied = $trainee->isDownpaymentSatisfied();
-                        $transactions = $trainee->paymentTransactions;
+                        $isGraduated = $trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED;
                     @endphp
                     <tr class="align-top">
                         <td>
@@ -83,59 +78,17 @@
                             <p class="text-xs text-stone-500">{{ $trainee->moduleProgress->whereIn('status', ['not_started', 'in_progress', 'needs_remediation'])->count() }} active or for remediation</p>
                         </td>
                         <td>
-                            <div class="space-y-1.5 text-xs">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex rounded-lg px-2.5 py-1 text-xs font-bold {{ $trainee->payment_status === 'paid' ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : ($isDownpaymentSatisfied ? 'bg-purple-50 text-purple-800 ring-1 ring-purple-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200') }}">
-                                        {{ $trainee->paymentStatusLabel() }}
-                                    </span>
-                                </div>
-                                <div class="text-[11px] space-y-0.5 text-slate-600">
-                                    <p>Paid: <strong class="font-semibold text-emerald-700">₱{{ number_format($totalPaid, 2) }}</strong> / ₱{{ number_format($totalFee, 2) }}</p>
-                                    @if($balance > 0)
-                                        <p class="text-amber-700">Balance: <strong>₱{{ number_format($balance, 2) }}</strong></p>
-                                    @endif
-                                </div>
-
-                                @if($transactions->isNotEmpty())
-                                    <details class="mt-2 rounded-lg border border-stone-200 bg-stone-50 p-2 text-[11px]">
-                                        <summary class="cursor-pointer font-bold text-purple-700 hover:text-purple-900 select-none">
-                                            Payment Records ({{ $transactions->count() }})
-                                        </summary>
-                                        <div class="mt-2 space-y-1.5">
-                                            @foreach($transactions as $tx)
-                                                <div class="rounded border border-stone-200 bg-white p-2 text-[11px] space-y-0.5">
-                                                    <div class="flex items-center justify-between font-bold">
-                                                        <span>₱{{ number_format((float)$tx->amount, 2) }}</span>
-                                                        <span class="{{ $tx->status === 'verified' ? 'text-emerald-700' : 'text-amber-700' }}">
-                                                            {{ $tx->statusLabel() }}
-                                                        </span>
-                                                    </div>
-                                                    <p class="text-stone-500">
-                                                        @if($tx->reference_number || $tx->ticket_number)
-                                                            Ref #: <strong class="font-mono text-purple-800">{{ $tx->reference_number ?: $tx->ticket_number }}</strong>
-                                                        @endif
-                                                        @if($tx->or_number)
-                                                            @if($tx->reference_number || $tx->ticket_number) · @endif
-                                                            OR #: <strong class="font-mono text-stone-800">{{ $tx->or_number }}</strong>
-                                                        @endif
-                                                        · {{ $tx->typeLabel() }}
-                                                    </p>
-                                                    <p class="text-[10px] text-stone-400">{{ $tx->paid_at?->format('M d, Y') ?? $tx->created_at->format('M d, Y') }} · {{ str($tx->payment_channel)->headline() }}</p>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </details>
-                                @endif
-                            </div>
-                        </td>
-                        <td>
-                            <p>{{ $trainee->batch?->trainingStateLabel() ?? 'No batch' }}</p>
-                            <x-graduate-batch-badge :application="$trainee" class="mt-2" />
+                            @if($isGraduated)
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-200">Graduated</span>
+                                <x-graduate-batch-badge :application="$trainee" class="mt-2" />
+                            @else
+                                <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">In progress</span>
+                            @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-5 py-10 text-center text-stone-600">No approved trainees found.</td>
+                        <td colspan="4" class="px-5 py-10 text-center text-stone-600">No approved trainees found.</td>
                     </tr>
                 @endforelse
             </tbody>

@@ -8,6 +8,8 @@ use App\Models\CompetencyOutcome;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
+use App\Models\PaymentTransaction;
+use App\Models\TraineeAttendance;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
@@ -941,19 +943,172 @@ class AdminLearningSystemController extends Controller
 
     public function reports(): View
     {
+        // Path: app/Http/Controllers/Admin/AdminLearningSystemController.php | Label: Detailed reports data
+        // Rich learning-report snapshot used by the admin Reports page.
+        // Every figure is derived from the same tables the rest of the admin
+        // area reads so the numbers stay consistent with day-to-day work.
+
+        $batches = TrainingBatch::query()
+            ->withCount([
+                'applications',
+                'applications as am_count' => fn ($query) => $query->where('schedule_preference', 'AM'),
+                'applications as pm_count' => fn ($query) => $query->where('schedule_preference', 'PM'),
+                'applications as approved_count' => fn ($query) => $query->where('status', EnrollmentApplication::STATUS_APPROVED),
+                'applications as pending_count' => fn ($query) => $query->where('status', EnrollmentApplication::STATUS_PRE_ENLISTMENT),
+                'applications as denied_count' => fn ($query) => $query->where('status', EnrollmentApplication::STATUS_DENIED),
+                'applications as paid_count' => fn ($query) => $query->where('payment_status', EnrollmentApplication::PAYMENT_PAID),
+                'applications as partial_paid_count' => fn ($query) => $query->where('payment_status', EnrollmentApplication::PAYMENT_PARTIALLY_PAID),
+                'applications as graduated_count' => fn ($query) => $query->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED),
+                'applications as active_learners_count' => fn ($query) => $query
+                    ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                    ->where(function ($nested) {
+                        $nested->whereNull('learning_status')
+                            ->orWhere('learning_status', EnrollmentApplication::LEARNING_ACTIVE);
+                    }),
+                'modules',
+                'modules as published_modules_count' => fn ($query) => $query->where('is_published', true),
+            ])
+            ->orderByDesc('year')
+            ->orderBy('name')
+            ->get();
+
+        // Aggregate KPIs (across all batches).
+        $totalApplications = (int) EnrollmentApplication::query()->count();
+        $approvedTrainees = (int) EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)->count();
+        $pendingApplications = (int) EnrollmentApplication::query()
+            ->whereIn('status', [
+                EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+                EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            ])->count();
+        $graduatedTrainees = (int) EnrollmentApplication::query()
+            ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED)->count();
+        $activeLearners = (int) EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where(function ($query) {
+                $query->whereNull('learning_status')
+                    ->orWhere('learning_status', EnrollmentApplication::LEARNING_ACTIVE);
+            })
+            ->count();
+
+        $totalPublishedModules = (int) TrainingModule::query()->where('is_published', true)->count();
+        $totalModules = (int) TrainingModule::query()->count();
+
+        // Module progress mix across every approved learner.
+        $progressStatuses = [
+            ModuleProgress::STATUS_NOT_STARTED,
+            ModuleProgress::STATUS_LOCKED,
+            ModuleProgress::STATUS_IN_PROGRESS,
+            ModuleProgress::STATUS_AWAITING_EVALUATION,
+            ModuleProgress::STATUS_NEEDS_REMEDIATION,
+            ModuleProgress::STATUS_COMPLETED,
+        ];
+        $moduleProgress = ModuleProgress::query()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+        foreach ($progressStatuses as $status) {
+            $moduleProgress[$status] = (int) ($moduleProgress[$status] ?? 0);
+        }
+        $moduleProgressTotal = array_sum($moduleProgress);
+        $completedModules = $moduleProgress[ModuleProgress::STATUS_COMPLETED];
+        $awaitingEvaluation = $moduleProgress[ModuleProgress::STATUS_AWAITING_EVALUATION];
+
+        // Payment / revenue snapshot.
+        $verifiedPaymentsSum = (float) PaymentTransaction::query()
+            ->where('status', PaymentTransaction::STATUS_VERIFIED)
+            ->sum('amount');
+        $pendingPaymentsCount = (int) PaymentTransaction::query()
+            ->where('status', PaymentTransaction::STATUS_PENDING)
+            ->count();
+        $paymentThisMonth = (float) PaymentTransaction::query()
+            ->where('status', PaymentTransaction::STATUS_VERIFIED)
+            ->where(function ($query) {
+                $query->whereBetween('paid_at', [now()->startOfMonth(), now()->endOfMonth()])
+                    ->orWhere(function ($nested) {
+                        $nested->whereNull('paid_at')
+                            ->whereBetween('verified_at', [now()->startOfMonth(), now()->endOfMonth()]);
+                    });
+            })
+            ->sum('amount');
+        $fullyPaidCount = (int) EnrollmentApplication::query()
+            ->where('payment_status', EnrollmentApplication::PAYMENT_PAID)->count();
+        $partiallyPaidCount = (int) EnrollmentApplication::query()
+            ->where('payment_status', EnrollmentApplication::PAYMENT_PARTIALLY_PAID)->count();
+
+        // Attendance snapshot (last 30 days).
+        $attendanceStart = now()->subDays(30)->startOfDay();
+        $attendanceCounts = TraineeAttendance::query()
+            ->where('attendance_date', '>=', $attendanceStart->toDateString())
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+        foreach ([
+            TraineeAttendance::STATUS_PRESENT,
+            TraineeAttendance::STATUS_LATE,
+            TraineeAttendance::STATUS_ABSENT,
+            TraineeAttendance::STATUS_EXCUSED,
+        ] as $s) {
+            $attendanceCounts[$s] = (int) ($attendanceCounts[$s] ?? 0);
+        }
+        $attendanceLogged = array_sum($attendanceCounts);
+        $attendanceRate = $attendanceLogged > 0
+            ? round((($attendanceCounts[TraineeAttendance::STATUS_PRESENT] + $attendanceCounts[TraineeAttendance::STATUS_LATE]) / $attendanceLogged) * 100, 1)
+            : null;
+
+        // Competency evaluation activity (last 30 days).
+        $recentCompetencyEvals = (int) TraineeCompetencyRecord::query()
+            ->where('updated_at', '>=', $attendanceStart)
+            ->count();
+
+        // Top trainees by module completion (whole system).
+        $topTrainees = EnrollmentApplication::query()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->withCount([
+                'moduleProgress as completed_modules' => fn ($q) => $q->where('status', ModuleProgress::STATUS_COMPLETED),
+                'moduleProgress as in_progress_modules' => fn ($q) => $q->whereIn('status', [
+                    ModuleProgress::STATUS_IN_PROGRESS,
+                    ModuleProgress::STATUS_AWAITING_EVALUATION,
+                    ModuleProgress::STATUS_NEEDS_REMEDIATION,
+                ]),
+            ])
+            ->with(['batch:id,name,year'])
+            ->orderByDesc('completed_modules')
+            ->orderByDesc('in_progress_modules')
+            ->limit(8)
+            ->get();
+
         return view('admin.learning.reports', [
-            'batches' => TrainingBatch::query()
-                ->withCount([
-                    'applications',
-                    'applications as am_count' => fn ($query) => $query->where('schedule_preference', 'AM'),
-                    'applications as pm_count' => fn ($query) => $query->where('schedule_preference', 'PM'),
-                    'applications as approved_count' => fn ($query) => $query->where('status', EnrollmentApplication::STATUS_APPROVED),
-                    'applications as paid_count' => fn ($query) => $query->where('payment_status', EnrollmentApplication::PAYMENT_PAID),
-                    'modules',
-                ])
-                ->orderByDesc('year')
-                ->orderBy('name')
-                ->get(),
+            'batches' => $batches,
+            'kpis' => [
+                'total_applications' => $totalApplications,
+                'approved_trainees' => $approvedTrainees,
+                'pending_applications' => $pendingApplications,
+                'graduated_trainees' => $graduatedTrainees,
+                'active_learners' => $activeLearners,
+                'total_modules' => $totalModules,
+                'published_modules' => $totalPublishedModules,
+                'completed_modules' => $completedModules,
+                'awaiting_evaluation' => $awaitingEvaluation,
+                'fully_paid' => $fullyPaidCount,
+                'partially_paid' => $partiallyPaidCount,
+                'pending_payments' => $pendingPaymentsCount,
+                'revenue_verified' => $verifiedPaymentsSum,
+                'revenue_this_month' => $paymentThisMonth,
+            ],
+            'moduleProgress' => $moduleProgress,
+            'moduleProgressTotal' => $moduleProgressTotal,
+            'attendance' => [
+                'counts' => $attendanceCounts,
+                'logged' => $attendanceLogged,
+                'rate' => $attendanceRate,
+                'window_start' => $attendanceStart,
+                'recent_competency_evaluations' => $recentCompetencyEvals,
+            ],
+            'topTrainees' => $topTrainees,
+            'generatedAt' => now(),
         ]);
     }
 

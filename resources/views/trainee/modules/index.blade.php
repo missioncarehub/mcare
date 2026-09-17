@@ -3,7 +3,14 @@
 @section('content')
 @php
     $classworkAccess = $classworkAccess ?? collect();
-    $categories = collect($modules)->groupBy(function ($module) {
+
+    // Path: resources/views/trainee/modules/index.blade.php | Label: Open (accessible) modules first, closed after
+    $orderedModules = collect($modules)->values()->sortBy(function ($module) use ($classworkAccess) {
+        $access = ($classworkAccess ?? collect())[$module->id] ?? ['accessible' => true];
+        return $access['accessible'] ?? true ? 0 : 1;
+    }, SORT_REGULAR, false)->values();
+
+    $categories = $orderedModules->groupBy(function ($module) {
         return match($module->competency_category) {
             'core' => '1. Core Competencies',
             'common' => '2. Common Competencies',

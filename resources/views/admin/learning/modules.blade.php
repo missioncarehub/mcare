@@ -503,6 +503,16 @@
                 submoduleList?.appendChild(input);
             });
 
+            // Path: resources/views/admin/learning/modules.blade.php | Label: Lock category dropdown after preset selection
+            const lockCategoryFromPreset = (locked) => {
+                if (!categoryInput) return;
+                categoryInput.dataset.presetLocked = locked ? '1' : '0';
+                categoryInput.classList.toggle('pointer-events-none', locked);
+                categoryInput.classList.toggle('opacity-70', locked);
+                categoryInput.setAttribute('aria-readonly', locked ? 'true' : 'false');
+                categoryInput.setAttribute('tabindex', locked ? '-1' : '0');
+            };
+
             categoryInput?.addEventListener('change', () => {
                 if (categoryInput.value === 'custom' && submoduleList?.querySelector('input[readonly]')) {
                     renderSubmodules([], false);
@@ -515,7 +525,10 @@
 
             presetSelect.addEventListener('change', () => {
                 const selectedOption = presetSelect.selectedOptions[0];
-                if (!selectedOption || !selectedOption.value) return;
+                if (!selectedOption || !selectedOption.value) {
+                    lockCategoryFromPreset(false);
+                    return;
+                }
 
                 const code = selectedOption.dataset.code || '';
                 const title = selectedOption.dataset.title || '';
@@ -542,11 +555,72 @@
                 }
 
                 renderSubmodules(outcomes, true);
+                lockCategoryFromPreset(true);
 
                 if (topicInput && outcomes.length > 0 && !topicInput.value) {
                     topicInput.value = outcomes[0];
                 }
             });
+        });
+
+        // Path: resources/views/admin/learning/modules.blade.php | Label: Primary lesson file inline preview
+        document.querySelectorAll('[data-file-preview-input]').forEach((input) => {
+            const key = input.dataset.filePreviewInput;
+            const panel = document.querySelector('[data-file-preview-panel="' + CSS.escape(key) + '"]');
+            if (!panel) return;
+            const nameEl = panel.querySelector('[data-file-preview-name]');
+            const sizeEl = panel.querySelector('[data-file-preview-size]');
+            const bodyEl = panel.querySelector('[data-file-preview-body]');
+            const removeBtn = document.querySelector('[data-file-preview-remove="' + CSS.escape(key) + '"]');
+
+            const formatBytes = (b) => {
+                if (!b) return '';
+                if (b < 1024) return b + ' B';
+                if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+                return (b/1024/1024).toFixed(2) + ' MB';
+            };
+
+            const renderPreview = (file) => {
+                if (!file) {
+                    panel.classList.add('hidden');
+                    if (bodyEl) bodyEl.innerHTML = '';
+                    return;
+                }
+                panel.classList.remove('hidden');
+                if (nameEl) nameEl.textContent = file.name;
+                if (sizeEl) sizeEl.textContent = formatBytes(file.size);
+                if (!bodyEl) return;
+                bodyEl.innerHTML = '';
+                const url = URL.createObjectURL(file);
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = file.name;
+                    img.className = 'max-h-72 w-auto rounded-lg border border-slate-200 bg-white';
+                    bodyEl.appendChild(img);
+                } else if (file.type === 'application/pdf') {
+                    const embed = document.createElement('iframe');
+                    embed.src = url;
+                    embed.title = file.name;
+                    embed.className = 'h-72 w-full rounded-lg border border-slate-200 bg-white';
+                    bodyEl.appendChild(embed);
+                } else {
+                    const note = document.createElement('p');
+                    note.className = 'text-xs text-slate-500';
+                    note.textContent = 'Preview not available for this file type — the file will still be uploaded.';
+                    bodyEl.appendChild(note);
+                }
+            };
+
+            input.addEventListener('change', () => {
+                renderPreview(input.files && input.files[0] ? input.files[0] : null);
+            });
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    input.value = '';
+                    renderPreview(null);
+                });
+            }
         });
     });
 </script>

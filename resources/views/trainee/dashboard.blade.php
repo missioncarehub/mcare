@@ -86,14 +86,30 @@
             <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Private LMS access</span>
         </div>
 
+        @php
+            // Path: resources/views/trainee/dashboard.blade.php | Label: Open modules first, closed after
+            // The service already orders by module code and defer status; re-sort here so accessible
+            // (open) modules come before locked ones, preserving the underlying sequence within each group.
+            $orderedModules = collect($modules)->values()->sortBy(function ($module) use ($classworkAccess) {
+                $access = ($classworkAccess ?? collect())[$module->id] ?? ['accessible' => true];
+                return $access['accessible'] ?? true ? 0 : 1;
+            }, SORT_REGULAR, false)->values();
+        @endphp
         <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            @forelse ($modules as $module)
+            @forelse ($orderedModules as $module)
                 @php
                     $moduleProgress = $progressByModule->get($module->id);
                     $access = ($classworkAccess ?? collect())[$module->id] ?? ['accessible' => true, 'blocker' => null];
                     $isLocked = ! ($access['accessible'] ?? true);
                     $blocker = $access['blocker'] ?? null;
                     $progressValue = $isLocked ? 0 : (int) ($moduleProgress?->displayProgressPercent() ?? 0);
+                    $isTrainerValidated = $moduleProgress?->isTrainerValidated() ?? false;
+                    $isAwaitingEval = ($moduleProgress?->status ?? null) === \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION;
+                    $canMarkAsDone = ! $isLocked
+                        && $module->requiresEvaluation()
+                        && ! $isTrainerValidated
+                        && ! $isAwaitingEval
+                        && ! ($module->submodules()->where('is_required', true)->exists());
                 @endphp
                 <article class="dashboard-card p-5{{ $isLocked ? ' opacity-75' : '' }}">
                     <div class="flex items-start justify-between gap-4">
@@ -120,6 +136,19 @@
                         <a href="{{ route('trainee.modules.show', $module) }}" class="secondary-action mt-5 w-full">
                             Open protected viewer
                         </a>
+                        {{-- Path: resources/views/trainee/dashboard.blade.php | Label: Mark as done → awaits trainer evaluation --}}
+                        @if($canMarkAsDone)
+                            <form method="POST" action="{{ route('trainee.modules.progress', $module) }}" class="mt-2" data-confirm="Mark this module as done and send it to your trainer for evaluation? You will not be able to edit it after this.">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="action" value="submit">
+                                <button type="submit" class="primary-action w-full">Mark as done</button>
+                            </form>
+                        @elseif($isAwaitingEval)
+                            <span class="dashboard-pill mt-3 w-full text-center bg-amber-50 text-amber-700 ring-amber-100">Awaiting trainer evaluation</span>
+                        @elseif($isTrainerValidated)
+                            <span class="dashboard-pill mt-3 w-full text-center bg-emerald-50 text-emerald-700 ring-emerald-100">Competent · evaluated by trainer</span>
+                        @endif
                     @endif
                 </article>
             @empty

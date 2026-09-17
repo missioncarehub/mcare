@@ -181,11 +181,23 @@
             <div class="lms-field lms-field-wide">
                 <label for="module-file">Primary Lesson File ({{ \App\Support\TrainingModuleFiles::humanLabel() }})</label>
                 <div class="lms-file-picker">
-                    <input id="module-file" name="module_file" type="file" required accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" data-lms-file-input>
+                    <input id="module-file" name="module_file" type="file" required accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" data-lms-file-input data-file-preview-input="module-file">
                     <div class="lms-file-preview" data-lms-file-preview aria-live="polite">
                         <x-dashboard-icon name="cloud-arrow-up" />
                         <span><strong>Choose primary lesson file</strong><small>{{ \App\Support\TrainingModuleFiles::humanLabel() }} - maximum 38MB</small></span>
                     </div>
+                </div>
+                {{-- Path: resources/views/trainer/resources.blade.php | Label: Primary lesson file preview + remove --}}
+                <div class="mt-3 hidden rounded-xl border border-slate-200 bg-slate-50 p-3" data-file-preview-panel="module-file">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold text-slate-500">Preview</p>
+                            <p class="mt-0.5 truncate text-sm font-bold text-slate-900" data-file-preview-name>—</p>
+                            <p class="text-[11px] text-slate-500" data-file-preview-size></p>
+                        </div>
+                        <button type="button" class="secondary-action text-xs" data-file-preview-remove="module-file">Remove / replace</button>
+                    </div>
+                    <div class="mt-3" data-file-preview-body></div>
                 </div>
                 @error('module_file')<p class="lms-field-error">{{ $message }}</p>@enderror
             </div>
@@ -614,10 +626,24 @@
             }
         });
 
+        // Path: resources/views/trainer/resources.blade.php | Label: Lock category dropdown after preset selection
+        const lockCategoryFromPreset = (locked) => {
+            if (!categorySelect) return;
+            categorySelect.dataset.presetLocked = locked ? '1' : '0';
+            categorySelect.classList.toggle('pointer-events-none', locked);
+            categorySelect.classList.toggle('opacity-70', locked);
+            categorySelect.setAttribute('aria-readonly', locked ? 'true' : 'false');
+            categorySelect.setAttribute('tabindex', locked ? '-1' : '0');
+        };
+
         if (presetSelect) {
             presetSelect.addEventListener('change', () => {
                 const selectedOption = presetSelect.selectedOptions[0];
-                if (!selectedOption || !selectedOption.value) return;
+                if (!selectedOption || !selectedOption.value) {
+                    // Cleared preset — reopen the category dropdown so trainer can pick again
+                    lockCategoryFromPreset(false);
+                    return;
+                }
 
                 const code = selectedOption.dataset.code || '';
                 const category = selectedOption.dataset.category || 'core';
@@ -648,9 +674,71 @@
                 if (topicInput && outcomes.length > 0 && !topicInput.value) {
                     topicInput.value = outcomes[0];
                 }
+
+                lockCategoryFromPreset(true);
             });
         }
         applyCategoryBehavior();
+
+        // Path: resources/views/trainer/resources.blade.php | Label: Primary lesson file inline preview
+        document.querySelectorAll('[data-file-preview-input]').forEach((input) => {
+            const key = input.dataset.filePreviewInput;
+            const panel = document.querySelector('[data-file-preview-panel="' + key + '"]');
+            if (!panel) return;
+            const nameEl = panel.querySelector('[data-file-preview-name]');
+            const sizeEl = panel.querySelector('[data-file-preview-size]');
+            const bodyEl = panel.querySelector('[data-file-preview-body]');
+            const removeBtn = document.querySelector('[data-file-preview-remove="' + key + '"]');
+
+            const formatBytes = (b) => {
+                if (!b) return '';
+                if (b < 1024) return b + ' B';
+                if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+                return (b/1024/1024).toFixed(2) + ' MB';
+            };
+
+            const renderPreview = (file) => {
+                if (!file) {
+                    panel.classList.add('hidden');
+                    if (bodyEl) bodyEl.innerHTML = '';
+                    return;
+                }
+                panel.classList.remove('hidden');
+                if (nameEl) nameEl.textContent = file.name;
+                if (sizeEl) sizeEl.textContent = formatBytes(file.size);
+                if (!bodyEl) return;
+                bodyEl.innerHTML = '';
+                const url = URL.createObjectURL(file);
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = file.name;
+                    img.className = 'max-h-72 w-auto rounded-lg border border-slate-200 bg-white';
+                    bodyEl.appendChild(img);
+                } else if (file.type === 'application/pdf') {
+                    const embed = document.createElement('iframe');
+                    embed.src = url;
+                    embed.title = file.name;
+                    embed.className = 'h-72 w-full rounded-lg border border-slate-200 bg-white';
+                    bodyEl.appendChild(embed);
+                } else {
+                    const note = document.createElement('p');
+                    note.className = 'text-xs text-slate-500';
+                    note.textContent = 'Preview not available for this file type — the file will still be uploaded.';
+                    bodyEl.appendChild(note);
+                }
+            };
+
+            input.addEventListener('change', () => {
+                renderPreview(input.files && input.files[0] ? input.files[0] : null);
+            });
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    input.value = '';
+                    renderPreview(null);
+                });
+            }
+        });
 
         const quickQuizModule = document.getElementById('quick-quiz-module');
         const quickQuizSubmodule = document.getElementById('quick-quiz-submodule');

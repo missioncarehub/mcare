@@ -32,6 +32,20 @@
             </header>
 
             <div class="enrollment-form-body">
+                {{-- Path: resources/views/applications/create.blade.php | Label: Applicant-facing error handler --}}
+                @if (session('application_error'))
+                    <p class="enrollment-notice enrollment-notice-error" role="alert" data-auto-dismiss="8000">
+                        {{ session('application_error') }}
+                    </p>
+                @endif
+
+                @if ($programs->isEmpty())
+                    <p class="enrollment-notice enrollment-notice-amber" role="alert">
+                        MCARE has not published any active training program right now. Applications will reopen once the administrator activates a program.
+                        You can <a href="{{ route('applications.status') }}" class="underline underline-offset-2">check the status of a previous application</a> in the meantime.
+                    </p>
+                @endif
+
                 @if ($errors->first('email') === \App\Models\AdmissionApplication::EMAIL_IN_USE_MESSAGE)
                     <p class="enrollment-notice enrollment-notice-error" role="alert">
                         This Gmail has already been used for a pending or approved MCARE application.
@@ -39,7 +53,26 @@
                         with the application number sent to this email.
                     </p>
                 @elseif ($errors->any())
-                    <p class="enrollment-notice enrollment-notice-error" role="alert">Please review the highlighted application fields.</p>
+                    <div class="enrollment-notice enrollment-notice-error" role="alert">
+                        <p class="font-bold">We couldn't submit your application yet.</p>
+                        <p class="mt-1">Please review the highlighted fields below and try again. Common issues:</p>
+                        <ul class="mt-2 list-disc pl-5 text-sm">
+                            <li>Use a valid Gmail address ending in <span class="font-mono">@gmail.com</span>.</li>
+                            <li>Enter a working PH contact number (digits, spaces, and <span class="font-mono">+-()</span> only).</li>
+                            <li>Do not include special characters like <span class="font-mono">&lt; &gt; " ' ` ; { } | \</span> in your name or notes.</li>
+                            <li>Tick the privacy consent checkbox before submitting.</li>
+                        </ul>
+                        @if ($errors->hasBag('default'))
+                            <details class="mt-3 text-xs">
+                                <summary class="cursor-pointer font-bold">Show detailed error list</summary>
+                                <ul class="mt-2 space-y-1">
+                                    @foreach ($errors->all() as $error)
+                                        <li>· {{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
+                    </div>
                 @endif
 
                 @php

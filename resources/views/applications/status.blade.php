@@ -40,22 +40,74 @@
                 @endif
 
                 @if ($admission)
-                    <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Application number</p>
-                            <p class="mt-1 font-display text-2xl font-extrabold text-slate-950">{{ $admission->application_number }}</p>
+                    @php
+                        $stages = $admission->progressStages();
+                        $enrollment = $admission->enrollment;
+                        $currentStage = $admission->currentStage();
+                        $badgeToneByState = [
+                            'complete' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                            'in_progress' => 'bg-amber-50 text-amber-700 ring-amber-100',
+                            'pending' => 'bg-slate-50 text-slate-500 ring-slate-100',
+                            'blocked' => 'bg-red-50 text-red-700 ring-red-100',
+                        ];
+                        $stateLabels = [
+                            'complete' => 'Complete',
+                            'in_progress' => 'In progress',
+                            'pending' => 'Pending',
+                            'blocked' => 'Blocked',
+                        ];
+                    @endphp
+
+                    <div class="rounded-xl border border-slate-200 bg-white p-5 space-y-5">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Application number</p>
+                                <p class="mt-1 font-display text-2xl font-extrabold text-slate-950">{{ $admission->application_number }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Current stage</p>
+                                <p class="mt-1 font-display text-lg font-bold text-slate-950">{{ $currentStage['label'] }}</p>
+                                <span class="mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 {{ $badgeToneByState[$currentStage['state']] ?? 'bg-slate-50 text-slate-600 ring-slate-100' }}">{{ $stateLabels[$currentStage['state']] ?? ucfirst($currentStage['state']) }}</span>
+                            </div>
                         </div>
-                        <p>
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Status</span>
-                            <span class="mt-1 block text-lg font-bold text-slate-900">{{ $admission->statusLabel() }}</span>
-                        </p>
-                        <p class="text-sm text-slate-600">Submitted {{ $admission->created_at?->format('M d, Y g:i A') }} for {{ $admission->program }}.</p>
+
+                        <div class="grid gap-3 sm:grid-cols-2 text-sm">
+                            <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Program</span><br>{{ $admission->program }}</p>
+                            <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Preferred schedule</span><br>{{ $admission->schedule_preference ?: 'No preference' }}</p>
+                            <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Submitted</span><br>{{ $admission->created_at?->format('M d, Y g:i A') ?? '—' }}</p>
+                            <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Overall status</span><br>{{ $admission->statusLabel() }}</p>
+                            @if ($enrollment)
+                                <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Enrollment number</span><br>{{ $enrollment->enrollment_number }}</p>
+                                <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Batch</span><br>{{ $enrollment->batch ? $enrollment->batch->name.' '.$enrollment->batch->year : 'Awaiting assignment' }}</p>
+                                <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Payment</span><br>{{ $enrollment->paymentStatusLabel() }}</p>
+                                @if ($enrollment->batch?->enrollment_ends_at && ! $enrollment->batch->is_continuous_enrollment)
+                                    <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Enrollment deadline</span><br>{{ $enrollment->batch->enrollment_ends_at->format('M d, Y g:i A') }}</p>
+                                @endif
+                            @endif
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Applicant progress</p>
+                            <ol class="mt-3 space-y-3">
+                                @foreach ($stages as $index => $stage)
+                                    <li class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+                                        <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black ring-1 {{ $badgeToneByState[$stage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">{{ $index + 1 }}</span>
+                                        <div class="min-w-0">
+                                            <p class="font-bold text-slate-900">{{ $stage['label'] }}
+                                                <span class="ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 {{ $badgeToneByState[$stage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">{{ $stateLabels[$stage['state']] ?? ucfirst($stage['state']) }}</span>
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-600">{{ $stage['description'] }}</p>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
 
                         @if ($admission->isPending())
                             <p class="enrollment-notice enrollment-notice-amber">MCARE is still reviewing this application. Return here anytime with the same number.</p>
                         @elseif ($admission->isApproved())
                             <p class="enrollment-notice enrollment-notice-ok">This application is approved. Enter this number on the enrollment page to open the TESDA form.</p>
-                            @if ($admission->enrollment)
+                            @if ($enrollment)
                                 <a href="{{ route('login') }}" class="primary-action">Sign in to continue enrollment</a>
                             @else
                                 <a href="{{ $admission->enrollmentUrl() }}" class="primary-action">Continue to enrollment</a>

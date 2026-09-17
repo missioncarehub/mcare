@@ -254,4 +254,15 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $application?->status === EnrollmentApplication::STATUS_APPROVED
             && $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
     }
+
+    // Path: app/Models/User.php | Label: Check whether the trainee has an approved enrollment
+    // Used by the trainee shell/middleware to decide whether LMS modules and classwork are unlocked.
+    public function hasApprovedEnrollment(): bool
+    {
+        $application = $this->relationLoaded('enrollmentApplication')
+            ? $this->enrollmentApplication
+            : $this->enrollmentApplication()->first();
+
+        return $application?->status === EnrollmentApplication::STATUS_APPROVED;
+    }
 }

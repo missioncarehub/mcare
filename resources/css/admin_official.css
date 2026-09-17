@@ -51,6 +51,47 @@
     box-shadow: none;
 }
 
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.5rem;
+    min-height: 3.5rem;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header .dashboard-brand {
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    align-items: center;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header .dashboard-brand > span {
+    min-width: 0;
+    flex: 1 1 0;
+    max-width: none;
+}
+
+.universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-collapse {
+    flex: 0 0 auto;
+    align-self: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: 0;
+}
+
+@media (min-width: 1024px) {
+    .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-collapse {
+        display: inline-flex;
+    }
+}
+
+html.is-admin-sidebar-collapsed .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-sidebar-header {
+    grid-template-columns: auto;
+    justify-items: center;
+    row-gap: 0.5rem;
+}
+
 .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-brand,
 .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-nav-link,
 .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-account-summary,
@@ -331,6 +372,48 @@
 
 .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .dashboard-section-kicker {
     letter-spacing: 0.14em;
+}
+
+.universal-dashboard .training-record-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.universal-dashboard .training-record-actions form {
+    display: contents;
+}
+
+.universal-dashboard .training-record-text-action {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--admin-purple);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.universal-dashboard .training-record-text-action:hover,
+.universal-dashboard .training-record-text-action:focus-visible {
+    color: var(--admin-purple-deep);
+    text-decoration: underline;
+    outline: none;
+}
+
+.universal-dashboard .training-record-text-action:disabled,
+.universal-dashboard .training-record-text-action.is-disabled {
+    color: #94a3b8;
+    cursor: not-allowed;
+    text-decoration: none;
 }
 
 .universal-dashboard:is([data-dashboard-role="admin"], [data-dashboard-role="trainer"], [data-dashboard-role="trainee"]) .primary-action,

@@ -193,6 +193,10 @@
                         <p class="enrollment-kicker">Your saved batch</p>
                         <p class="enrollment-batch-title">{{ $enrollmentBatch->program?->name ?? $application->program }}</p>
                         <p class="enrollment-batch-meta">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
+                        <p class="enrollment-batch-meta">
+                            <strong class="text-purple-700">Enrollment deadline:</strong>
+                            {{ $enrollmentBatch->is_continuous_enrollment ? 'Continuous enrollment · no deadline' : ($enrollmentBatch->enrollment_ends_at?->format('M d, Y g:i A') ?? 'To be announced') }}
+                        </p>
                     </div>
                 @elseif ($availableBatches->isNotEmpty())
                     <div class="enrollment-batch-list">
@@ -210,6 +214,10 @@
                                 </div>
                                 <p class="enrollment-batch-meta">AM: {{ $availableBatch->scheduleLabelFor('AM') }}</p>
                                 <p class="enrollment-batch-meta">PM: {{ $availableBatch->scheduleLabelFor('PM') }}</p>
+                                <p class="enrollment-batch-meta">
+                                    <strong class="text-purple-700">Enrollment deadline:</strong>
+                                    {{ $availableBatch->is_continuous_enrollment ? 'Continuous enrollment · no deadline' : ($availableBatch->enrollment_ends_at?->format('M d, Y g:i A') ?? 'To be announced') }}
+                                </p>
                                 <p class="enrollment-batch-fee">Required downpayment: ₱{{ number_format((float) $availableBatch->program?->downpayment_amount, 2) }}</p>
                             </a>
                         @endforeach

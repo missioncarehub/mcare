@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Notifications\EnrollmentDocumentsReviseRequestedNotification;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
 use App\Services\AccountDeletionService;
 use App\Services\RollingModuleReleaseService;
@@ -448,6 +449,77 @@ class EnrollmentReviewController extends Controller
         return redirect()
             ->route('admin.enrollments.show', $enrollmentApplication)
             ->with('saved', 'Document review completed. You can now save the enrollment decision.');
+    }
+
+    /**
+     * Path: app/Http/Controllers/Admin/EnrollmentReviewController.php | Label: Request document revisions
+     *
+     * Emails the applicant a "please revise your documents" notice with a
+     * direct link back to the enrollment page so they can re-upload the
+     * corrected files. Uses whatever documents are currently marked
+     * "Needs replacement" plus an optional free-form remark from the admin.
+     */
+    public function requestDocumentRevisions(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    {
+        $this->ensureReleasedForReview($enrollmentApplication);
+
+        $validated = $request->validate([
+            'remark' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $review = $enrollmentApplication->document_review ?? [];
+        $labels = [];
+        foreach ($this->documentFields() as $key => $definition) {
+            if (data_get($review, $key.'.status') === 'replace') {
+                $labels[] = $definition['label'];
+            }
+        }
+
+        if ($labels === []) {
+            return redirect()
+                ->route('admin.enrollments.document-review', $enrollmentApplication)
+                ->withErrors([
+                    'documents' => 'Mark at least one document as "Needs replacement" (with an optional note) before requesting revisions.',
+                ]);
+        }
+
+        // Clear any prior completion timestamp so the request goes back to review.
+        $enrollmentApplication->forceFill([
+            'documents_reviewed_at' => null,
+            'documents_reviewed_by_id' => null,
+        ])->save();
+
+        $enrollee = $enrollmentApplication->user;
+
+        $sent = false;
+        if ($enrollee) {
+            try {
+                $enrollee->notifyNow(new EnrollmentDocumentsReviseRequestedNotification(
+                    $enrollmentApplication->fresh(),
+                    $labels,
+                    trim((string) ($validated['remark'] ?? '')) ?: null,
+                ));
+                $sent = true;
+            } catch (Throwable $exception) {
+                // A mail outage must not undo the admin's revision request.
+                report($exception);
+            }
+        }
+
+        AdminActivityLog::record($request->user(), 'enrollment.documents.revise-requested', $enrollmentApplication, [
+            'applicant_email' => $enrollmentApplication->email,
+            'documents' => $labels,
+            'email_sent' => $sent,
+            'remark' => $validated['remark'] ?? null,
+        ]);
+
+        $notice = $sent
+            ? 'Revision request emailed to '.$enrollmentApplication->email.'. The applicant can re-upload the flagged documents through the enrollment page.'
+            : 'Revision request logged. No email was sent (applicant has no linked account or mail is unavailable).';
+
+        return redirect()
+            ->route('admin.enrollments.document-review', $enrollmentApplication)
+            ->with('saved', $notice);
     }
 
     public function documentPreview(EnrollmentApplication $enrollmentApplication, string $document): View

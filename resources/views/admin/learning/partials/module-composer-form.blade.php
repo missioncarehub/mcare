@@ -12,6 +12,7 @@
         'submodule_titles',
         $isEdit ? ($module->submodules->pluck('title')->filter()->values()->all() ?: ['']) : ['']
     );
+    $previewKey = $prefix.'-module-file-'.($isEdit ? $module->id : 'new');
 @endphp
 
 <form
@@ -129,10 +130,22 @@
 
     <div>
         <label class="mb-2 block text-xs font-bold uppercase text-slate-500">{{ \App\Support\TrainingModuleFiles::humanLabel() }}</label>
-        <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" @required(! $isEdit)>
+        <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" @required(! $isEdit) data-file-preview-input="{{ $previewKey }}">
         @if($isEdit && filled($module->original_file_name))
             <p class="mt-1 text-xs text-slate-500">Current file: {{ $module->original_file_name }}. Leave empty to keep it.</p>
         @endif
+        {{-- Path: resources/views/admin/learning/partials/module-composer-form.blade.php | Label: Primary lesson file preview + remove --}}
+        <div class="mt-3 hidden rounded-xl border border-slate-200 bg-slate-50 p-3" data-file-preview-panel="{{ $previewKey }}">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-slate-500">Preview</p>
+                    <p class="mt-0.5 truncate text-sm font-bold text-slate-900" data-file-preview-name>—</p>
+                    <p class="text-[11px] text-slate-500" data-file-preview-size></p>
+                </div>
+                <button type="button" class="secondary-action text-xs" data-file-preview-remove="{{ $previewKey }}">Remove / replace</button>
+            </div>
+            <div class="mt-3" data-file-preview-body></div>
+        </div>
         @error('module_file', $errorBag)<p class="mt-2 text-xs font-bold text-red-600">{{ $message }}</p>@enderror
     </div>
 

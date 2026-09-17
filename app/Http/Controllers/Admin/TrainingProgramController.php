@@ -142,13 +142,27 @@ class TrainingProgramController extends Controller
             ])->errorBag('program');
         }
 
+        // Path: app/Http/Controllers/Admin/TrainingProgramController.php | Label: Publish requires batch
+        // A program cannot be published (is_active = true) until at least one batch exists for it.
+        // On create, there is no program yet so no batch can be attached — force inactive.
+        $wantsPublish = $request->boolean('program_is_active');
+        $hasBatch = $program !== null && $program->batches()->exists();
+
+        if ($wantsPublish && ! $hasBatch) {
+            throw ValidationException::withMessages([
+                'program_is_active' => $program === null
+                    ? 'Create the program first, add a batch, then publish it.'
+                    : 'Add at least one batch to this program before publishing it.',
+            ])->errorBag('program');
+        }
+
         return [
             'name' => $validated['program_name'],
             'code' => $validated['program_code'],
             'description' => $validated['program_description'] ?? null,
             'total_program_fee' => $validated['program_total_fee'],
             'downpayment_amount' => $validated['program_downpayment'],
-            'is_active' => $request->boolean('program_is_active'),
+            'is_active' => $wantsPublish,
         ];
     }
 

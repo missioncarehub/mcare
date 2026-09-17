@@ -50,6 +50,8 @@ class AttendanceController extends Controller
         $existingAttendances = collect();
         $summary = null;
 
+        $eligibleFromByTrainee = collect();
+
         if ($selectedBatch) {
             $trainees = $selectedBatch->applications()
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
@@ -58,6 +60,11 @@ class AttendanceController extends Controller
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
+
+            // Path: app/Http/Controllers/Trainer/AttendanceController.php | Label: Newly enrolled attendance eligibility
+            $eligibleFromByTrainee = $trainees->mapWithKeys(fn ($trainee) => [
+                $trainee->id => $this->attendanceService->attendanceEligibleFrom($trainee),
+            ]);
 
             $existingAttendances = TraineeAttendance::where('training_batch_id', $selectedBatch->id)
                 ->whereDate('attendance_date', $selectedDate->toDateString())
@@ -79,6 +86,7 @@ class AttendanceController extends Controller
             'existingAttendances' => $existingAttendances,
             'summary' => $summary,
             'statuses' => TraineeAttendance::statuses(),
+            'eligibleFromByTrainee' => $eligibleFromByTrainee,
         ]);
     }
 

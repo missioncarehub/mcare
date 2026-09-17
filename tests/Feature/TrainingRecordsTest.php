@@ -152,9 +152,10 @@ class TrainingRecordsTest extends TestCase
         $trainer = User::factory()->create(['role' => 'trainer']);
         $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
         $this->completeCompetencies($application, $trainer);
+        $this->graduate($application);
 
         $this->actingAs($admin)
-            ->get(route('admin.learning.certificates'))
+            ->get(route('admin.learning.certificates', ['tab' => 'graduates']))
             ->assertOk()
             ->assertSee(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]), false)
             ->assertSee('Generate TOR');
@@ -198,6 +199,7 @@ class TrainingRecordsTest extends TestCase
         $trainer = User::factory()->create(['role' => 'trainer']);
         $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
         $this->completeCompetencies($application, $trainer);
+        $this->graduate($application);
 
         $this->actingAs($admin)
             ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_COTC]))
@@ -236,6 +238,7 @@ class TrainingRecordsTest extends TestCase
         $trainer = User::factory()->create(['role' => 'trainer']);
         $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
         $this->completeCompetencies($application, $trainer);
+        $this->graduate($application);
         $tor = OfficialDocument::create([
             'enrollment_application_id' => $application->id,
             'training_batch_id' => $application->training_batch_id,
@@ -248,7 +251,7 @@ class TrainingRecordsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('admin.learning.certificates'))
+            ->get(route('admin.learning.certificates', ['tab' => 'graduates']))
             ->assertOk()
             ->assertSee('Generate TOR now');
 
@@ -654,6 +657,7 @@ class TrainingRecordsTest extends TestCase
         $trainee = User::factory()->create(['role' => 'trainee']);
         $application = $this->approvedApplication($trainee, completed: true);
         $this->completeCompetencies($application, $trainer);
+        $this->graduate($application);
         $export = BatchDocumentExport::create([
             'training_batch_id' => $application->training_batch_id,
             'type' => OfficialDocument::TYPE_TOR,
@@ -731,6 +735,14 @@ class TrainingRecordsTest extends TestCase
             'published_at' => now(),
             'activated_at' => now(),
         ]);
+    }
+
+    private function graduate(EnrollmentApplication $application): void
+    {
+        $application->forceFill([
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            'learning_status_changed_at' => now(),
+        ])->save();
     }
 
     private function completeCompetencies(EnrollmentApplication $application, User $trainer): void
@@ -820,5 +832,71 @@ class TrainingRecordsTest extends TestCase
             ->get(route('trainee.grades'))
             ->assertOk()
             ->assertSee('Official Certificate and Transcript of Records (TOR) Notice');
+    }
+
+    public function test_tor_requires_graduation_and_all_completion_checks(): void
+    {
+        Storage::fake('local');
+        $this->app->bind(OfficialDocumentRenderer::class, fn () => new class implements OfficialDocumentRenderer
+        {
+            public function render(OfficialDocument $document): string
+            {
+                return '%PDF-1.4 '.$document->type;
+            }
+        });
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $application = $this->approvedApplication(User::factory()->create(['role' => 'trainee']), completed: true);
+        $this->completeCompetencies($application, $trainer);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.certificates'))
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('eligibility');
+
+        $this->graduate($application);
+
+        $application->forceFill([
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.certificates'))
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('eligibility');
+
+        $application->forceFill([
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.documents.generate', [$application, OfficialDocument::TYPE_TOR]))
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $tor = OfficialDocument::query()->where('type', OfficialDocument::TYPE_TOR)->sole();
+        Storage::disk('local')->put($tor->file_path, '%PDF-1.4 tor');
+
+        $application->forceFill([
+            'learning_status' => EnrollmentApplication::LEARNING_ACTIVE,
+        ])->save();
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.documents.preview', $tor))
+            ->assertForbidden();
+        $this->actingAs($admin)
+            ->get(route('admin.learning.documents.download', $tor))
+            ->assertForbidden();
+
+        $this->graduate($application);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.documents.preview', $tor))
+            ->assertOk();
+        $this->actingAs($admin)
+            ->get(route('admin.learning.documents.download', $tor))
+            ->assertOk();
     }
 }

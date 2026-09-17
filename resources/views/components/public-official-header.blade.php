@@ -14,6 +14,16 @@
     $secondaryIsHome = filled($secondaryHref)
         && rtrim((string) $secondaryHref, '/') === rtrim($homeUrl, '/');
     $showSecondaryInMenu = filled($secondaryHref) && filled($secondaryLabel) && ! $secondaryIsHome;
+
+    // Path: resources/views/components/public-official-header.blade.php | Label: shared public nav links
+    // Mirrors the landing page so public pages (applications, status, enrollment, payments, alumni) share the same navigation.
+    $publicNavLinks = [
+        ['href' => $homeUrl.'#programs', 'label' => 'Programs'],
+        ['href' => route('applications.create'), 'label' => 'Apply'],
+        ['href' => route('applications.status'), 'label' => 'Check status'],
+        ['href' => route('payments.show'), 'label' => 'Payments'],
+        ['href' => route('alumni.claim.create'), 'label' => 'Alumni claim'],
+    ];
 @endphp
 
 <header {{ $attributes->class('auth-site-header') }} data-header-scroll-border>
@@ -31,6 +41,9 @@
         </a>
         <div class="auth-topnav-links">
             <a href="{{ $homeUrl }}" class="auth-topnav-link">Home</a>
+            @foreach ($publicNavLinks as $link)
+                <a href="{{ $link['href'] }}" class="auth-topnav-link is-compact-hide">{{ $link['label'] }}</a>
+            @endforeach
             @if ($showSecondaryInMenu)
                 <a href="{{ $secondaryHref }}" class="auth-topnav-link{{ $secondaryCompactHide ? ' is-compact-hide' : '' }}">{{ $secondaryLabel }}</a>
             @endif
@@ -63,6 +76,9 @@
         </div>
         <nav class="public-mobile-menu-links">
             <a href="{{ $homeUrl }}" class="public-mobile-menu-link" data-public-menu-link>Home</a>
+            @foreach ($publicNavLinks as $link)
+                <a href="{{ $link['href'] }}" class="public-mobile-menu-link" data-public-menu-link>{{ $link['label'] }}</a>
+            @endforeach
             @if ($showSecondaryInMenu)
                 <a href="{{ $secondaryHref }}" class="public-mobile-menu-link" data-public-menu-link>{{ $secondaryLabel }}</a>
             @endif

@@ -46,8 +46,10 @@
                         </td>
                         <td>
                             <span class="dashboard-pill {{ $eligibility['eligible'] ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">{{ $eligibility['eligible'] ? 'Eligible for issuance' : 'Completion checks pending' }}</span>
-                            @if($record->learning_status && $record->learning_status !== \App\Models\EnrollmentApplication::LEARNING_ACTIVE && $record->learning_status !== \App\Models\EnrollmentApplication::LEARNING_GRADUATED)
-                                <p class="mt-2"><span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">{{ $record->learningStatusLabel() }}</span></p>
+                            @if($record->learning_status === \App\Models\EnrollmentApplication::LEARNING_GRADUATED)
+                                <p class="mt-2"><span class="dashboard-pill bg-indigo-50 text-indigo-700 ring-indigo-100">Graduated</span></p>
+                            @else
+                                <p class="mt-2"><span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">Not graduated</span></p>
                             @endif
                         </td>
                         <td>

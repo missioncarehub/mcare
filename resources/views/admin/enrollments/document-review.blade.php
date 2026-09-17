@@ -79,6 +79,32 @@
         </form>
     </section>
 
+    {{-- Path: resources/views/admin/enrollments/document-review.blade.php | Label: Request revisions block --}}
+    <section class="mt-6 border border-amber-200 bg-amber-50/40 p-6">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-amber-900">Request revisions from the applicant</h2>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-amber-900/90">
+                    First mark each problem document above as <strong>Needs replacement</strong> and add a short note explaining what to correct. Then click the button below to email the applicant a direct link to re-upload the flagged files.
+                </p>
+            </div>
+            @error('documents_request')
+                <p class="text-xs font-bold text-red-700">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <form method="POST" action="{{ route('admin.enrollments.documents.request-revisions', $application) }}" class="mt-4 space-y-3">
+            @csrf
+            <label for="revise-remark" class="block text-xs font-bold uppercase tracking-wider text-amber-900">Overall remark (optional)</label>
+            <textarea id="revise-remark" name="remark" rows="3" maxlength="2000" class="w-full border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="Example: Two of your documents were unclear. Please re-upload sharp, complete scans.">{{ old('remark') }}</textarea>
+            @error('remark')<p class="text-xs font-bold text-red-700">{{ $message }}</p>@enderror
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="submit" class="primary-action">Email revision request</button>
+                <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's enrollment page so they can immediately re-upload.</p>
+            </div>
+        </form>
+    </section>
+
     <div id="document-preview-modal"
         class="fixed inset-0 z-[100] hidden"
         role="dialog"

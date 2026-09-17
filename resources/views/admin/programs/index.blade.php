@@ -6,6 +6,7 @@
         $programFormHasErrors = $errors->program->any();
         $formAction = $program ? route('admin.training-programs.update', $program) : route('admin.training-programs.store');
         $useOld = $programFormHasErrors;
+        $isLastProgram = $programs->count() <= 1;
     @endphp
 
     <div class="space-y-6">
@@ -30,7 +31,6 @@
                 </div>
                 <span class="w-fit rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">{{ $programs->count() }} configured</span>
             </div>
-            @php($isLastProgram = $programs->count() <= 1)
 
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-100 text-sm">
@@ -64,8 +64,10 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">
-                                    @php($programHasRelatedRecords = ($item->batches_count + $item->applications_count + $item->admission_applications_count) > 0)
-                                    @php($cannotDeleteProgram = $isLastProgram || $programHasRelatedRecords)
+                                    @php
+                                        $programHasRelatedRecords = ($item->batches_count + $item->applications_count + $item->admission_applications_count) > 0;
+                                        $cannotDeleteProgram = $isLastProgram || $programHasRelatedRecords;
+                                    @endphp
                                     <div class="flex flex-wrap justify-end gap-2">
                                         <a href="{{ route('admin.training-programs.edit', $item) }}" data-dashboard-prefetch class="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-50">
                                             <x-dashboard-icon name="pencil" class="h-3.5 w-3.5" />
@@ -155,10 +157,28 @@
                     @error('program_description', 'program') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <input type="checkbox" name="program_is_active" value="1" @checked($useOld ? old('program_is_active', true) : ($program->is_active ?? true)) class="rounded border-slate-300 text-purple-600">
-                    Active program
-                </label>
+                @php
+                    // Path: resources/views/admin/programs/index.blade.php | Label: Publish requires at least one batch
+                    $programHasBatch = $program && (($program->batches_count ?? null) !== null
+                        ? $program->batches_count > 0
+                        : $program->batches()->exists());
+                    $canPublish = $program !== null && $programHasBatch;
+                @endphp
+                <div class="rounded-xl border {{ $canPublish ? 'border-slate-200 bg-white' : 'border-amber-200 bg-amber-50' }} px-3 py-2">
+                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                        <input type="checkbox" name="program_is_active" value="1"
+                            @checked($useOld ? old('program_is_active', false) : ($program->is_active ?? false))
+                            @disabled(! $canPublish)
+                            class="rounded border-slate-300 text-purple-600 disabled:opacity-40">
+                        Publish program (make active)
+                    </label>
+                    @if (! $canPublish)
+                        <p class="mt-1 text-[11px] font-semibold text-amber-800">
+                            {{ $program === null ? 'You can publish only after saving the program and adding at least one batch.' : 'Add at least one batch to this program before publishing it.' }}
+                        </p>
+                    @endif
+                    @error('program_is_active', 'program') <p class="mt-1 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                </div>
 
                 <button type="submit" data-action-button class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-purple-800">
                     <x-dashboard-icon name="save" class="h-4 w-4" />
