@@ -110,6 +110,89 @@ class EnrollmentSubmissionTest extends TestCase
         );
     }
 
+    public function test_enrollment_locks_educational_attainment_from_the_approved_application(): void
+    {
+        Notification::fake();
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
+            'name' => 'Locked Education Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+        $admission = $this->makeApprovedAdmission([
+            'email' => 'locked.edu@gmail.com',
+            'educational_attainment' => 'College Graduate',
+        ]);
+
+        $this->withSession([
+            'enrollment.admission_application_id' => $admission->id,
+        ])->get(route('enrollment.create', ['batch' => $batch->id]))
+            ->assertOk()
+            ->assertSee('Highest educational attainment')
+            ->assertSee('College Graduate')
+            ->assertSee('data-locked-educational-attainment', false)
+            ->assertSee('Copied from your approved application and cannot be changed.')
+            ->assertDontSee('<select id="educational_attainment"', false);
+
+        $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'admission' => $admission,
+            'training_batch_id' => $batch->id,
+            'email' => 'locked.edu@gmail.com',
+            'educational_attainment' => 'Doctorate',
+        ]))->assertRedirect(route('payment.show'));
+
+        $this->assertDatabaseHas('enrollment_applications', [
+            'email' => 'locked.edu@gmail.com',
+            'educational_attainment' => 'College Graduate',
+        ]);
+        $this->assertDatabaseHas('users', [
+            'email' => 'locked.edu@gmail.com',
+            'educational_attainment' => 'College Graduate',
+        ]);
+    }
+
+    public function test_enrollment_sets_year_graduated_to_null_when_attainment_is_not_graduate(): void
+    {
+        Notification::fake();
+        $batch = TrainingBatch::create([
+            'training_program_id' => TrainingProgram::query()->value('id'),
+            'name' => 'Undergraduate Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+        $admission = $this->makeApprovedAdmission([
+            'email' => 'undergrad.edu@gmail.com',
+            'educational_attainment' => 'College Undergraduate',
+        ]);
+
+        $this->withSession([
+            'enrollment.admission_application_id' => $admission->id,
+        ])->get(route('enrollment.create', ['batch' => $batch->id]))
+            ->assertOk()
+            ->assertSee('College Undergraduate')
+            ->assertSee('value="N/A"', false)
+            ->assertSee('not a graduate level');
+
+        $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'admission' => $admission,
+            'training_batch_id' => $batch->id,
+            'email' => 'undergrad.edu@gmail.com',
+            'educational_attainment' => 'College Graduate',
+            'year_graduated' => 2018,
+        ]))->assertRedirect(route('payment.show'));
+
+        $application = EnrollmentApplication::query()->where('email', 'undergrad.edu@gmail.com')->firstOrFail();
+        $this->assertSame('College Undergraduate', $application->educational_attainment);
+        $this->assertNull($application->year_graduated);
+        $this->assertNull($application->user?->year_graduated);
+    }
+
     public function test_enrollment_form_uses_a_simple_browser_submit_and_json_handoff_still_works(): void
     {
         Notification::fake();

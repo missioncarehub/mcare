@@ -100,6 +100,9 @@ class AdmissionApplicationTest extends TestCase
             ->assertSee('id="enrollment-form"', false)
             ->assertSee($approved->application_number)
             ->assertSee('value="approved.applicant@gmail.com"', false)
+            ->assertSee('High School Graduate')
+            ->assertSee('data-locked-educational-attainment', false)
+            ->assertDontSee('<select id="educational_attainment"', false)
             ->assertSee('data-password-toggle="password"', false)
             ->assertSee('data-password-toggle="password_confirmation"', false);
     }
@@ -184,7 +187,11 @@ class AdmissionApplicationTest extends TestCase
 
         $this->get($admission->fresh()->enrollmentUrl())
             ->assertOk()
-            ->assertSee('id="enrollment-form"', false);
+            ->assertSee('id="enrollment-form"', false)
+            ->assertSee('College Graduate')
+            ->assertSee('data-locked-educational-attainment', false)
+            ->assertSee('Copied from your approved application and cannot be changed.')
+            ->assertDontSee('<select id="educational_attainment"', false);
     }
 
     public function test_duplicate_open_application_email_is_rejected(): void

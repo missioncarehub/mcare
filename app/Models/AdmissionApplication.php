@@ -71,6 +71,30 @@ class AdmissionApplication extends Model
         ];
     }
 
+    public static function requiresGraduationYear(?string $attainment): bool
+    {
+        $value = trim((string) $attainment);
+
+        if ($value === '') {
+            return false;
+        }
+
+        if (in_array($value, ['Masteral', 'Doctorate'], true)) {
+            return true;
+        }
+
+        return str_contains($value, 'Graduate') && ! str_contains($value, 'Undergraduate');
+    }
+
+    /** @return list<string> */
+    public static function graduateEducationalAttainmentOptions(): array
+    {
+        return array_values(array_filter(
+            self::educationalAttainmentOptions(),
+            fn (string $option): bool => self::requiresGraduationYear($option),
+        ));
+    }
+
     public function statusLabel(): string
     {
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();

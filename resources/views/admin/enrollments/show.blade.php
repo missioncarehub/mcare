@@ -52,7 +52,7 @@
         $educationFields = [
             'Educational attainment' => $application->educational_attainment,
             'School name' => $application->school_name,
-            'Year graduated' => $application->year_graduated,
+            'Year graduated' => $application->year_graduated ?? 'N/A',
             'Guardian name' => $application->guardian_name,
             'Guardian address' => $application->guardian_address,
         ];

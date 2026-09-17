@@ -31,10 +31,14 @@ class EnrollmentController extends Controller
         $application = null;
 
         if ($request->user()) {
-            $application = EnrollmentApplication::where('user_id', $request->user()->id)->latest()->first();
+            $application = EnrollmentApplication::where('user_id', $request->user()->id)
+                ->with('admissionApplication')
+                ->latest()
+                ->first();
         }
 
         $unlockedAdmission = $this->unlockedAdmission($request, $application);
+        $lockedEducationalAttainment = $this->lockedEducationalAttainment($application, $unlockedAdmission);
 
         $availableBatches = TrainingBatch::query()
             ->publishedForEnrollment()
@@ -73,6 +77,7 @@ class EnrollmentController extends Controller
             'documentLabels' => $documentLabels,
             'documentFeedback' => $documentFeedback,
             'draftUploads' => $request->session()->get('enrollment.draft_uploads', []),
+            'lockedEducationalAttainment' => $lockedEducationalAttainment,
         ]);
     }
 
@@ -158,8 +163,18 @@ class EnrollmentController extends Controller
         }
 
         $currentApplication = $currentUser
-            ? EnrollmentApplication::where('user_id', $currentUser->id)->first()
+            ? EnrollmentApplication::where('user_id', $currentUser->id)->with('admissionApplication')->first()
             : null;
+        $lockedEducationalAttainment = $this->lockedEducationalAttainmentFromRequest($request, $currentApplication);
+        if ($lockedEducationalAttainment !== null) {
+            $request->merge(['educational_attainment' => $lockedEducationalAttainment]);
+        }
+        $requiresGraduationYear = AdmissionApplication::requiresGraduationYear(
+            (string) $request->input('educational_attainment', ''),
+        );
+        if (! $requiresGraduationYear) {
+            $request->merge(['year_graduated' => null]);
+        }
         $isDeniedResubmission = $currentApplication?->status === EnrollmentApplication::STATUS_DENIED;
         $previousDenialNote = $isDeniedResubmission ? $currentApplication->admin_notes : null;
         $requestedBatchId = $currentApplication?->training_batch_id
@@ -223,9 +238,11 @@ class EnrollmentController extends Controller
             'province' => ['required', 'string', 'max:120', ...$safeText],
             'region' => ['required', 'string', 'max:120', ...$safeText],
             'zip_code' => ['required', 'string', 'max:20', 'regex:/\A[\pL\pN\s-]+\z/u'],
-            'educational_attainment' => ['required', 'string', 'max:150'],
+            'educational_attainment' => ['required', 'string', Rule::in(AdmissionApplication::educationalAttainmentOptions())],
             'school_name' => ['required', 'string', 'max:180', ...$safeText],
-            'year_graduated' => ['required', 'integer', 'min:1950', 'max:'.now()->year],
+            'year_graduated' => $requiresGraduationYear
+                ? ['required', 'integer', 'min:1950', 'max:'.now()->year]
+                : ['nullable'],
             'guardian_name' => ['required', 'string', 'max:180', ...$safeText],
             'guardian_address' => ['required', 'string', 'max:255', ...$safeText],
             'classification' => ['nullable', 'string', 'max:120'],
@@ -256,6 +273,8 @@ class EnrollmentController extends Controller
             '*.max' => 'Each uploaded file must not exceed 5MB.',
             'training_batch_id.required' => 'Choose one of the active batches published by MCARE before submitting enrollment.',
             'application_number.required' => 'Enter the approved application number issued after MCARE reviewed your application.',
+            'educational_attainment.in' => 'Choose an educational attainment from the application list.',
+            'year_graduated.required' => 'Enter the year you graduated.',
         ]);
 
         $validator->after(function ($validator) use ($currentApplication, $enrollmentBatch, $request): void {
@@ -450,6 +469,30 @@ class EnrollmentController extends Controller
         return redirect()
             ->route('payment.show')
             ->with('payment_notice', $paymentNotice);
+    }
+
+    private function lockedEducationalAttainmentFromRequest(Request $request, ?EnrollmentApplication $application): ?string
+    {
+        $admission = $this->unlockedAdmission($request, $application)
+            ?: AdmissionApplication::findByNumber((string) $request->input('application_number'));
+
+        if ($admission && ! $admission->isApproved()) {
+            $admission = null;
+        }
+
+        return $this->lockedEducationalAttainment($application, $admission);
+    }
+
+    private function lockedEducationalAttainment(?EnrollmentApplication $application, ?AdmissionApplication $admission): ?string
+    {
+        foreach ([$admission, $application?->admissionApplication] as $source) {
+            $value = trim((string) ($source?->educational_attainment ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function unlockedAdmission(Request $request, ?EnrollmentApplication $application): ?AdmissionApplication

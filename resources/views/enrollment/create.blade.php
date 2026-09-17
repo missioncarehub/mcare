@@ -563,13 +563,19 @@
                     </div>
                     <div class="enrollment-fields mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div>
-                            <label for="educational_attainment" class="mb-2 block text-sm font-semibold text-slate-800">Educational attainment</label>
-                            <select id="educational_attainment" name="educational_attainment" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
-                                <option value="">Select</option>
-                                @foreach (['No Grade Completed', 'Elementary Undergraduate', 'Elementary Graduate', 'High School Undergraduate', 'High School Graduate', 'Junior High (K-12)', 'Senior High (K-12)', 'Post-Secondary/Technical Vocational Undergraduate', 'Post-Secondary/Technical Vocational Graduate', 'College Undergraduate', 'College Graduate', 'Masteral', 'Doctorate'] as $option)
-                                    <option value="{{ $option }}" @selected(old('educational_attainment', $application->educational_attainment ?? $unlockedAdmission?->educational_attainment ?? '') === $option)>{{ $option }}</option>
-                                @endforeach
-                            </select>
+                            <label for="educational_attainment" class="mb-2 block text-sm font-semibold text-slate-800">Highest educational attainment</label>
+                            @if ($lockedEducationalAttainment)
+                                <input id="educational_attainment" type="text" value="{{ $lockedEducationalAttainment }}" readonly data-locked-educational-attainment class="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-600 outline-none read-only:cursor-not-allowed">
+                                <input type="hidden" name="educational_attainment" value="{{ $lockedEducationalAttainment }}">
+                                <p class="mt-2 text-xs leading-5 text-slate-500">Copied from your approved application and cannot be changed.</p>
+                            @else
+                                <select id="educational_attainment" name="educational_attainment" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                                    <option value="">Select</option>
+                                    @foreach (\App\Models\AdmissionApplication::educationalAttainmentOptions() as $option)
+                                        <option value="{{ $option }}" @selected(old('educational_attainment', $application->educational_attainment ?? '') === $option)>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                             @error('educational_attainment') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -577,9 +583,23 @@
                             <input id="school_name" name="school_name" type="text" value="{{ old('school_name', $application->school_name ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
                             @error('school_name') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
-                        <div>
+                        <div data-year-graduated-wrap>
                             <label for="year_graduated" class="mb-2 block text-sm font-semibold text-slate-800">Year graduated</label>
-                            <input id="year_graduated" name="year_graduated" type="number" min="1950" max="{{ now()->year }}" value="{{ old('year_graduated', $application->year_graduated ?? '') }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            @php
+                                $attainmentForYear = $lockedEducationalAttainment
+                                    ?? old('educational_attainment', $application->educational_attainment ?? '');
+                                $requiresGraduationYear = \App\Models\AdmissionApplication::requiresGraduationYear($attainmentForYear);
+                            @endphp
+                            <div data-year-graduated-year class="{{ $requiresGraduationYear ? '' : 'hidden' }}">
+                                <input id="year_graduated" name="year_graduated" type="number" min="1950" max="{{ now()->year }}" value="{{ old('year_graduated', $requiresGraduationYear ? ($application->year_graduated ?? '') : '') }}" @required($requiresGraduationYear) @disabled(! $requiresGraduationYear) class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-purple-300 focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            </div>
+                            <div data-year-graduated-na class="{{ $requiresGraduationYear ? 'hidden' : '' }}">
+                                <input type="text" value="N/A" readonly data-year-graduated-na-display class="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-600 outline-none read-only:cursor-not-allowed">
+                                <input type="hidden" name="year_graduated" value="N/A" @disabled($requiresGraduationYear) data-year-graduated-na-value>
+                            </div>
+                            <p class="mt-2 text-xs leading-5 text-slate-500" data-year-graduated-hint>
+                                {{ $requiresGraduationYear ? 'Enter the year you completed this level.' : 'N/A because the approved educational attainment is not a graduate level.' }}
+                            </p>
                             @error('year_graduated') <p class="mt-2 text-sm font-semibold text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -904,6 +924,57 @@
                         : ''
                 );
             }
+        }
+
+        function requiresGraduationYear(value) {
+            const attainment = String(value || '').trim();
+            if (!attainment) return false;
+            if (attainment === 'Masteral' || attainment === 'Doctorate') return true;
+            return attainment.includes('Graduate') && !attainment.includes('Undergraduate');
+        }
+
+        function currentEducationalAttainment() {
+            const locked = document.querySelector('[data-locked-educational-attainment]');
+            if (locked) return locked.value;
+            const select = document.getElementById('educational_attainment');
+            if (select && select.tagName === 'SELECT') return select.value;
+            const hidden = enrollmentForm?.querySelector('input[type="hidden"][name="educational_attainment"]');
+            return hidden?.value || '';
+        }
+
+        function attachYearGraduatedField() {
+            const wrap = document.querySelector('[data-year-graduated-wrap]');
+            if (!wrap) return;
+
+            const yearWrap = wrap.querySelector('[data-year-graduated-year]');
+            const naWrap = wrap.querySelector('[data-year-graduated-na]');
+            const yearInput = yearWrap?.querySelector('input[name="year_graduated"]');
+            const naValue = wrap.querySelector('[data-year-graduated-na-value]');
+            const hint = wrap.querySelector('[data-year-graduated-hint]');
+            const select = document.getElementById('educational_attainment');
+
+            const syncYearGraduatedField = () => {
+                const graduate = requiresGraduationYear(currentEducationalAttainment());
+                yearWrap?.classList.toggle('hidden', !graduate);
+                naWrap?.classList.toggle('hidden', graduate);
+                if (yearInput) {
+                    yearInput.disabled = !graduate;
+                    yearInput.required = graduate;
+                }
+                if (naValue) {
+                    naValue.disabled = graduate;
+                }
+                if (hint) {
+                    hint.textContent = graduate
+                        ? 'Enter the year you completed this level.'
+                        : 'N/A because the approved educational attainment is not a graduate level.';
+                }
+            };
+
+            if (select && select.tagName === 'SELECT') {
+                select.addEventListener('change', syncYearGraduatedField);
+            }
+            syncYearGraduatedField();
         }
 
         function attachInputHardening() {
@@ -1381,6 +1452,7 @@
             }, 80);
         }
 
+        attachYearGraduatedField();
         attachInputHardening();
         attachBirthplaceAddressCopy();
         attachAddressAutofillGuard();
