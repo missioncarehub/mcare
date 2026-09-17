@@ -42,6 +42,8 @@ class EnrollmentApplication extends Model
 
     public const PAYMENT_EXPIRED = 'expired';
 
+    public const YEAR_GRADUATED_NOT_APPLICABLE = 0;
+
     protected $fillable = [
         'user_id',
         'enrollment_number',
@@ -214,7 +216,19 @@ class EnrollmentApplication extends Model
             'reviewed_at' => 'datetime',
             'learning_started_at' => 'datetime',
             'learning_status_changed_at' => 'datetime',
+            'year_graduated' => 'integer',
         ];
+    }
+
+    public function yearGraduatedLabel(): string
+    {
+        if (! AdmissionApplication::requiresGraduationYear($this->educational_attainment)) {
+            return 'N/A';
+        }
+
+        $year = (int) $this->year_graduated;
+
+        return $year >= 1950 ? (string) $year : 'N/A';
     }
 
     public static function statuses(): array

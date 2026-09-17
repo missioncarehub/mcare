@@ -173,7 +173,7 @@ class EnrollmentController extends Controller
             (string) $request->input('educational_attainment', ''),
         );
         if (! $requiresGraduationYear) {
-            $request->merge(['year_graduated' => null]);
+            $request->merge(['year_graduated' => EnrollmentApplication::YEAR_GRADUATED_NOT_APPLICABLE]);
         }
         $isDeniedResubmission = $currentApplication?->status === EnrollmentApplication::STATUS_DENIED;
         $previousDenialNote = $isDeniedResubmission ? $currentApplication->admin_notes : null;
@@ -242,7 +242,7 @@ class EnrollmentController extends Controller
             'school_name' => ['required', 'string', 'max:180', ...$safeText],
             'year_graduated' => $requiresGraduationYear
                 ? ['required', 'integer', 'min:1950', 'max:'.now()->year]
-                : ['nullable'],
+                : ['required', 'integer', 'in:'.EnrollmentApplication::YEAR_GRADUATED_NOT_APPLICABLE],
             'guardian_name' => ['required', 'string', 'max:180', ...$safeText],
             'guardian_address' => ['required', 'string', 'max:255', ...$safeText],
             'classification' => ['nullable', 'string', 'max:120'],

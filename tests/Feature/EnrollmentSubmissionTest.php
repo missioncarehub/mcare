@@ -189,8 +189,9 @@ class EnrollmentSubmissionTest extends TestCase
 
         $application = EnrollmentApplication::query()->where('email', 'undergrad.edu@gmail.com')->firstOrFail();
         $this->assertSame('College Undergraduate', $application->educational_attainment);
-        $this->assertNull($application->year_graduated);
-        $this->assertNull($application->user?->year_graduated);
+        $this->assertSame(EnrollmentApplication::YEAR_GRADUATED_NOT_APPLICABLE, $application->year_graduated);
+        $this->assertSame('N/A', $application->yearGraduatedLabel());
+        $this->assertSame(EnrollmentApplication::YEAR_GRADUATED_NOT_APPLICABLE, $application->user?->year_graduated);
     }
 
     public function test_enrollment_form_uses_a_simple_browser_submit_and_json_handoff_still_works(): void
