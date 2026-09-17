@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AdmissionApplicationReviewedMail;
 use App\Models\AdminActivityLog;
 use App\Models\AdmissionApplication;
+use App\Models\PublicSiteSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -59,6 +60,7 @@ class AdmissionApplicationReviewController extends Controller
             'selectedStatus' => $selectedStatus,
             'statuses' => $statuses,
             'totalApplications' => AdmissionApplication::query()->count(),
+            'unusedApprovedExpirySummary' => PublicSiteSetting::current()->unusedApprovedExpirySummary(),
         ]);
     }
 

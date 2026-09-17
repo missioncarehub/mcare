@@ -57,9 +57,11 @@ class AccountSettingsTest extends TestCase
                 ->assertSee($avatarUrl, false);
 
             if ($role === 'admin') {
-                $settings->assertSee('TESDA form registrar');
+                $settings->assertSee('TESDA form registrar')
+                    ->assertSee('Unused approved applications');
             } else {
-                $settings->assertDontSee('TESDA form registrar');
+                $settings->assertDontSee('TESDA form registrar')
+                    ->assertDontSee('Unused approved applications');
             }
 
             $this->actingAs($user)

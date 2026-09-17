@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('career:send-scheduled-sms')->everyMinute();
+Schedule::command('mcare:purge-unused-approved-applications')->dailyAt('01:20');

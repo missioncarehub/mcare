@@ -129,6 +129,9 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::patch('/registrar', [AccountSettingsController::class, 'updateRegistrar'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('registrar.update');
+            Route::patch('/unused-approved-expiry', [AccountSettingsController::class, 'updateUnusedApprovedExpiry'])
+                ->middleware('throttle:sensitive-mutation')
+                ->name('unused-approved-expiry.update');
             Route::get('/registrar-signature', [AccountSettingsController::class, 'registrarSignature'])
                 ->name('registrar.signature');
             Route::post('/security-event', [AccountSettingsController::class, 'securityEvent'])

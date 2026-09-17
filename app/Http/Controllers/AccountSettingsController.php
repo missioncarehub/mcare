@@ -28,7 +28,7 @@ class AccountSettingsController extends Controller
     {
         $topics = match ($request->user()?->role) {
             'admin' => [
-                ['Applications', 'Review applicant details, preview documents, and record missing requirements.'],
+                ['Applications', 'Review applicant details, preview documents, and record missing requirements. Unused approved applications can expire automatically from Settings.'],
                 ['Schedules and payments', 'Control enrollment windows, class schedules, and payment verification.'],
                 ['Audit reports', 'Use Admin Logs to filter, print, or export system activity.'],
             ],
@@ -119,6 +119,63 @@ class AccountSettingsController extends Controller
         return redirect()
             ->to(route('account.settings').'#tesda-registrar')
             ->with('saved', 'TESDA form registrar name and signature saved.');
+    }
+
+    public function updateUnusedApprovedExpiry(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin($request);
+
+        $validated = $request->validateWithBag('unusedApprovedExpiry', [
+            'unused_approved_expiry_mode' => ['required', Rule::in(array_keys(PublicSiteSetting::unusedApprovedExpiryModes()))],
+            'unused_approved_expiry_amount' => [
+                Rule::requiredIf(fn (): bool => in_array($request->input('unused_approved_expiry_mode'), [
+                    PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DAYS,
+                    PublicSiteSetting::UNUSED_APPROVED_EXPIRY_MONTHS,
+                ], true)),
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::when($request->input('unused_approved_expiry_mode') === PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DAYS, ['max:365']),
+                Rule::when($request->input('unused_approved_expiry_mode') === PublicSiteSetting::UNUSED_APPROVED_EXPIRY_MONTHS, ['max:36']),
+            ],
+            'unused_approved_expiry_date' => [
+                Rule::requiredIf(fn (): bool => $request->input('unused_approved_expiry_mode') === PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DATE),
+                'nullable',
+                'date',
+            ],
+        ], [
+            'unused_approved_expiry_amount.required' => 'Enter how long unused approved applications should be kept.',
+            'unused_approved_expiry_amount.min' => 'Enter at least 1 day or month.',
+            'unused_approved_expiry_date.required' => 'Choose the date unused approved applications should be deleted.',
+        ]);
+
+        $mode = $validated['unused_approved_expiry_mode'];
+        $settings = PublicSiteSetting::instance();
+        $before = $settings->only([
+            'unused_approved_expiry_mode',
+            'unused_approved_expiry_amount',
+            'unused_approved_expiry_date',
+        ]);
+
+        $settings->update([
+            'unused_approved_expiry_mode' => $mode,
+            'unused_approved_expiry_amount' => in_array($mode, [
+                PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DAYS,
+                PublicSiteSetting::UNUSED_APPROVED_EXPIRY_MONTHS,
+            ], true) ? (int) $validated['unused_approved_expiry_amount'] : null,
+            'unused_approved_expiry_date' => $mode === PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DATE
+                ? $validated['unused_approved_expiry_date']
+                : null,
+        ]);
+
+        AdminActivityLog::record($request->user(), 'account.unused-approved-expiry.updated', $settings, [
+            'before' => $before,
+            'after' => $settings->fresh()->only(array_keys($before)),
+        ]);
+
+        return redirect()
+            ->to(route('account.settings').'#unused-approved-expiry')
+            ->with('saved', 'Unused approved-application expiry saved.');
     }
 
     public function registrarSignature(Request $request): BinaryFileResponse

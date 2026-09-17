@@ -48,6 +48,13 @@
             @endforeach
         </div>
 
+        @if ($unusedApprovedExpirySummary)
+            <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-900">
+                {{ $unusedApprovedExpirySummary }}
+                <a href="{{ route('account.settings') }}#unused-approved-expiry" class="ml-1 font-bold text-purple-800 hover:text-purple-900">Change in Settings</a>
+            </p>
+        @endif
+
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <form method="GET" action="{{ route('admin.applications.index') }}" data-auto-filter class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div class="sm:col-span-2">

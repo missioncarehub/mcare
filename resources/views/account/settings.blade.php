@@ -6,6 +6,11 @@
     $registrarName = $registrarHasErrors ? old('registrar_name') : ($siteSettings?->registrarNameForForm() ?? '');
     $registrarSignatureType = $registrarHasErrors ? old('registrar_signature_type', 'draw') : ($siteSettings?->registrar_signature_type ?: 'draw');
     $hasSavedRegistrarSignature = (bool) $siteSettings?->hasRegistrarSignature();
+    $expiryModes = \App\Models\PublicSiteSetting::unusedApprovedExpiryModes();
+    $expiryOff = \App\Models\PublicSiteSetting::UNUSED_APPROVED_EXPIRY_OFF;
+    $expiryDays = \App\Models\PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DAYS;
+    $expiryMonths = \App\Models\PublicSiteSetting::UNUSED_APPROVED_EXPIRY_MONTHS;
+    $expiryDateMode = \App\Models\PublicSiteSetting::UNUSED_APPROVED_EXPIRY_DATE;
 @endphp
 
 @extends($layout, ['title' => 'Account Settings | MCARE '.$roleLabel])
@@ -19,7 +24,7 @@
     <header class="border-b border-slate-200 pb-6">
         <p class="dashboard-section-kicker">Account preferences</p>
         <h1 class="dashboard-section-title mt-2 text-3xl">Settings</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account, profile photo, display preference, and password.{{ $isAdmin ? ' Admins can also save the TESDA form registrar name and signature here.' : '' }}</p>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage the signed-in {{ strtolower($roleLabel) }} account, profile photo, display preference, and password.{{ $isAdmin ? ' Admins can also save unused approved-application expiry and the TESDA form registrar here.' : '' }}</p>
     </header>
 
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
@@ -104,6 +109,61 @@
     </div>
 
     @if ($isAdmin)
+        @php
+            $expiryHasErrors = $errors->unusedApprovedExpiry->any();
+            $expiryMode = $expiryHasErrors
+                ? old('unused_approved_expiry_mode', $expiryOff)
+                : ($siteSettings?->unusedApprovedExpiryMode() ?? $expiryOff);
+            $expiryAmount = $expiryHasErrors
+                ? old('unused_approved_expiry_amount')
+                : ($siteSettings?->unused_approved_expiry_amount ?? '');
+            $expiryDate = $expiryHasErrors
+                ? old('unused_approved_expiry_date')
+                : optional($siteSettings?->unused_approved_expiry_date)->format('Y-m-d');
+            $expirySummary = $siteSettings?->unusedApprovedExpirySummary();
+        @endphp
+        <section id="unused-approved-expiry" class="dashboard-panel scroll-mt-8 space-y-4">
+            <p class="dashboard-section-kicker">Applications</p>
+            <h2 class="text-lg font-bold text-slate-950">Unused approved applications</h2>
+            <p class="text-sm leading-6 text-slate-600">If an application is approved but the applicant never continues to enrollment, MCARE can delete that application automatically. Submitted enrollments are never removed by this setting.</p>
+            @if ($expirySummary && ! $expiryHasErrors)
+                <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-900">{{ $expirySummary }}</p>
+            @endif
+            <form method="POST" action="{{ route('account.unused-approved-expiry.update') }}" class="space-y-5" data-unused-approved-expiry-form>
+                @csrf
+                @method('PATCH')
+                <fieldset class="space-y-3">
+                    <legend class="text-sm font-bold text-slate-700">Delete unused approved applications</legend>
+                    @foreach ($expiryModes as $mode => $label)
+                        <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800">
+                            <input type="radio" name="unused_approved_expiry_mode" value="{{ $mode }}" class="mt-1" @checked($expiryMode === $mode)>
+                            <span>{{ $label }}</span>
+                        </label>
+                    @endforeach
+                    @error('unused_approved_expiry_mode', 'unusedApprovedExpiry') <span class="block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </fieldset>
+
+                <div data-expiry-amount-fields class="{{ in_array($expiryMode, [$expiryDays, $expiryMonths], true) ? '' : 'hidden' }}">
+                    <label for="unused_approved_expiry_amount" class="block text-sm font-bold text-slate-700">Keep unused approved applications for</label>
+                    <input id="unused_approved_expiry_amount" name="unused_approved_expiry_amount" type="number" min="1" max="365" value="{{ $expiryAmount }}" class="form-field mt-2 max-w-xs text-base" placeholder="14">
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Counted from the day the application was approved. Days accept 1–365. Months accept 1–36.</p>
+                    @error('unused_approved_expiry_amount', 'unusedApprovedExpiry') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </div>
+
+                <div data-expiry-date-fields class="{{ $expiryMode === $expiryDateMode ? '' : 'hidden' }}">
+                    <label for="unused_approved_expiry_date" class="block text-sm font-bold text-slate-700">Delete unused approved applications starting</label>
+                    <input id="unused_approved_expiry_date" name="unused_approved_expiry_date" type="date" value="{{ $expiryDate }}" class="form-field mt-2 max-w-xs text-base">
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Applications approved on or before this date are removed if the applicant still has not enrolled. Applications approved after this date stay until you set a new deadline.</p>
+                    @error('unused_approved_expiry_date', 'unusedApprovedExpiry') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </div>
+
+                <button type="submit" class="primary-action">
+                    <x-dashboard-icon name="save" class="h-4 w-4" />
+                    <span>Save application expiry</span>
+                </button>
+            </form>
+        </section>
+
         <section id="tesda-registrar" class="dashboard-panel scroll-mt-8 space-y-4">
             <p class="dashboard-section-kicker">TESDA form</p>
             <h2 class="text-lg font-bold text-slate-950">TESDA form registrar</h2>
@@ -185,6 +245,28 @@
         </section>
     @endif
 </section>
+
+@if ($isAdmin)
+    <script>
+        (() => {
+            const form = document.querySelector('[data-unused-approved-expiry-form]');
+            if (!form) return;
+
+            const amountFields = form.querySelector('[data-expiry-amount-fields]');
+            const dateFields = form.querySelector('[data-expiry-date-fields]');
+            const radios = form.querySelectorAll('input[name="unused_approved_expiry_mode"]');
+
+            const syncExpiryFields = () => {
+                const mode = form.querySelector('input[name="unused_approved_expiry_mode"]:checked')?.value || 'off';
+                amountFields?.classList.toggle('hidden', mode !== 'days' && mode !== 'months');
+                dateFields?.classList.toggle('hidden', mode !== 'date');
+            };
+
+            radios.forEach((radio) => radio.addEventListener('change', syncExpiryFields));
+            syncExpiryFields();
+        })();
+    </script>
+@endif
 
 @if ($isAdmin)
     <script>
