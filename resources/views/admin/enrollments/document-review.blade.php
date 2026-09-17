@@ -100,7 +100,7 @@
             @error('remark')<p class="text-xs font-bold text-red-700">{{ $message }}</p>@enderror
             <div class="flex flex-wrap items-center gap-3">
                 <button type="submit" class="primary-action">Email revision request</button>
-                <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's enrollment page so they can immediately re-upload.</p>
+                <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's document revision page so they can replace only the files marked Needs replacement.</p>
             </div>
         </form>
     </section>

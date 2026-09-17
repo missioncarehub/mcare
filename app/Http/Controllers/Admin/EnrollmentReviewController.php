@@ -455,9 +455,8 @@ class EnrollmentReviewController extends Controller
      * Path: app/Http/Controllers/Admin/EnrollmentReviewController.php | Label: Request document revisions
      *
      * Emails the applicant a "please revise your documents" notice with a
-     * direct link back to the enrollment page so they can re-upload the
-     * corrected files. Uses whatever documents are currently marked
-     * "Needs replacement" plus an optional free-form remark from the admin.
+     * signed link to the document revision page so they can re-upload only
+     * the files marked "Needs replacement". Includes an optional remark.
      */
     public function requestDocumentRevisions(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
     {
@@ -514,7 +513,7 @@ class EnrollmentReviewController extends Controller
         ]);
 
         $notice = $sent
-            ? 'Revision request emailed to '.$enrollmentApplication->email.'. The applicant can re-upload the flagged documents through the enrollment page.'
+            ? 'Revision request emailed to '.$enrollmentApplication->email.'. The applicant can re-upload the flagged documents through the document revision page.'
             : 'Revision request logged. No email was sent (applicant has no linked account or mail is unavailable).';
 
         return redirect()

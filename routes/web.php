@@ -25,6 +25,7 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\ClassroomCommentController;
 use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\EnrollmentDocumentRevisionController;
 use App\Http\Controllers\EnrollmentPaymentController;
 use App\Http\Controllers\HistoricalAlumniClaimController;
 use App\Http\Controllers\LandingChatController;
@@ -211,6 +212,12 @@ Route::middleware('throttle:global-web')->group(function () {
         Route::get('/enrollment/drafts/{field}/content', [EnrollmentController::class, 'draftContent'])
             ->middleware('throttle:document-downloads')
             ->name('enrollment.drafts.content');
+
+        Route::get('/enrollment/{enrollmentApplication}/documents/revise', [EnrollmentDocumentRevisionController::class, 'show'])
+            ->name('enrollment.documents.revise');
+        Route::post('/enrollment/{enrollmentApplication}/documents/revise', [EnrollmentDocumentRevisionController::class, 'update'])
+            ->middleware('throttle:8,1')
+            ->name('enrollment.documents.revise.update');
 
         Route::get('/payments', [EnrollmentPaymentController::class, 'payments'])
             ->name('payments.show');

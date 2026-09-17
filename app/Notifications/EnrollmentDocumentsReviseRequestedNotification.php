@@ -7,6 +7,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 /**
  * Path: app/Notifications/EnrollmentDocumentsReviseRequestedNotification.php
@@ -14,8 +16,8 @@ use Illuminate\Notifications\Notification;
  *
  * Sent from the admin document-review page whenever the administrator marks
  * one or more enrollment documents as "Needs replacement" and clicks
- * "Request revisions". The email includes the direct link to the applicant's
- * enrollment/documents page so the applicant can immediately re-upload.
+ * "Request revisions". The email includes a signed link to the applicant's
+ * document revision page so they can replace only the flagged files.
  */
 class EnrollmentDocumentsReviseRequestedNotification extends Notification implements ShouldQueue
 {
@@ -51,9 +53,9 @@ class EnrollmentDocumentsReviseRequestedNotification extends Notification implem
             'title' => 'Enrollment documents need revision',
             'message' => 'MCARE administration asked you to revise '
                 .count($this->documentsNeedingRevision).' enrollment '
-                .\Illuminate\Support\Str::plural('document', count($this->documentsNeedingRevision))
-                .'. Open the enrollment page to re-upload the corrected files.',
-            'url' => route('enrollment.create'),
+                .Str::plural('document', count($this->documentsNeedingRevision))
+                .'. Open the document revision page to re-upload only the files marked for replacement.',
+            'url' => route('enrollment.documents.revise', $this->application),
             'icon' => 'clipboard-list',
             'enrollment_application_id' => $this->application->id,
         ];
@@ -78,11 +80,20 @@ class EnrollmentDocumentsReviseRequestedNotification extends Notification implem
                 'intro' => $intro,
                 'enrollmentNumber' => $this->application->enrollment_number,
                 'adminNotes' => $this->remark,
-                'actionLabel' => 'Open my enrollment page',
-                'actionUrl' => route('enrollment.create'),
+                'actionLabel' => 'Open document revision page',
+                'actionUrl' => $this->revisionUrl(),
                 'secondaryActionLabel' => null,
                 'secondaryActionUrl' => null,
-                'closing' => 'Once you re-upload the corrected files, MCARE administration will resume the review of your enrollment.',
+                'closing' => 'The link opens a revision page where you can replace only the documents marked Needs replacement. Accepted files stay unchanged.',
             ]);
+    }
+
+    public function revisionUrl(): string
+    {
+        return URL::temporarySignedRoute(
+            'enrollment.documents.revise',
+            now()->addDays(14),
+            ['enrollmentApplication' => $this->application],
+        );
     }
 }
