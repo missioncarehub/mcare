@@ -32,8 +32,8 @@
         <div class="competency-board-toolbar">
             <div class="min-w-0">
                 <p class="truncate text-sm font-bold text-slate-950">{{ $selectedBatch->name }} {{ $selectedBatch->year }}{{ ! empty($filters['schedule']) ? ' | '.$filters['schedule'].' class' : '' }}</p>
-                <p class="mt-1 text-xs font-medium text-slate-500">Click a competency cell to evaluate that trainee. The result is saved to classwork and the TESDA record.</p>
-                <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600" aria-label="Competency status legend"><span class="competency-legend is-competent">C Competent</span><span class="competency-legend is-progress">IP In progress</span><span class="competency-legend is-not-yet">NYC Not yet competent</span><span class="competency-legend is-empty">Evaluate Not assessed</span></div>
+                <p class="mt-1 text-xs font-medium text-slate-500">Evaluate only after the trainee marks the module as done. Locked and in-progress cells stay closed.</p>
+                <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600" aria-label="Competency status legend"><span class="competency-legend is-competent">C Competent</span><span class="competency-legend is-progress">IP In progress</span><span class="competency-legend is-not-yet">NYC Not yet competent</span><span class="competency-legend is-empty">Evaluate Ready</span><span class="competency-legend is-waiting">In progress Closed</span><span class="competency-legend is-locked">Locked Closed</span></div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 @if($summary['trainees'] > 0 && $unitsByCategory->flatten()->isNotEmpty())
@@ -88,6 +88,16 @@
                                     $record = $recordsByTrainee->get($trainee->id)?->get($unit->id);
                                     $status = $record?->status ?? 'not_assessed';
                                     $results = $record?->outcomeResults?->keyBy('competency_outcome_id') ?? collect();
+                                    $gate = ($evaluationByTrainee ?? collect())->get($trainee->id)?->get($unit->id) ?? ['evaluable' => false, 'reason' => 'locked'];
+                                    $canEvaluate = (bool) ($gate['evaluable'] ?? false) || (bool) $record?->locked_at;
+                                    $waitReason = $gate['reason'] ?? 'locked';
+                                    $cellState = ! $canEvaluate
+                                        ? ($waitReason === 'in_progress' ? 'waiting' : 'module-locked')
+                                        : str($status)->replace('_', '-');
+                                    $waitLabel = $waitReason === 'in_progress' ? 'In progress' : 'Locked';
+                                    $waitTitle = $waitReason === 'in_progress'
+                                        ? 'Trainee is still in progress. Evaluation opens after they mark this module as done.'
+                                        : 'This module is locked. Evaluation opens after the trainee marks it as done.';
                                     $payload = [
                                         'trainee_name' => trim($trainee->first_name.' '.$trainee->last_name),
                                         'unit_id' => $unit->id,
@@ -103,16 +113,22 @@
                                     ];
                                     $encodedPayload = base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES));
                                 @endphp
-                                <td class="competency-record-cell is-{{ str($status)->replace('_', '-') }}">
-                                    <button type="button" data-competency-cell data-record-payload="{{ $encodedPayload }}" aria-label="{{ $status === 'not_assessed' ? 'Evaluate' : 'Update evaluation for' }} {{ $unit->title }} for {{ $trainee->first_name }} {{ $trainee->last_name }}" title="{{ $status === 'not_assessed' ? 'Evaluate this competency' : ($statuses[$status].($record?->percentage_score ? ' | '.$record->percentage_score.'%' : '')) }}">
-                                        @if($status === 'not_assessed')
-                                            <span>Evaluate</span>
-                                        @else
-                                            <span>{{ $statusSymbols[$status] }}</span>
-                                            @if($record?->percentage_score)<small>{{ number_format((float) $record->percentage_score, 0) }}</small>@endif
-                                        @endif
-                                        @if($record?->locked_at)<x-dashboard-icon name="lock" class="competency-lock-icon" />@endif
-                                    </button>
+                                <td class="competency-record-cell is-{{ $cellState }}">
+                                    @if($canEvaluate)
+                                        <button type="button" data-competency-cell data-record-payload="{{ $encodedPayload }}" aria-label="{{ $status === 'not_assessed' ? 'Evaluate' : 'Update evaluation for' }} {{ $unit->title }} for {{ $trainee->first_name }} {{ $trainee->last_name }}" title="{{ $status === 'not_assessed' ? 'Evaluate this competency' : ($statuses[$status].($record?->percentage_score ? ' | '.$record->percentage_score.'%' : '')) }}">
+                                            @if($status === 'not_assessed')
+                                                <span>Evaluate</span>
+                                            @else
+                                                <span>{{ $statusSymbols[$status] }}</span>
+                                                @if($record?->percentage_score)<small>{{ number_format((float) $record->percentage_score, 0) }}</small>@endif
+                                            @endif
+                                            @if($record?->locked_at)<x-dashboard-icon name="lock" class="competency-lock-icon" />@endif
+                                        </button>
+                                    @else
+                                        <button type="button" disabled aria-disabled="true" title="{{ $waitTitle }}" aria-label="{{ $waitLabel }} {{ $unit->title }} for {{ $trainee->first_name }} {{ $trainee->last_name }}">
+                                            <span>{{ $waitLabel }}</span>
+                                        </button>
+                                    @endif
                                 </td>
                             @endforeach
                         @endforeach

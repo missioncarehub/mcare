@@ -14,7 +14,7 @@
 <section class="space-y-6">
     <header class="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
         @unless (auth()->user()?->role === 'admin')
-            <div><p class="dashboard-section-kicker">Account updates</p><h1 class="mt-2 dashboard-section-title text-3xl">Notification center</h1><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p></div>
+            <div><p class="dashboard-section-kicker">Account updates</p><h1 class="mt-2 dashboard-section-title text-2xl sm:text-3xl">Notification center</h1><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p></div>
         @else
             <p class="max-w-2xl text-sm leading-6 text-slate-600">Review classroom, career, and system updates connected to this account.</p>
         @endunless
@@ -31,10 +31,10 @@
             @endphp
             <article class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between {{ $notification->read_at ? 'bg-white' : 'bg-purple-50/40' }}">
                 <div class="flex min-w-0 gap-4"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700"><x-dashboard-icon :name="$notificationData['icon'] ?? 'bell'" class="h-5 w-5" /></span><div class="min-w-0"><h2 class="font-bold text-slate-950">{{ $notificationData['title'] ?? 'MCARE update' }}</h2><p class="mt-1 text-sm leading-6 text-slate-600">{{ $notificationData['message'] ?? 'Open the linked workspace for more details.' }}</p><p class="mt-2 text-xs font-semibold text-slate-400">{{ $notification->created_at?->format('M d, Y g:i A') ?? 'Recently' }}</p></div></div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
                     @if ($notificationUrl)<a href="{{ $notificationUrl }}" class="secondary-action inline-flex items-center justify-center text-sm">Open</a>@endif
                     @if (! $notification->read_at)
-                        <form method="POST" action="{{ route('notifications.read', $notification) }}"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="PATCH"><button type="submit" class="primary-action text-sm">Mark read</button></form>
+                        <form method="POST" action="{{ route('notifications.read', $notification) }}" class="w-full sm:w-auto"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="PATCH"><button type="submit" class="primary-action w-full text-sm sm:w-auto">Mark read</button></form>
                     @else
                         <span class="text-xs font-bold text-emerald-700">Read</span>
                     @endif

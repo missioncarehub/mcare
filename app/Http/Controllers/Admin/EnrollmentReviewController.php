@@ -143,9 +143,7 @@ class EnrollmentReviewController extends Controller
 
     public function show(EnrollmentApplication $enrollmentApplication): View
     {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
-        $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer']);
+        $enrollmentApplication->load(['user', 'reviewer', 'batch', 'documentReviewer', 'admissionApplication']);
 
         return view('admin.enrollments.show', [
             'application' => $enrollmentApplication,
@@ -157,8 +155,6 @@ class EnrollmentReviewController extends Controller
 
     public function documentReview(EnrollmentApplication $enrollmentApplication): View
     {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
         $enrollmentApplication->load(['user', 'documentReviewer']);
 
         return view('admin.enrollments.document-review', [
@@ -318,8 +314,6 @@ class EnrollmentReviewController extends Controller
 
     public function photo(EnrollmentApplication $enrollmentApplication, StaffVisiblePhoto $photos): BinaryFileResponse
     {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
         $enrollmentApplication->loadMissing('user');
         $located = $photos->locate($enrollmentApplication->user, $enrollmentApplication);
         abort_unless($located !== null, 404);
@@ -343,8 +337,6 @@ class EnrollmentReviewController extends Controller
         EnrollmentApplication $enrollmentApplication,
         TesdaRegistrationPdfService $pdfService,
     ): Response {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
         $validated = $request->validate([
             'disposition' => ['nullable', Rule::in(['inline', 'attachment'])],
         ]);
@@ -523,8 +515,6 @@ class EnrollmentReviewController extends Controller
 
     public function documentPreview(EnrollmentApplication $enrollmentApplication, string $document): View
     {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
         $definition = $this->documentDefinition($document);
         $path = $enrollmentApplication->{$definition['field']};
 
@@ -545,8 +535,6 @@ class EnrollmentReviewController extends Controller
 
     public function documentContent(EnrollmentApplication $enrollmentApplication, string $document): BinaryFileResponse
     {
-        $this->ensureReleasedForReview($enrollmentApplication);
-
         $definition = $this->documentDefinition($document);
         $path = $enrollmentApplication->{$definition['field']};
 

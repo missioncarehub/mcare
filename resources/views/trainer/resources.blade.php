@@ -21,14 +21,6 @@
         </button>
     </div>
 
-    <nav class="lms-context-tabs" aria-label="Trainer classroom sections">
-        @if(\Illuminate\Support\Facades\Route::has('trainer.stream'))
-            <a href="{{ route('trainer.stream') }}">Stream</a>
-        @endif
-        <a href="{{ route('trainer.resources') }}" class="is-active" aria-current="page">Classwork</a>
-        <a href="{{ route('trainer.trainees') }}">People</a>
-    </nav>
-
     <!-- Content Type View Switcher Filter -->
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
         <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Classwork view filter">

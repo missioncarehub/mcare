@@ -7,6 +7,7 @@ use App\Models\TraineeAttendance;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceService
@@ -25,11 +26,11 @@ class AttendanceService
         $savedCount = 0;
         $formattedDate = $date->toDateString();
 
-        $enrolledIds = $batch->applications()
-            ->where('status', EnrollmentApplication::STATUS_APPROVED)
-            ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
-            ->pluck('id')
-            ->all();
+        if ($this->isFutureAttendanceDate($date)) {
+            return 0;
+        }
+
+        $enrolledIds = $this->rosterForDate($batch, $date)->pluck('id')->all();
 
         foreach ($records as $appId => $record) {
             if (! in_array((int) $appId, $enrolledIds, true)) {
@@ -100,9 +101,21 @@ class AttendanceService
         $totalRates = 0;
 
         foreach ($trainees as $trainee) {
+            $enrolledFrom = $this->attendanceEligibleFrom($trainee);
             $attendances = $trainee->attendances
                 ->where('training_batch_id', $batch->id)
-                ->filter(fn (TraineeAttendance $attendance): bool => $attendance->quiz_id === null);
+                ->filter(fn (TraineeAttendance $attendance): bool => $attendance->quiz_id === null)
+                ->filter(function (TraineeAttendance $attendance) use ($enrolledFrom): bool {
+                    if (! $enrolledFrom) {
+                        return true;
+                    }
+
+                    $attendanceDate = $attendance->attendance_date instanceof Carbon
+                        ? $attendance->attendance_date
+                        : Carbon::parse($attendance->attendance_date);
+
+                    return $attendanceDate->copy()->startOfDay()->gte($enrolledFrom);
+                });
             $present = $attendances->where('status', TraineeAttendance::STATUS_PRESENT)->count();
             $late = $attendances->where('status', TraineeAttendance::STATUS_LATE)->count();
             $absent = $attendances->where('status', TraineeAttendance::STATUS_ABSENT)->count();
@@ -119,18 +132,15 @@ class AttendanceService
                 $totalRates += $rate;
             }
 
-            $enrolledFrom = $this->attendanceEligibleFrom($trainee);
             $dateStatusMap = [];
             foreach ($distinctDates as $dateStr) {
-                $att = $attendances->first(fn ($a) => (is_string($a->attendance_date) ? $a->attendance_date : $a->attendance_date?->toDateString()) === $dateStr);
-                if ($att) {
-                    $dateStatusMap[$dateStr] = $att->status;
-                } elseif ($enrolledFrom && Carbon::parse($dateStr)->lt($enrolledFrom)) {
-                    // Trainee was not yet enrolled on this date — clearly mark it instead of counting as absent.
+                if ($enrolledFrom && Carbon::parse($dateStr)->lt($enrolledFrom)) {
                     $dateStatusMap[$dateStr] = 'not_enrolled';
-                } else {
-                    $dateStatusMap[$dateStr] = '-';
+                    continue;
                 }
+
+                $att = $attendances->first(fn ($a) => (is_string($a->attendance_date) ? $a->attendance_date : $a->attendance_date?->toDateString()) === $dateStr);
+                $dateStatusMap[$dateStr] = $att?->status ?? '-';
             }
 
             $summaryTrainees[] = [
@@ -163,17 +173,45 @@ class AttendanceService
         ];
     }
 
+    /**
+     * Approved trainees who were already enrolled on the selected session date.
+     *
+     * @return Collection<int, EnrollmentApplication>
+     */
+    public function rosterForDate(TrainingBatch $batch, Carbon $date): Collection
+    {
+        return $batch->applications()
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
+            ->with('user')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->filter(fn (EnrollmentApplication $trainee): bool => $this->isEligibleOn($trainee, $date))
+            ->values();
+    }
+
+    public function isEligibleOn(EnrollmentApplication $application, Carbon $date): bool
+    {
+        $from = $this->attendanceEligibleFrom($application);
+
+        return ! $from || $date->copy()->startOfDay()->gte($from);
+    }
+
+    public function isFutureAttendanceDate(Carbon $date): bool
+    {
+        return $date->copy()->startOfDay()->gt(now()->copy()->startOfDay());
+    }
+
     // Path: app/Services/AttendanceService.php | Label: Date from which a trainee counts for attendance
-    // Uses the earliest of learning_started_at, reviewed_at (admin approval), then created_at.
+    // Prefer the class start date, then admin approval, then the application timestamp.
     public function attendanceEligibleFrom(EnrollmentApplication $application): ?Carbon
     {
-        $candidates = collect([
-            $application->learning_started_at,
-            $application->reviewed_at,
-            $application->created_at,
-        ])->filter();
+        $source = $application->learning_started_at
+            ?? $application->reviewed_at
+            ?? $application->created_at;
 
-        return $candidates->isEmpty() ? null : $candidates->sort()->first()->copy()->startOfDay();
+        return $source?->copy()->startOfDay();
     }
 
     /**

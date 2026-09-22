@@ -30,6 +30,7 @@ class AdmissionApplicationTest extends TestCase
             ->assertSee('id="training_program_id"', false)
             ->assertSee('Caregiving NC II')
             ->assertSee('data-application-form', false)
+            ->assertSee('data-form-draft="applications.create"', false)
             ->assertSee('data-application-submit', false)
             ->assertDontSee('id="enrollment-form"', false);
 
@@ -55,7 +56,8 @@ class AdmissionApplicationTest extends TestCase
 
         $this->get(route('applications.received'))
             ->assertOk()
-            ->assertSee($admission->application_number);
+            ->assertSee($admission->application_number)
+            ->assertSee('data-form-draft-clear="applications.create"', false);
 
         Mail::assertSent(AdmissionApplicationReceivedMail::class, function (AdmissionApplicationReceivedMail $mail) use ($admission): bool {
             return $mail->hasTo($admission->email)
@@ -98,6 +100,7 @@ class AdmissionApplicationTest extends TestCase
         $this->get(route('enrollment.create'))
             ->assertOk()
             ->assertSee('id="enrollment-form"', false)
+            ->assertSee('data-form-draft="enrollment.create.'.$approved->application_number.'"', false)
             ->assertSee($approved->application_number)
             ->assertSee('value="approved.applicant@gmail.com"', false)
             ->assertSee('High School Graduate')
@@ -317,5 +320,64 @@ class AdmissionApplicationTest extends TestCase
             ->assertSessionHasErrors('application');
 
         $this->assertDatabaseHas('admission_applications', ['id' => $admission->id]);
+    }
+
+    public function test_admin_can_open_a_linked_enrollment_record_before_it_is_released_for_review(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admission = $this->makeApprovedAdmission(['email' => 'open.enrollment@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+
+        $enrollment = EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => $admission->contact_number,
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Undergraduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.applications.show', $admission))
+            ->assertOk()
+            ->assertSee('This number is already linked to a submitted enrollment.')
+            ->assertSee(route('admin.enrollments.show', $enrollment), false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.show', $enrollment))
+            ->assertOk()
+            ->assertSee($admission->last_name)
+            ->assertSee('This enrollment is not in the review queue yet.')
+            ->assertSee(route('admin.applications.show', $admission), false);
+    }
+
+    public function test_application_and_enrollment_forms_keep_browser_drafts_after_refresh(): void
+    {
+        $script = file_get_contents(resource_path('js/form-drafts.js'));
+
+        $this->assertIsString($script);
+        $this->assertStringContainsString('mcare-form-draft:', $script);
+        $this->assertStringContainsString('sessionStorage', $script);
+        $this->assertStringContainsString('password_confirmation', $script);
+        $this->assertStringContainsString('signature_data', $script);
+        $this->assertStringContainsString('attachFormDrafts', $script);
+
+        $this->get(route('enrollment.create'))
+            ->assertOk()
+            ->assertSee('data-form-draft="enrollment.unlock"', false);
     }
 }

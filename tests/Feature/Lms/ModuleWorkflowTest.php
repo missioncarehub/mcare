@@ -58,6 +58,37 @@ class ModuleWorkflowTest extends TestCase
             ->assertSee('Trainer records Competent or Not yet competent.')
             ->assertDontSee('Mark Submodule as Done')
             ->assertDontSee('data-module-progress-form', false);
+
+        $this->actingAs($user)
+            ->get(route('trainee.modules.index'))
+            ->assertOk()
+            ->assertSee('Required Caregiving Classwork')
+            ->assertSee('Mark as done');
+    }
+
+    public function test_classwork_list_shows_mark_as_done_next_to_open_for_assessed_modules(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $user] = $this->lmsTrainee($batch);
+        $module = $this->lmsModule($trainer, $batch, [
+            'title' => 'Foster Physical Development of Children',
+            'completion_mode' => TrainingModule::COMPLETION_ASSESSED,
+        ]);
+
+        $html = $this->actingAs($user)
+            ->get(route('trainee.modules.index'))
+            ->assertOk()
+            ->assertSee('lms-classwork-actions', false)
+            ->assertSee('Open')
+            ->assertSee('Mark as done')
+            ->assertSee(route('trainee.modules.progress', $module), false)
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/lms-classwork-actions[\s\S]{0,1200}Open[\s\S]{0,800}Mark as done/',
+            $html,
+        );
     }
 
     public function test_completed_module_keeps_the_pdf_behind_a_show_hide_toggle(): void

@@ -102,7 +102,7 @@
         }
     </style>
 </head>
-<body class="enrollment-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased">
+<body class="enrollment-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased" @if($canCompleteEnrollment ?? false) data-form-draft-clear="enrollment.unlock" @endif>
     <div class="enrollment-page-glow pointer-events-none fixed inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-purple-100 via-purple-50/70 to-white"></div>
     <div class="enrollment-page-glow pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-72 bg-gradient-to-t from-purple-100 via-purple-50/60 to-white"></div>
 
@@ -159,7 +159,7 @@
                     @if ($errors->any())
                         <p class="enrollment-notice enrollment-notice-error">{{ $errors->first('application_number') ?: 'Please review the application number.' }}</p>
                     @endif
-                    <form method="POST" action="{{ route('enrollment.unlock') }}" class="space-y-5">
+                    <form method="POST" action="{{ route('enrollment.unlock') }}" class="space-y-5" data-form-draft="enrollment.unlock" @if($errors->any()) data-form-draft-server-old="1" @endif>
                         @csrf
                         <div class="enrollment-section-heading">
                             <p>Required before enrollment</p>
@@ -306,6 +306,8 @@
                 data-address-province="{{ old('province', $application->province ?? '') }}"
                 data-address-city="{{ old('city', $application->city ?? '') }}"
                 data-address-barangay="{{ old('barangay', $application->barangay ?? '') }}"
+                data-form-draft="enrollment.create.{{ $unlockedAdmission?->application_number ?? ($application?->admissionApplication?->application_number ?? 'open') }}"
+                @if($errors->any()) data-form-draft-server-old="1" @endif
             >
                 @csrf
                 @if ($unlockedAdmission)

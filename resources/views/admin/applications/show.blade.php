@@ -41,7 +41,7 @@
             @endif
             @if ($admission->enrollment)
                 <p class="mt-6 text-sm font-semibold text-purple-800">This number is already linked to a submitted enrollment.</p>
-                <a href="{{ route('admin.enrollments.show', $admission->enrollment) }}" class="mt-2 inline-flex text-sm font-bold text-purple-700 hover:text-purple-900">Open enrollment record</a>
+                <a href="{{ route('admin.enrollments.show', $admission->enrollment) }}" class="primary-action mt-3 inline-flex items-center justify-center">Open enrollment record</a>
             @endif
 
             {{-- Path: resources/views/admin/applications/show.blade.php | Label: Applicant lifecycle stage timeline --}}
@@ -79,7 +79,7 @@
 
         <aside class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Review decision</p>
-            <form method="POST" action="{{ route('admin.applications.update', $admission) }}" class="mt-4 space-y-4">
+            <form method="POST" action="{{ route('admin.applications.update', $admission) }}" class="mt-4 space-y-4" data-form-draft="admin.applications.{{ $admission->id }}" @if($errors->any()) data-form-draft-server-old="1" @endif>
                 @csrf
                 @method('PATCH')
                 <div>

@@ -15,7 +15,7 @@
     $cotcStateLabel = $cotc ? str($cotc->status)->headline() : 'Not issued';
 @endphp
 <section class="space-y-6">
-    <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">My documents</p><h1 class="dashboard-section-title mt-2 text-3xl">Training and registration records</h1></header>
+    <header class="border-b border-slate-200 pb-6"><p class="dashboard-section-kicker">My documents</p><h1 class="dashboard-section-title mt-2 text-2xl sm:text-3xl">Training and registration records</h1></header>
 
     {{-- Path: resources/views/trainee/documents.blade.php | Label: Program card gate for Certificate of Training Completion --}}
     <article class="dashboard-panel" data-cotc-panel>
@@ -29,10 +29,10 @@
                     <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 {{ $cotcReady ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-slate-50 text-slate-600 ring-slate-100' }}">{{ $cotcStateLabel }}</span>
                 </p>
             </div>
-            <div class="shrink-0">
+            <div class="w-full shrink-0 sm:w-auto">
                 <button
                     type="button"
-                    class="primary-action"
+                    class="primary-action w-full sm:w-auto"
                     data-cotc-view-toggle
                     aria-expanded="false"
                     aria-controls="cotc-details"
@@ -60,9 +60,9 @@
                     <p class="mt-2 text-sm text-slate-600">The admin will release this after every completion check passes.</p>
                 @endif
             </div>
-            <div class="shrink-0">
+            <div class="w-full shrink-0 sm:w-auto">
                 @if($cotc?->isDownloadableByTrainee())
-                    <a class="primary-action" href="{{ route('trainee.cotc.download', $cotc) }}">Download COTC once</a>
+                    <a class="primary-action w-full sm:w-auto" href="{{ route('trainee.cotc.download', $cotc) }}">Download COTC once</a>
                 @elseif($cotc?->downloaded_at)
                     <span class="dashboard-pill bg-slate-100 text-slate-700 ring-slate-200">Downloaded {{ $cotc->downloaded_at->format('M j, Y g:i A') }}</span>
                 @elseif($cotc)

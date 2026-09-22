@@ -12,12 +12,12 @@
     <div class="{{ ($isAdminPreview ?? false) ? '' : 'mt-3 ' }}flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
             @unless ($isAdminPreview ?? false)
-                <h1 class="text-3xl font-black text-slate-950 sm:text-4xl">Alumni Career Hub</h1>
+                <h1 class="text-2xl font-black text-slate-950 sm:text-3xl">Alumni Career Hub</h1>
             @endunless
             <p class="{{ ($isAdminPreview ?? false) ? '' : 'mt-2 ' }}text-sm text-slate-600">Privacy-reviewed caregiving opportunities for MCARE graduates.</p>
         </div>
         @unless ($isAdminPreview ?? false)
-            <a href="{{ route('notifications.index') }}" class="secondary-action inline-flex items-center gap-3 self-start lg:self-auto">
+            <a href="{{ route('notifications.index') }}" class="secondary-action inline-flex w-full items-center gap-3 self-start sm:w-auto lg:self-auto">
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700"><x-dashboard-icon name="bell" class="h-4 w-4" /></span>
                 <span><span class="block text-xs font-bold uppercase text-slate-500">Unread updates</span><span class="block text-lg font-black text-slate-950">{{ $unreadNotifications }}</span></span>
             </a>
@@ -40,7 +40,7 @@
         <form method="POST" action="{{ route('trainee.career-hub.availability') }}" data-confirm="Update your caregiver availability?">
             @csrf @method('PATCH')
             <input type="hidden" name="is_available_for_duty" value="{{ $alumniProfile->is_available_for_duty ? '0' : '1' }}">
-            <button type="submit" data-action-button class="{{ $alumniProfile->is_available_for_duty ? 'secondary-action' : 'primary-action' }} whitespace-nowrap">
+            <button type="submit" data-action-button class="{{ $alumniProfile->is_available_for_duty ? 'secondary-action' : 'primary-action' }} w-full whitespace-normal sm:w-auto sm:whitespace-nowrap">
                 {{ $alumniProfile->is_available_for_duty ? 'Mark unavailable' : 'Mark Available for Duty' }}
             </button>
         </form>

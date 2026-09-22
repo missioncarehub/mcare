@@ -272,6 +272,10 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
             (string) $o->id => TraineeCompetencyRecord::STATUS_COMPETENT,
         ])->all();
 
+        $this->actingAs($traineeUser)
+            ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
+            ->assertSessionHasNoErrors();
+
         $gradeResponse = $this->actingAs($trainer)->patch(route('trainer.competencies.update', $traineeApplication), [
             'records' => [
                 [

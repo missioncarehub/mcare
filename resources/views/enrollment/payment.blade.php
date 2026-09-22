@@ -7,7 +7,7 @@
     <x-site-favicon />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="enrollment-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased">
+<body class="enrollment-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased" data-form-draft-clear="enrollment.create">
     @php
         $fullName = preg_replace('/\s+/', ' ', trim($application->first_name.' '.$application->middle_name.' '.$application->last_name.' '.$application->extension_name)) ?: 'Applicant';
         $amount = 'PHP '.number_format((float) ($application->downpayment_amount ?: $application->payment_amount ?: 0), 2);

@@ -10,8 +10,8 @@
 <section class="space-y-6">
     @if ($isGraduate ?? false)
         <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
-            <div><p class="dashboard-section-kicker">Graduate calendar</p><h1 class="dashboard-section-title mt-2 text-3xl">Career opportunities calendar</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This calendar shows estimated start dates for privacy-reviewed caregiving duties.</p></div>
-            <a href="{{ route('trainee.career-hub') }}" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Career Hub</a>
+            <div><p class="dashboard-section-kicker">Graduate calendar</p><h1 class="dashboard-section-title mt-2 text-2xl sm:text-3xl">Career opportunities calendar</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This calendar shows estimated start dates for privacy-reviewed caregiving duties.</p></div>
+            <a href="{{ route('trainee.career-hub') }}" class="secondary-action inline-flex w-full items-center justify-center gap-2 sm:w-auto"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Career Hub</a>
         </header>
         <x-training-calendar
             :month="$calendarMonth"
@@ -28,7 +28,7 @@
     <header class="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <p class="dashboard-section-kicker">My schedule</p>
-            <h1 class="dashboard-section-title mt-2 text-3xl">Class calendar</h1>
+            <h1 class="dashboard-section-title mt-2 text-2xl sm:text-3xl">Class calendar</h1>
             <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Your calendar only includes the {{ $application->schedule_preference }} sessions assigned to your approved batch.</p>
         </div>
         <div class="flex flex-wrap gap-2 text-xs font-bold">
@@ -59,7 +59,7 @@
 
     <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section class="dashboard-panel">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div class="rounded-xl bg-slate-50 p-5">
                     <p class="text-xs font-black uppercase tracking-wide text-slate-500">Regular schedule</p>
                     <p class="mt-2 text-lg font-black text-slate-900">{{ $scheduleLabel }}</p>

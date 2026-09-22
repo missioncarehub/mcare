@@ -64,17 +64,6 @@
                 </form>
             </section>
 
-            <section id="preferences" class="dashboard-panel space-y-3">
-                <p class="dashboard-section-kicker">Display</p>
-                <h2 class="text-lg font-bold text-slate-950">Theme preference</h2>
-                <p class="text-sm leading-6 text-slate-600">Night mode is stored only on this browser and can be changed anytime.</p>
-                <button type="button" class="secondary-action w-full sm:w-auto" data-dashboard-theme-toggle aria-pressed="false">
-                    <x-dashboard-icon name="moon" class="h-4 w-4" data-dashboard-theme-icon="moon" />
-                    <x-dashboard-icon name="sun" class="hidden h-4 w-4" data-dashboard-theme-icon="sun" />
-                    <span data-dashboard-theme-label>Night mode</span>
-                </button>
-            </section>
-
             <a href="{{ route('account.help') }}" class="dashboard-panel block space-y-2 transition hover:border-purple-300">
                 <p class="dashboard-section-kicker">Need assistance?</p>
                 <h2 class="text-lg font-bold text-slate-950">Open help center</h2>

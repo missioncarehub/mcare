@@ -218,6 +218,11 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasMany(ClassroomComment::class, 'recipient_user_id');
     }
 
+    public function adminContactMessages(): HasMany
+    {
+        return $this->hasMany(AdminContactMessage::class);
+    }
+
     /** @return array<string, string> */
     public static function traineeStatuses(): array
     {

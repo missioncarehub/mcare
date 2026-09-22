@@ -125,6 +125,10 @@ class TraineePortalTest extends TestCase
             ->assertSee('dashboard-sidebar-header', false)
             ->assertDontSee('dashboard-gradient', false)
             ->assertSee('href="'.route('trainee.payments').'"', false)
+            ->assertSee('href="'.route('trainee.modules.index').'"', false)
+            ->assertSee('href="'.route('trainee.documents').'"', false)
+            ->assertSee('Continue in classwork')
+            ->assertSee('dashboard-stat-meter', false)
             ->assertDontSee('href="'.route('payment.show').'"', false);
     }
 

@@ -78,6 +78,114 @@ class AttendanceTrackingTest extends TestCase
         ]);
     }
 
+    public function test_newly_enrolled_trainee_is_hidden_from_previous_attendance_dates(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+
+        $this->lmsTrainee($batch, [
+            'first_name' => 'Early',
+            'last_name' => 'Bird',
+            'reviewed_at' => now()->subWeeks(2),
+            'learning_started_at' => now()->subWeeks(2),
+        ]);
+
+        ['application' => $newTrainee] = $this->lmsTrainee($batch, [
+            'first_name' => 'New',
+            'last_name' => 'Enrollee',
+            'reviewed_at' => now(),
+            'learning_started_at' => now(),
+        ]);
+
+        $pastDate = now()->subWeek()->toDateString();
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => $pastDate,
+            ]))
+            ->assertOk()
+            ->assertSee('Early Bird')
+            ->assertDontSee('New Enrollee');
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => now()->toDateString(),
+            ]))
+            ->assertOk()
+            ->assertSee('Early Bird')
+            ->assertSee('New Enrollee');
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.attendance.store'), [
+                'batch_id' => $batch->id,
+                'date' => $pastDate,
+                'records' => [
+                    $newTrainee->id => [
+                        'status' => 'present',
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('trainee_attendances', [
+            'training_batch_id' => $batch->id,
+            'enrollment_application_id' => $newTrainee->id,
+            'attendance_date' => $pastDate,
+        ]);
+    }
+
+    public function test_future_attendance_date_hides_status_and_rejects_save(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['application' => $trainee] = $this->lmsTrainee($batch, [
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+        ]);
+
+        $futureDate = now()->addDay()->toDateString();
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => $futureDate,
+            ]))
+            ->assertOk()
+            ->assertSee('Maria Santos')
+            ->assertSee('Attendance status will be available on the session day')
+            ->assertDontSee('Mark All as Present')
+            ->assertDontSee('name="records['.$trainee->id.'][status]"', false);
+
+        $this->actingAs($trainer)
+            ->from(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => $futureDate,
+            ]))
+            ->post(route('trainer.attendance.store'), [
+                'batch_id' => $batch->id,
+                'date' => $futureDate,
+                'records' => [
+                    $trainee->id => [
+                        'status' => 'present',
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('trainer.attendance.index', [
+                'batch_id' => $batch->id,
+                'date' => $futureDate,
+                'tab' => 'sheet',
+            ]))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseMissing('trainee_attendances', [
+            'training_batch_id' => $batch->id,
+            'enrollment_application_id' => $trainee->id,
+            'attendance_date' => $futureDate,
+        ]);
+    }
+
     public function test_graduated_trainees_are_excluded_from_the_attendance_sheet(): void
     {
         $trainer = $this->lmsUser('trainer');

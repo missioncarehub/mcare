@@ -7,7 +7,7 @@
     <x-dashboard-theme-head />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="enrollment-page application-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased">
+<body class="enrollment-page application-page min-h-screen bg-[#f3f2f6] font-sans text-slate-900 antialiased" data-form-draft-clear="applications.create">
     <x-public-official-header
         masthead-aside="Caregiving NC II · Official application"
         nav-label="Application received"

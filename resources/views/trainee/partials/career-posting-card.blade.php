@@ -38,7 +38,7 @@
         <p class="mt-4 {{ $job->postingSummary() ? 'border-t border-slate-100 pt-4' : '' }} text-sm leading-6 text-slate-600"><span class="font-bold text-slate-900">Requirements:</span> {{ $job->specific_contraptions }}</p>
     @endif
 
-    <div class="mt-6 {{ $job->postingSummary() || $job->specific_contraptions ? '' : 'flex-1' }} flex flex-wrap gap-2">
+    <div class="mt-6 {{ $job->postingSummary() || $job->specific_contraptions ? '' : 'flex-1' }} flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
         @unless ($isAdminPreview ?? false)
             @if (in_array((int) $job->id, array_map('intval', $contactedJobIds ?? []), true))
                 <span class="secondary-action inline-flex items-center text-sm">Inquiry sent</span>

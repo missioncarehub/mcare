@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\EnrollmentApplication;
 use App\Models\TraineeAttendance;
 use App\Models\TrainingBatch;
 use App\Services\AttendanceService;
@@ -43,15 +42,10 @@ class AdminAttendanceController extends Controller
         $trainees = collect();
         $existingAttendances = collect();
         $summary = null;
+        $isFutureDate = $this->attendanceService->isFutureAttendanceDate($selectedDate);
 
         if ($selectedBatch) {
-            $trainees = $selectedBatch->applications()
-                ->where('status', EnrollmentApplication::STATUS_APPROVED)
-                ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
-                ->with('user')
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get();
+            $trainees = $this->attendanceService->rosterForDate($selectedBatch, $selectedDate);
 
             $existingAttendances = TraineeAttendance::where('training_batch_id', $selectedBatch->id)
                 ->whereDate('attendance_date', $selectedDate->toDateString())
@@ -73,6 +67,7 @@ class AdminAttendanceController extends Controller
             'existingAttendances' => $existingAttendances,
             'summary' => $summary,
             'statuses' => TraineeAttendance::statuses(),
+            'isFutureDate' => $isFutureDate,
         ]);
     }
 
@@ -88,6 +83,16 @@ class AdminAttendanceController extends Controller
 
         $batch = TrainingBatch::findOrFail($validated['batch_id']);
         $date = Carbon::parse($validated['date']);
+
+        if ($this->attendanceService->isFutureAttendanceDate($date)) {
+            return redirect()
+                ->route('admin.learning.attendance', [
+                    'batch_id' => $batch->id,
+                    'date' => $date->toDateString(),
+                    'tab' => 'sheet',
+                ])
+                ->with('error', 'Attendance status can only be recorded on or after the session date.');
+        }
 
         $savedCount = $this->attendanceService->saveDailyAttendance(
             $batch,

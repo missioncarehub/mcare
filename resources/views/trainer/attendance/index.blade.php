@@ -66,23 +66,59 @@
                     <h2 class="text-lg font-bold text-slate-900">
                         {{ $selectedBatch->name }} &mdash; {{ $selectedDate->format('F d, Y (l)') }}
                     </h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Total Enrolled Trainees: {{ $trainees->count() }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Trainees enrolled on this date: {{ $trainees->count() }}</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button type="button" onclick="markAllPresent()" class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-                        <i class="fa-solid fa-check-double text-emerald-600"></i>
-                        <span>Mark All as Present</span>
-                    </button>
-                    <button type="submit" form="attendance_form" class="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-800">
-                        <i class="fa-solid fa-floppy-disk"></i>
-                        <span>Save Attendance</span>
-                    </button>
-                </div>
+                @unless($isFutureDate)
+                    <div class="flex items-center gap-3">
+                        <button type="button" onclick="markAllPresent()" class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                            <i class="fa-solid fa-check-double text-emerald-600"></i>
+                            <span>Mark All as Present</span>
+                        </button>
+                        <button type="submit" form="attendance_form" class="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-800">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Save Attendance</span>
+                        </button>
+                    </div>
+                @endunless
             </div>
+
+            @if($isFutureDate)
+                <div class="border-b border-slate-100 bg-slate-50 px-5 py-3 text-sm text-slate-600">
+                    This date is in the future. Attendance status will be available on the session day.
+                </div>
+            @endif
 
             @if($trainees->isEmpty())
                 <div class="p-12 text-center text-slate-500">
-                    <p class="font-medium">No approved trainees found in this batch.</p>
+                    <p class="font-medium">No enrolled trainees for this date.</p>
+                </div>
+            @elseif($isFutureDate)
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-100/75 text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                            <tr>
+                                <th scope="col" class="py-3.5 px-4 font-bold">#</th>
+                                <th scope="col" class="py-3.5 px-4 font-bold">Trainee Name</th>
+                                <th scope="col" class="py-3.5 px-4 font-bold">Schedule</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach($trainees as $index => $trainee)
+                                <tr class="hover:bg-slate-50/60 transition">
+                                    <td class="py-3.5 px-4 font-medium text-slate-400">{{ $index + 1 }}</td>
+                                    <td class="py-3.5 px-4">
+                                        <div class="font-bold text-slate-900">{{ $trainee->full_name }}</div>
+                                        <div class="text-xs text-slate-500">{{ $trainee->email ?? $trainee->user?->email }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4">
+                                        <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 uppercase">
+                                            {{ $trainee->schedule_preference ?: 'AM' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             @else
                 <form id="attendance_form" method="POST" action="{{ route('trainer.attendance.store') }}">
@@ -107,20 +143,12 @@
                                     @php
                                         $att = $existingAttendances->get($trainee->id);
                                         $currentStatus = $att?->status ?? 'present';
-                                        // Path: resources/views/trainer/attendance/index.blade.php | Label: Highlight newly enrolled trainees on past dates
-                                        $eligibleFrom = ($eligibleFromByTrainee ?? collect())->get($trainee->id);
-                                        $notYetEnrolled = $eligibleFrom && $selectedDate->copy()->startOfDay()->lt($eligibleFrom);
                                     @endphp
-                                    <tr class="hover:bg-slate-50/60 transition {{ $notYetEnrolled ? 'bg-amber-50/40' : '' }}">
+                                    <tr class="hover:bg-slate-50/60 transition">
                                         <td class="py-3.5 px-4 font-medium text-slate-400">{{ $index + 1 }}</td>
                                         <td class="py-3.5 px-4">
                                             <div class="font-bold text-slate-900">{{ $trainee->full_name }}</div>
                                             <div class="text-xs text-slate-500">{{ $trainee->email ?? $trainee->user?->email }}</div>
-                                            @if($notYetEnrolled)
-                                                <div class="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                                                    Newly enrolled — starts {{ $eligibleFrom->format('M d, Y') }}
-                                                </div>
-                                            @endif
                                         </td>
                                         <td class="py-3.5 px-4">
                                             <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 uppercase">

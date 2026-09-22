@@ -126,6 +126,15 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.enrollments.show', $application))
+            ->assertOk()
+            ->assertSee('Payment Pending Learner')
+            ->assertSee('This enrollment is not in the review queue yet.')
+            ->assertDontSee('Save decision');
+
+        $this->actingAs($admin)
+            ->patch(route('admin.enrollments.update', $application), [
+                'status' => EnrollmentApplication::STATUS_APPROVED,
+            ])
             ->assertNotFound();
 
         $this->actingAs($admin)

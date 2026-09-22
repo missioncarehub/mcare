@@ -128,7 +128,13 @@ class SubmoduleWorkflowTest extends TestCase
 
         $this->actingAs($trainee)
             ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
-            ->assertSessionHasErrors('action');
+            ->assertRedirect(route('trainee.modules.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            ModuleProgress::STATUS_AWAITING_EVALUATION,
+            $this->parentProgress($application->id, $module->id)->status,
+        );
 
         foreach ($module->submodules as $index => $submodule) {
             $this->actingAs($trainer)

@@ -304,6 +304,10 @@ class ModuleManagementTest extends TestCase
             ->assertSee('Pending Evaluation')
             ->assertDontSee('Mark Submodule as Done');
 
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.progress', $module), ['action' => 'submit'])
+            ->assertSessionHasNoErrors();
+
         $this->actingAs($trainer)
             ->patch(route('trainer.competencies.update', $application), [
                 'records' => [
@@ -362,6 +366,10 @@ class ModuleManagementTest extends TestCase
 
         $this->assertNotNull($firstSubmodule);
         $this->assertNotNull($laterSubmodule);
+
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.progress', $first), ['action' => 'submit'])
+            ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->patch(route('trainer.competencies.update', $application), [
@@ -441,6 +449,10 @@ class ModuleManagementTest extends TestCase
             'title' => 'Foster Physical Development of Children',
         ]);
         $unit = $first->competencyUnit;
+
+        $this->actingAs($trainee)
+            ->patch(route('trainee.modules.progress', $first), ['action' => 'submit'])
+            ->assertSessionHasNoErrors();
 
         $this->actingAs($trainer)
             ->patch(route('trainer.competencies.update', $application), [

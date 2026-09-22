@@ -1,10 +1,10 @@
 @extends('trainee.layouts.app', ['title' => 'Tuition & Payments | MCARE Trainee'])
 
 @section('content')
-<section class="space-y-6">
-    <header class="border-b border-slate-200 pb-6">
+<section class="space-y-6" data-trainee-payments>
+    <header class="border-b border-slate-200 pb-5 sm:pb-6">
         <p class="dashboard-section-kicker">Tuition & Financial Records</p>
-        <h1 class="dashboard-section-title mt-2 text-3xl">Payment summary</h1>
+        <h1 class="dashboard-section-title mt-2 text-2xl sm:text-3xl">Payment summary</h1>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             View your program tuition breakdown, monitor installment payments, upload on-site Official Receipt (OR) details for administrative validation, or make online payments.
         </p>
@@ -28,36 +28,36 @@
 
     <!-- Milestone Financial Status -->
     @if ($application->remainingBalance() <= 0)
-        <div class="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-5 text-emerald-950">
-            <div class="flex items-center gap-3">
+        <div class="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 sm:p-5 text-emerald-950">
+            <div class="flex items-start gap-3">
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
                     <x-dashboard-icon name="check" class="h-6 w-6" />
                 </div>
-                <div>
+                <div class="min-w-0">
                     <h2 class="text-base font-bold">Program Tuition Fully Settled</h2>
                     <p class="text-xs text-emerald-800">You have completed all financial requirements for the Caregiving NC II program.</p>
                 </div>
             </div>
         </div>
     @elseif ($application->isDownpaymentSatisfied())
-        <div class="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-indigo-50 p-5 text-sky-950">
-            <div class="flex items-center gap-3">
+        <div class="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-indigo-50 p-4 sm:p-5 text-sky-950">
+            <div class="flex items-start gap-3">
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white">
                     <x-dashboard-icon name="circle-check" class="h-6 w-6" />
                 </div>
-                <div>
+                <div class="min-w-0">
                     <h2 class="text-base font-bold">Downpayment Milestone Confirmed — In Good Standing</h2>
                     <p class="text-xs text-sky-800">Your initial downpayment was verified. You have full access to training modules and LMS activities. You can pay your remaining balance in installments.</p>
                 </div>
             </div>
         </div>
     @else
-        <div class="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-5 text-amber-950">
-            <div class="flex items-center gap-3">
+        <div class="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:p-5 text-amber-950">
+            <div class="flex items-start gap-3">
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white">
                     <x-dashboard-icon name="triangle-exclamation" class="h-6 w-6" />
                 </div>
-                <div>
+                <div class="min-w-0">
                     <h2 class="text-base font-bold">Initial Downpayment (₱2,000.00) Required</h2>
                     <p class="text-xs text-amber-800">Please pay at the cashier or online to activate your classroom and training schedule.</p>
                 </div>
@@ -66,51 +66,51 @@
     @endif
 
     <!-- 4 Metric Cards -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <article class="dashboard-stat min-h-0">
-            <div>
+    <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" data-trainee-stat-cards>
+        <article class="dashboard-stat min-h-0" data-trainee-stat-card>
+            <div class="min-w-0" data-trainee-stat-body>
                 <p class="dashboard-stat-label">Total Program Tuition</p>
                 <p class="dashboard-stat-value">₱{{ number_format((float) ($application->total_program_fee ?? 22000.00), 2) }}</p>
             </div>
-            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 ring-1 ring-slate-200"><x-dashboard-icon name="file-text" class="h-5 w-5" /></span>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600 ring-1 ring-slate-200" data-trainee-stat-icon><x-dashboard-icon name="file-text" class="h-5 w-5" /></span>
         </article>
-        <article class="dashboard-stat min-h-0">
-            <div>
+        <article class="dashboard-stat min-h-0" data-trainee-stat-card>
+            <div class="min-w-0" data-trainee-stat-body>
                 <p class="dashboard-stat-label">Downpayment Requirement</p>
                 <p class="dashboard-stat-value text-purple-700">₱{{ number_format((float) ($application->downpayment_amount ?? 2000.00), 2) }}</p>
             </div>
-            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100"><x-dashboard-icon name="credit-card" class="h-5 w-5" /></span>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100" data-trainee-stat-icon><x-dashboard-icon name="credit-card" class="h-5 w-5" /></span>
         </article>
-        <article class="dashboard-stat min-h-0">
-            <div>
+        <article class="dashboard-stat min-h-0" data-trainee-stat-card>
+            <div class="min-w-0" data-trainee-stat-body>
                 <p class="dashboard-stat-label">Total Paid to Date</p>
                 <p class="dashboard-stat-value text-emerald-700">₱{{ number_format((float) ($application->total_paid_amount ?? 0.00), 2) }}</p>
             </div>
-            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><x-dashboard-icon name="circle-check" class="h-5 w-5" /></span>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" data-trainee-stat-icon><x-dashboard-icon name="circle-check" class="h-5 w-5" /></span>
         </article>
-        <article class="dashboard-stat min-h-0">
-            <div>
+        <article class="dashboard-stat min-h-0" data-trainee-stat-card>
+            <div class="min-w-0" data-trainee-stat-body>
                 <p class="dashboard-stat-label">Remaining Balance</p>
                 <p class="dashboard-stat-value {{ $application->remainingBalance() <= 0 ? 'text-emerald-700' : 'text-amber-700' }}">
                     ₱{{ number_format($application->remainingBalance(), 2) }}
                 </p>
             </div>
-            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $application->remainingBalance() <= 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }} ring-1"><x-dashboard-icon name="signal" class="h-5 w-5" /></span>
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {{ $application->remainingBalance() <= 0 ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }} ring-1" data-trainee-stat-icon><x-dashboard-icon name="signal" class="h-5 w-5" /></span>
         </article>
     </div>
 
     <!-- Main Content: Generate Ticket, Submit Proof & Transaction History -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="space-y-6">
             <!-- Primary flow: generate a server-backed ticket before visiting the cashier. -->
             <section id="onsite-ticket" class="dashboard-panel space-y-4 border-2 border-purple-100">
                 <header class="border-b border-slate-100 pb-3">
                     <div class="flex items-start justify-between gap-3">
-                        <div>
+                        <div class="min-w-0">
                             <h2 class="text-base font-bold text-slate-950">Generate On-Site Payment Ticket</h2>
                             <p class="mt-1 text-xs text-slate-500">Create a ticket before visiting MCARE. The ticket is saved for the admin cashier queue; it is not marked paid until the cashier verifies the actual OR.</p>
                         </div>
-                        <x-dashboard-icon name="file-invoice" class="h-5 w-5 shrink-0 text-purple-700" />
+                        <x-dashboard-icon name="file-invoice" class="hidden h-5 w-5 shrink-0 text-purple-700 sm:block" />
                     </div>
                 </header>
 
@@ -152,7 +152,7 @@
                                 <p class="mt-1 text-[11px] text-slate-400">Maximum remaining balance: ₱{{ number_format($balance, 2) }}</p>
                             </div>
                         </div>
-                        <button type="submit" class="primary-action">
+                        <button type="submit" class="primary-action w-full sm:w-auto">
                             <x-dashboard-icon name="file-invoice" class="h-4 w-4" />
                             <span>Generate Payment Ticket</span>
                         </button>
@@ -192,22 +192,60 @@
                         </div>
                         <div>
                             <label for="trainee-receipt-proof" class="mb-1.5 block text-xs font-bold uppercase text-slate-600">Receipt photo/document</label>
-                            <input id="trainee-receipt-proof" name="receipt_proof" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-field file:mr-4 file:rounded-lg file:border-0 file:bg-purple-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-purple-700 hover:file:bg-purple-100">
+                            <input id="trainee-receipt-proof" name="receipt_proof" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-field max-w-full file:mr-3 file:rounded-lg file:border-0 file:bg-purple-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-purple-700 hover:file:bg-purple-100">
                             <p class="mt-1 text-[11px] text-slate-500">PDF or clear JPG, PNG, or WebP; maximum 10 MB.</p>
                         </div>
-                        <button type="submit" class="secondary-action">Submit receipt proof</button>
+                        <button type="submit" class="secondary-action w-full sm:w-auto">Submit receipt proof</button>
                     </form>
                 </details>
             </section>
 
             <!-- Transaction History Ledger -->
             <section class="dashboard-table-wrap">
-                <div class="border-b border-slate-100 px-5 py-4">
+                <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
                     <h2 class="text-base font-bold text-slate-950">Payment History & Receipt Ledger</h2>
                     <p class="text-xs text-slate-500">Official log of all recorded tuition payments, installment deposits, and verification records.</p>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="space-y-3 p-4 md:hidden">
+                    @forelse ($application->paymentTransactions as $tx)
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="font-mono text-xs font-bold break-all text-slate-950">{{ $tx->referenceLabel() }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $tx->paid_at?->format('M d, Y') ?? $tx->created_at->format('M d, Y') }}</p>
+                                </div>
+                                <span class="shrink-0 inline-flex rounded px-2 py-0.5 text-xs font-bold {{ $tx->status === 'verified' ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : ($tx->status === 'pending_verification' ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200') }}">
+                                    {{ $tx->statusLabel() }}
+                                </span>
+                            </div>
+                            <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <dt class="text-slate-500">Classification</dt>
+                                    <dd class="mt-0.5 font-semibold text-slate-900">{{ $tx->typeLabel() }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-slate-500">Channel</dt>
+                                    <dd class="mt-0.5 font-semibold text-slate-900">{{ str($tx->payment_channel)->headline() }}</dd>
+                                </div>
+                                <div class="col-span-2">
+                                    <dt class="text-slate-500">Amount</dt>
+                                    <dd class="mt-0.5 font-bold text-slate-900">₱{{ number_format((float) $tx->amount, 2) }}</dd>
+                                </div>
+                            </dl>
+                            @if ($tx->ticket_number)
+                                <p class="mt-2 text-[11px] font-semibold text-amber-700">On-site ticket</p>
+                            @endif
+                        </article>
+                    @empty
+                        <div class="py-6 text-center text-slate-500">
+                            <p class="font-bold text-slate-900">No payment transactions recorded yet</p>
+                            <p class="mt-1 text-xs">Generate an on-site ticket above or complete an online payment.</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="hidden overflow-x-auto md:block">
                     <table class="dashboard-table w-full min-w-[36rem]">
                         <thead>
                             <tr>

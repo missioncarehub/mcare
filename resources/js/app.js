@@ -1,6 +1,7 @@
 import './bootstrap';
 import { attachPhilippineAddressLookups } from './philippine-address-lookup';
 import { attachLandingChat } from './landing-chat';
+import { attachFormDrafts } from './form-drafts';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Load the worker from Laravel's public/ folder, not the Vite dev server.
@@ -46,7 +47,6 @@ const loadPdfDocument = async (url) => {
     }
 };
 
-const dashboardThemeStorageKey = 'mcare-dashboard-theme';
 const adminSidebarCollapsedStorageKey = 'mcare-admin-sidebar-collapsed';
 const trainerSidebarCollapsedStorageKey = 'mcare-trainer-sidebar-collapsed';
 const traineeSidebarCollapsedStorageKey = 'mcare-trainee-sidebar-collapsed';
@@ -56,22 +56,8 @@ const officialSidebarStorageKeys = {
     trainee: traineeSidebarCollapsedStorageKey,
 };
 
-const readDashboardTheme = () => {
-    try {
-        return window.localStorage.getItem(dashboardThemeStorageKey) === 'dark' ? 'dark' : 'light';
-    } catch (error) {
-        // Light is the safe default when storage is unavailable or blocked.
-        return 'light';
-    }
-};
-
-const applyDashboardTheme = (theme) => {
-    const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
-    document.documentElement.dataset.dashboardTheme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme;
-};
-
-applyDashboardTheme(readDashboardTheme());
+document.documentElement.dataset.dashboardTheme = 'light';
+document.documentElement.style.colorScheme = 'light';
 
 // Sidebar collapse must survive back/forward cache restores and any errors
 // thrown by unrelated DOMContentLoaded logic (e.g. the PDF viewer on lesson
@@ -150,6 +136,7 @@ window.addEventListener('pageshow', syncOfficialSidebarFromStorage);
 
 document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.remove('dashboard-navigating');
+    attachFormDrafts();
     attachPhilippineAddressLookups();
     attachLandingChat();
 
@@ -177,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountMenus = document.querySelectorAll('[data-dashboard-account]');
     const dashboardLinks = document.querySelectorAll('.dashboard-nav-link, .dashboard-mobile-link');
     const hashLinks = document.querySelectorAll('.dashboard-nav-link[href*="#"], .dashboard-mobile-link[href*="#"]');
-    const themeToggleButtons = document.querySelectorAll('[data-dashboard-theme-toggle]');
     const prefetchLinks = document.querySelectorAll('a[data-dashboard-prefetch]');
     const trainingCalendars = document.querySelectorAll('[data-training-calendar]');
     const dashboardMain = document.querySelector('.dashboard-main');
@@ -471,44 +457,6 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ event: eventName }),
         }).catch(() => {});
     };
-
-    const updateThemeControls = () => {
-        const isDark = document.documentElement.dataset.dashboardTheme === 'dark';
-
-        themeToggleButtons.forEach((button) => {
-            button.setAttribute('aria-pressed', String(isDark));
-            const label = button.querySelector('[data-dashboard-theme-label]');
-            const moonIcon = button.querySelector('[data-dashboard-theme-icon="moon"]');
-            const sunIcon = button.querySelector('[data-dashboard-theme-icon="sun"]');
-
-            if (label) label.textContent = isDark ? 'Light mode' : 'Night mode';
-            moonIcon?.classList.toggle('hidden', isDark);
-            sunIcon?.classList.toggle('hidden', !isDark);
-        });
-    };
-
-    themeToggleButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            const nextTheme = document.documentElement.dataset.dashboardTheme === 'dark' ? 'light' : 'dark';
-            applyDashboardTheme(nextTheme);
-
-            try {
-                // One shared key carries the user's choice across every role portal.
-                window.localStorage.setItem(dashboardThemeStorageKey, nextTheme);
-            } catch (error) {
-                // The current page can still change theme when storage is disabled.
-            }
-
-            updateThemeControls();
-        });
-    });
-    updateThemeControls();
-    // Keep the account menu label/icon in sync when another tab changes the
-    // shared preference. The page-level storage handler below updates the
-    // document attribute; this listener updates controls without a reload.
-    window.addEventListener('storage', (event) => {
-        if (event.key === dashboardThemeStorageKey) updateThemeControls();
-    });
 
     if (protectedViewer) {
         const notice = protectedViewer.querySelector('[data-protected-viewer-notice]');
@@ -1613,20 +1561,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('pageshow', () => {
-    applyDashboardTheme(readDashboardTheme());
     document.documentElement.classList.remove('dashboard-navigating');
     document.querySelector('.dashboard-main')?.removeAttribute('aria-busy');
     document.querySelectorAll('a[data-dashboard-prefetch].is-loading').forEach((navLink) => {
         navLink.classList.remove('is-loading');
         navLink.removeAttribute('aria-disabled');
     });
-});
-
-window.addEventListener('storage', (event) => {
-    if (event.key === dashboardThemeStorageKey) {
-        applyDashboardTheme(readDashboardTheme());
-    }
-
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1765,6 +1705,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     board.querySelectorAll('[data-competency-cell]').forEach((cell) => {
         cell.addEventListener('click', () => {
+            if (cell.disabled || !cell.dataset.recordPayload) {
+                return;
+            }
+
             try {
                 openDrawer(decodeRecordPayload(cell.dataset.recordPayload));
             } catch (error) {

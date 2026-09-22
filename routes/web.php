@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminAttendanceController;
 use App\Http\Controllers\Admin\AdminCareerHubController;
+use App\Http\Controllers\Admin\AdminContactMessageController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
 use App\Http\Controllers\Admin\AdminSessionController;
@@ -120,6 +121,9 @@ Route::middleware('throttle:global-web')->group(function () {
         ->group(function () {
             Route::get('/settings', [AccountSettingsController::class, 'show'])->name('settings');
             Route::get('/help', [AccountSettingsController::class, 'help'])->name('help');
+            Route::post('/contact', [AccountSettingsController::class, 'storeContact'])
+                ->middleware('throttle:5,60')
+                ->name('contact.store');
             Route::patch('/avatar', [AccountSettingsController::class, 'updateAvatar'])
                 ->middleware('throttle:sensitive-mutation')
                 ->name('avatar.update');
@@ -441,6 +445,17 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/announcements/{announcement}', [AdminAnnouncementController::class, 'destroy'])
                     ->middleware(['permission:announcements.view', 'throttle:sensitive-mutation'])
                     ->name('announcements.destroy');
+
+                Route::get('/contact-messages', [AdminContactMessageController::class, 'index'])
+                    ->name('contact-messages.index');
+
+                Route::patch('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'update'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('contact-messages.update');
+
+                Route::delete('/contact-messages/{contactMessage}', [AdminContactMessageController::class, 'destroy'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('contact-messages.destroy');
 
                 Route::get('/learning/trainees', [AdminLearningSystemController::class, 'trainees'])
                     ->middleware('permission:trainees.manage')

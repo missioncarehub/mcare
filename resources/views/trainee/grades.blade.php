@@ -11,7 +11,7 @@
         <p class="dashboard-section-kicker">Graduate record</p>
         <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <h1 class="dashboard-section-title">Course grades</h1>
+                <h1 class="dashboard-section-title text-2xl sm:text-3xl">Course grades</h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Only module results formally evaluated by an MCARE trainer appear here. Uploaded lessons and learning files are no longer accessible after graduation.</p>
             </div>
             <span class="inline-flex self-start rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 ring-1 ring-purple-200">Read-only official record</span>
@@ -44,7 +44,7 @@
                     <p class="mt-1 text-sm text-slate-500">{{ $batch ? $batch->name.' '.$batch->year : 'Verified graduate record' }}</p>
                 </div>
             </div>
-            <div class="grid grid-cols-3 gap-2 text-center sm:min-w-[24rem]">
+            <div class="grid w-full grid-cols-3 gap-2 text-center" data-trainee-grade-chips>
                 <div class="rounded-xl bg-slate-50 px-3 py-3"><strong class="block text-xl text-slate-950">{{ $gradeRecords->count() ?: ($competencyRecords->count() ?? 0) }}</strong><span class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Evaluated</span></div>
                 <div class="rounded-xl bg-emerald-50 px-3 py-3"><strong class="block text-xl text-emerald-800">{{ $competentCount ?: ($competencyRecords->where('status', 'competent')->count() ?? 0) }}</strong><span class="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Competent</span></div>
                 <div class="rounded-xl bg-amber-50 px-3 py-3"><strong class="block text-xl text-amber-800">{{ $notYetCompetentCount }}</strong><span class="text-[10px] font-bold uppercase tracking-wide text-amber-700">NYC</span></div>

@@ -38,11 +38,6 @@
     </a>
 @endif
 
-<button type="button" class="dashboard-account-action" data-dashboard-theme-toggle aria-pressed="false">
-    <x-dashboard-icon name="moon" class="mr-3 w-4" data-dashboard-theme-icon="moon" />
-    <x-dashboard-icon name="sun" class="mr-3 hidden w-4" data-dashboard-theme-icon="sun" />
-    <span data-dashboard-theme-label>Night mode</span>
-</button>
 <a href="{{ route('account.settings') }}" class="dashboard-account-action">
     <x-dashboard-icon name="gear" class="mr-3 w-4" />Settings
 </a>

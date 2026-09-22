@@ -122,11 +122,13 @@ class SecurityHardeningTest extends TestCase
             ->assertOk();
     }
 
-    public function test_theme_uses_light_as_default_and_shared_persistent_storage_key(): void
+    public function test_theme_is_locked_to_light_mode(): void
     {
         $this->get('/login')
             ->assertOk()
-            ->assertSee("window.localStorage.getItem('mcare-dashboard-theme') === 'dark' ? 'dark' : 'light'", false)
+            ->assertSee("document.documentElement.style.colorScheme = 'light'", false)
+            ->assertSee("window.localStorage.removeItem('mcare-dashboard-theme')", false)
+            ->assertDontSee('Night mode')
             ->assertSee('One sign-in page for applicants, trainees, trainers, alumni, and administrators.');
     }
 }

@@ -7,73 +7,71 @@
         $scheduleLabel = $batch?->scheduleLabelFor($application->schedule_preference) ?? 'Schedule to be confirmed';
         $roomLabel = $batch?->roomFor($application->schedule_preference) ?: 'Room TBA';
         $deadline = $application->effectivePaymentDeadline() ?: $batch?->enrollment_ends_at;
-        $documents = [
-            'birth-certificate' => ['label' => 'Birth Certificate', 'path' => $application->birth_certificate_path],
-            'education-document' => ['label' => 'Form 137/138 or Diploma', 'path' => $application->education_document_path],
-            'good-moral-certificate' => ['label' => 'Good Moral Certificate', 'path' => $application->good_moral_certificate_path],
-            'id-photo' => ['label' => 'ID Photo', 'path' => $application->id_photo_path],
-            'signature' => ['label' => 'E-Signature', 'path' => $application->signature_path],
-        ];
+        $progressPercent = max(0, min(100, (int) ($stats['progress'] ?? 0)));
     @endphp
 
     <section id="dashboard" class="space-y-6">
         <div class="dashboard-hero">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
+                <div class="min-w-0">
                     <span class="dashboard-pill bg-purple-50 text-purple-700 ring-purple-100">Approved trainee</span>
                     <h1 class="mt-4">Welcome back, {{ $application->first_name }}</h1>
                     <p>
                         Continue your Caregiving NC II training with your approved batch schedule, modules, payment status, and submitted records in one place.
                     </p>
                 </div>
-                <div class="rounded-xl bg-purple-50 px-5 py-4 ring-1 ring-purple-100">
+                <div class="min-w-0 rounded-xl bg-purple-50 px-5 py-4 ring-1 ring-purple-100">
                     <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Current batch</p>
                     <p class="mt-1 font-display text-2xl font-extrabold text-slate-950">{{ $batchLabel }}</p>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div class="dashboard-stat">
-                <div>
+        {{-- Path: resources/views/trainee/dashboard.blade.php | Label: Compact status cards link to the matching trainee page --}}
+        <div class="dashboard-stat-rail grid grid-cols-2 gap-3 xl:grid-cols-4" data-trainee-stat-cards>
+            <a href="{{ route('trainee.modules.index') }}" class="dashboard-stat dashboard-stat-link" data-trainee-stat-card>
+                <div class="min-w-0 flex-1" data-trainee-stat-body>
                     <p class="dashboard-stat-label">Training progress</p>
-                    <p class="dashboard-stat-value">{{ $stats['progress'] }}%</p>
-                    <p class="dashboard-stat-help">Calculated from your server-recorded module activity.</p>
+                    <p class="dashboard-stat-value">{{ $progressPercent }}%</p>
+                    <div class="dashboard-stat-meter" role="progressbar" aria-label="Training progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressPercent }}">
+                        <span style="width: {{ $progressPercent }}%"></span>
+                    </div>
+                    <p class="dashboard-stat-help">Continue in classwork</p>
                 </div>
-                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-100" data-trainee-stat-icon>
                     <x-dashboard-icon name="signal" class="h-5 w-5" />
                 </span>
-            </div>
-            <div class="dashboard-stat">
-                <div>
+            </a>
+            <a href="{{ route('trainee.modules.index') }}" class="dashboard-stat dashboard-stat-link" data-trainee-stat-card>
+                <div class="min-w-0 flex-1" data-trainee-stat-body>
                     <p class="dashboard-stat-label">Available modules</p>
                     <p class="dashboard-stat-value">{{ $stats['modules'] }}</p>
-                    <p class="dashboard-stat-help">Published by trainer for your batch.</p>
+                    <p class="dashboard-stat-help">Open classwork</p>
                 </div>
-                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100" data-trainee-stat-icon>
                     <x-dashboard-icon name="book-open" class="h-5 w-5" />
                 </span>
-            </div>
-            <div class="dashboard-stat">
-                <div>
+            </a>
+            <a href="{{ route('trainee.documents') }}" class="dashboard-stat dashboard-stat-link" data-trainee-stat-card>
+                <div class="min-w-0 flex-1" data-trainee-stat-body>
                     <p class="dashboard-stat-label">Documents</p>
                     <p class="dashboard-stat-value">{{ $stats['documents'] }}/5</p>
-                    <p class="dashboard-stat-help">TESDA registration files on record.</p>
+                    <p class="dashboard-stat-help">Review TESDA files</p>
                 </div>
-                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100" data-trainee-stat-icon>
                     <x-dashboard-icon name="file-text" class="h-5 w-5" />
                 </span>
-            </div>
-            <div class="dashboard-stat">
-                <div>
+            </a>
+            <a href="{{ route('trainee.payments') }}" class="dashboard-stat dashboard-stat-link" data-trainee-stat-card>
+                <div class="min-w-0 flex-1" data-trainee-stat-body>
                     <p class="dashboard-stat-label">Payment</p>
-                    <p class="mt-2 text-lg font-black leading-tight text-slate-900">{{ $stats['payment'] }}</p>
+                    <p class="dashboard-stat-value text-lg leading-tight">{{ $stats['payment'] }}</p>
                     <p class="dashboard-stat-help">{{ $deadline ? 'Deadline '.$deadline->format('M d, Y g:i A') : 'Deadline TBA' }}</p>
                 </div>
-                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100" data-trainee-stat-icon>
                     <x-dashboard-icon name="credit-card" class="h-5 w-5" />
                 </span>
-            </div>
+            </a>
         </div>
     </section>
 
@@ -112,8 +110,8 @@
                         && ! ($module->submodules()->where('is_required', true)->exists());
                 @endphp
                 <article class="dashboard-card p-5{{ $isLocked ? ' opacity-75' : '' }}">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
                             <p class="text-xs font-black uppercase tracking-wide text-purple-600">{{ $module->batch ? $module->batch->name.' '.$module->batch->year : 'General module' }}</p>
                             <h3 class="mt-2 font-display text-xl font-black leading-tight text-slate-900">{{ $module->title }}</h3>
                         </div>
@@ -183,7 +181,7 @@
         <section class="dashboard-panel">
             <p class="dashboard-section-kicker">My schedule</p>
             <h2 class="dashboard-section-title">Class details</h2>
-            <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div class="rounded-2xl bg-slate-50 p-5">
                     <p class="text-xs font-black uppercase tracking-wide text-slate-500">Preferred class</p>
                     <p class="mt-2 font-display text-2xl font-black text-slate-900">{{ $application->schedule_preference }}</p>
@@ -226,29 +224,5 @@
             <p class="mt-2 text-sm leading-6 text-slate-500">Use the payment page to review your current online/on-site payment status or receipt.</p>
             <a href="{{ route('trainee.payments') }}" class="primary-action mt-5 w-full">Open payment page</a>
         </aside>
-    </section>
-
-    <section id="documents" class="mt-8 dashboard-panel">
-        <p class="dashboard-section-kicker">My documents</p>
-        <h2 class="dashboard-section-title">Submitted registration files</h2>
-        <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-            @foreach ($documents as $documentKey => $document)
-                @php
-                    $documentFeedback = data_get($application->document_review, $documentKey, []);
-                @endphp
-                <article class="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                    <p class="font-bold text-slate-900">{{ $document['label'] }}</p>
-                    @if ($document['path'])
-                        <span class="dashboard-pill mt-4 bg-emerald-50 text-emerald-700 ring-emerald-100">On file</span>
-                    @else
-                        <span class="dashboard-pill mt-4 bg-red-50 text-red-700 ring-red-100">Missing</span>
-                    @endif
-                    @if($documentFeedback)
-                        <p class="mt-3 text-xs font-black uppercase {{ ($documentFeedback['status'] ?? '') === 'accepted' ? 'text-emerald-700' : 'text-amber-700' }}">{{ str($documentFeedback['status'] ?? 'unreviewed')->headline() }}</p>
-                        @if($documentFeedback['note'] ?? null)<p class="mt-1 text-xs leading-5 text-slate-600">{{ $documentFeedback['note'] }}</p>@endif
-                    @endif
-                </article>
-            @endforeach
-        </div>
     </section>
 @endsection

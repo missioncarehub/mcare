@@ -31,6 +31,7 @@
             ['label' => 'Alumni claims', 'icon' => 'fa-user-check', 'href' => route('admin.historical-alumni.index'), 'active' => request()->routeIs('admin.historical-alumni.*')],
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('admin.payment-schedules.index'), 'active' => request()->routeIs('admin.payment-schedules.*')],
             ['label' => 'Announcements', 'icon' => 'fa-bullhorn', 'href' => route('admin.announcements.index'), 'active' => request()->routeIs('admin.announcements.*')],
+            ['label' => 'Contact admin', 'icon' => 'fa-message-circle', 'href' => route('admin.contact-messages.index'), 'active' => request()->routeIs('admin.contact-messages.*')],
             ['label' => 'Public Settings', 'icon' => 'fa-gear', 'href' => route('admin.public-settings.index'), 'active' => request()->routeIs('admin.public-settings.*')],
             ['label' => 'Programs', 'icon' => 'fa-file-text', 'href' => route('admin.training-programs.index'), 'active' => request()->routeIs('admin.training-programs.*')],
             ['label' => 'Batches', 'icon' => 'fa-folder-open', 'href' => route('admin.batches.index'), 'active' => request()->routeIs('admin.batches.*')],

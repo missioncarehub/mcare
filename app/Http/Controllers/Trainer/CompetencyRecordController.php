@@ -34,7 +34,6 @@ class CompetencyRecordController extends Controller
         $this->assertBatchAccess($request, $requestedBatchId);
         $selectedBatchId = $requestedBatchId ?? $assignedBatch?->id;
         $units = $this->unitsForBatch($selectedBatchId);
-        $unitsByCategory = $this->catalog()->groupByCategory($units);
 
         $trainees = collect();
         $traineeLimitReached = false;
@@ -64,6 +63,11 @@ class CompetencyRecordController extends Controller
         $recordsByTrainee = $trainees->mapWithKeys(fn ($trainee) => [
             $trainee->id => $trainee->competencyRecords->keyBy('competency_unit_id'),
         ]);
+        $evaluationByTrainee = $this->evaluationStateByTrainee($trainees, $units);
+        $unitsByCategory = $this->orderUnitsByProgress(
+            $this->catalog()->groupByCategory($units),
+            $evaluationByTrainee,
+        );
         $requiredUnits = $units->where('is_required', true);
         $competentMarks = $trainees->sum(fn ($trainee) => $trainee->competencyRecords
             ->whereIn('competency_unit_id', $requiredUnits->pluck('id'))
@@ -76,6 +80,7 @@ class CompetencyRecordController extends Controller
             'traineeLimitReached' => $traineeLimitReached,
             'unitsByCategory' => $unitsByCategory,
             'recordsByTrainee' => $recordsByTrainee,
+            'evaluationByTrainee' => $evaluationByTrainee,
             'statuses' => TraineeCompetencyRecord::statuses(),
             'filters' => array_merge($validated, ['batch_id' => $selectedBatchId]),
             'batches' => $batches,
@@ -113,40 +118,125 @@ class CompetencyRecordController extends Controller
     // A competency unit becomes evaluable for a trainee once at least one of the trainee's
     // assigned modules that maps to that unit has been marked as done (awaiting evaluation)
     // or already trainer-validated (completed / competent). Units whose modules are still
-    // locked or in progress are hidden from the evaluation form until the trainee submits.
+    // locked or in progress stay closed until the trainee submits.
     private function evaluableUnitIdsFor(EnrollmentApplication $application, Collection $units): Collection
     {
-        $unitIds = $units->pluck('id')->all();
-        if (empty($unitIds)) {
-            return collect();
+        return $this->evaluationStateByTrainee(collect([$application]), $units)
+            ->get($application->id, collect())
+            ->filter(fn (array $state): bool => $state['evaluable'])
+            ->keys()
+            ->map(fn ($unitId): int => (int) $unitId)
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Collection<int, array{evaluable: bool, reason: string}>>
+     */
+    private function evaluationStateByTrainee(Collection $trainees, Collection $units): Collection
+    {
+        $states = [];
+        foreach ($trainees as $trainee) {
+            foreach ($units as $unit) {
+                $states[(int) $trainee->id][(int) $unit->id] = [
+                    'evaluable' => false,
+                    'reason' => 'locked',
+                ];
+            }
         }
 
-        $moduleUnitMap = TrainingModule::query()
-            ->assignedTo($application)
-            ->whereIn('competency_unit_id', $unitIds)
-            ->pluck('competency_unit_id', 'id');
-
-        if ($moduleUnitMap->isEmpty()) {
-            return collect();
+        if ($trainees->isEmpty() || $units->isEmpty()) {
+            return collect($states)->map(fn (array $unitStates) => collect($unitStates));
         }
+
+        $modules = TrainingModule::query()
+            ->where('is_published', true)
+            ->whereIn('competency_unit_id', $units->pluck('id'))
+            ->whereIn('training_batch_id', $trainees->pluck('training_batch_id')->unique()->filter())
+            ->get(['id', 'competency_unit_id', 'training_batch_id']);
+
+        if ($modules->isEmpty()) {
+            return collect($states)->map(fn (array $unitStates) => collect($unitStates));
+        }
+
+        $progressRows = ModuleProgress::query()
+            ->whereIn('enrollment_application_id', $trainees->pluck('id'))
+            ->whereIn('training_module_id', $modules->pluck('id'))
+            ->get(['enrollment_application_id', 'training_module_id', 'status']);
 
         $doneStatuses = [
             ModuleProgress::STATUS_AWAITING_EVALUATION,
             ModuleProgress::STATUS_COMPLETED,
             ModuleProgress::STATUS_NEEDS_REMEDIATION,
         ];
+        $openStatuses = [
+            ModuleProgress::STATUS_NOT_STARTED,
+            ModuleProgress::STATUS_IN_PROGRESS,
+        ];
+        $modulesById = $modules->keyBy('id');
 
-        $doneModuleIds = ModuleProgress::query()
-            ->where('enrollment_application_id', $application->id)
-            ->whereIn('training_module_id', $moduleUnitMap->keys())
-            ->whereIn('status', $doneStatuses)
-            ->pluck('training_module_id');
+        foreach ($progressRows as $progress) {
+            $module = $modulesById->get($progress->training_module_id);
+            if (! $module) {
+                continue;
+            }
 
-        return $doneModuleIds
-            ->map(fn ($moduleId) => (int) $moduleUnitMap->get($moduleId))
-            ->filter()
-            ->unique()
-            ->values();
+            $traineeId = (int) $progress->enrollment_application_id;
+            $unitId = (int) $module->competency_unit_id;
+            $current = $states[$traineeId][$unitId] ?? ['evaluable' => false, 'reason' => 'locked'];
+
+            if (in_array($progress->status, $doneStatuses, true)) {
+                $states[$traineeId][$unitId] = [
+                    'evaluable' => true,
+                    'reason' => 'ready',
+                ];
+                continue;
+            }
+
+            if ($current['evaluable']) {
+                continue;
+            }
+
+            if (in_array($progress->status, $openStatuses, true)) {
+                $states[$traineeId][$unitId] = [
+                    'evaluable' => false,
+                    'reason' => 'in_progress',
+                ];
+            }
+        }
+
+        return collect($states)->map(fn (array $unitStates) => collect($unitStates));
+    }
+
+    /**
+     * Keep in-progress modules first in each category so locked units do not lead the board.
+     *
+     * @param  Collection<string, Collection<int, mixed>>  $unitsByCategory
+     * @param  Collection<int, Collection<int, array{evaluable: bool, reason: string}>>  $evaluationByTrainee
+     * @return Collection<string, Collection<int, mixed>>
+     */
+    private function orderUnitsByProgress(Collection $unitsByCategory, Collection $evaluationByTrainee): Collection
+    {
+        $rankFor = function (int $unitId) use ($evaluationByTrainee): int {
+            $reasons = $evaluationByTrainee->map(
+                fn (Collection $states): string => $states->get($unitId)['reason'] ?? 'locked'
+            );
+
+            if ($reasons->contains('in_progress')) {
+                return 0;
+            }
+
+            if ($reasons->contains('ready')) {
+                return 1;
+            }
+
+            return 2;
+        };
+
+        return $unitsByCategory->map(
+            fn (Collection $units) => $units->values()->sortBy(
+                fn ($unit, $index) => [$rankFor((int) $unit->id), $index]
+            )->values()
+        );
     }
 
     public function chart(Request $request, TrainingBatch $trainingBatch, string $chart): View

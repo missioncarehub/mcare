@@ -719,11 +719,6 @@ class TraineeDashboardController extends Controller
         $application = $this->approvedApplicationFor($request);
         $this->authorizeModule($application, $module);
         $validated = $request->validate(['action' => ['required', 'in:submit,complete,reopen']]);
-        if ($module->submodules()->where('is_required', true)->exists()) {
-            throw ValidationException::withMessages([
-                'action' => 'Complete and submit each required submodule. The main module result is calculated automatically.',
-            ]);
-        }
         $submitting = in_array($validated['action'], ['submit', 'complete'], true);
         $progress = ModuleProgress::query()->where([
             'enrollment_application_id' => $application->id,
@@ -745,13 +740,7 @@ class TraineeDashboardController extends Controller
 
             $summary = $assessments->summary($module, $application);
 
-            if ($summary['required_count'] === 0) {
-                throw ValidationException::withMessages([
-                    'action' => 'This assessed module has no published classwork yet. Wait for the trainer to publish a quiz or activity before using Mark as Done.',
-                ]);
-            }
-
-            if (! $summary['all_passed']) {
+            if ($summary['required_count'] > 0 && ! $summary['all_passed']) {
                 $message = $summary['ready_for_remediation_evaluation']
                     ? 'All attempts are used and one or more assessments were not passed. Your trainer can now record a remediation evaluation; Mark as Done is unavailable.'
                     : 'Pass every published quiz or activity before submitting this module for trainer evaluation.';
@@ -770,6 +759,24 @@ class TraineeDashboardController extends Controller
             'submitted_at' => $submitting ? now() : null,
             'completed_at' => null,
         ])->save();
+
+        if ($submitting) {
+            $requiredSubmoduleIds = $module->submodules()->where('is_required', true)->pluck('id');
+            if ($requiredSubmoduleIds->isNotEmpty()) {
+                TrainingSubmoduleProgress::query()
+                    ->where('enrollment_application_id', $application->id)
+                    ->whereIn('training_submodule_id', $requiredSubmoduleIds)
+                    ->whereNotIn('status', [
+                        TrainingSubmoduleProgress::STATUS_COMPLETED,
+                        TrainingSubmoduleProgress::STATUS_NEEDS_REMEDIATION,
+                    ])
+                    ->update([
+                        'status' => TrainingSubmoduleProgress::STATUS_AWAITING_EVALUATION,
+                        'submitted_at' => now(),
+                        'progress_percent' => 95,
+                    ]);
+            }
+        }
 
         AdminActivityLog::record($request->user(), 'trainee.module.progress.updated', $progress, [
             'module_id' => $module->id,

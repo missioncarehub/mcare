@@ -130,6 +130,90 @@ class LmsResponsiveRenderingTest extends TestCase
             ->assertRedirect(route('trainee.modules.index'));
     }
 
+    public function test_trainee_payments_page_exposes_mobile_safe_structure(): void
+    {
+        $batch = $this->lmsBatch();
+        ['user' => $trainee] = $this->lmsTrainee($batch);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.payments'))
+            ->assertOk()
+            ->assertSee('<meta name="viewport" content="width=device-width, initial-scale=1.0">', false)
+            ->assertSee('data-trainee-page', false)
+            ->assertSee('data-trainee-payments', false)
+            ->assertSee('data-trainee-stat-cards', false)
+            ->assertSee('data-trainee-stat-card', false)
+            ->assertSee('data-trainee-stat-icon', false)
+            ->assertSee('data-trainee-stat-body', false)
+            ->assertSee('grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4', false)
+            ->assertSee('xl:grid-cols-[minmax(0,1fr)_20rem]', false)
+            ->assertSee('Generate On-Site Payment Ticket')
+            ->assertSee('Receipt Ledger');
+
+        $css = file_get_contents(resource_path('css/admin_official.css'));
+        $this->assertIsString($css);
+        $this->assertStringContainsString('[data-trainee-payments] .dashboard-stat-value', $css);
+        $this->assertStringContainsString('[data-trainee-page]', $css);
+        $this->assertStringContainsString('[data-trainee-stat-cards]', $css);
+        $this->assertStringContainsString('repeat(2, minmax(0, 1fr))', $css);
+        $this->assertStringContainsString('[data-trainee-stat-body]', $css);
+        $this->assertStringContainsString('overflow-wrap: anywhere', $css);
+    }
+
+    public function test_trainee_pages_expose_mobile_safe_stat_and_card_structure(): void
+    {
+        $batch = $this->lmsBatch();
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+
+        foreach ([
+            'trainee.dashboard',
+            'trainee.stream',
+            'trainee.modules.index',
+            'trainee.schedule',
+            'trainee.payments',
+            'trainee.documents',
+            'notifications.index',
+        ] as $routeName) {
+            $this->actingAs($trainee)
+                ->get(route($routeName))
+                ->assertOk()
+                ->assertSee('<meta name="viewport" content="width=device-width, initial-scale=1.0">', false)
+                ->assertSee('data-trainee-page', false);
+        }
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.dashboard'))
+            ->assertSee('data-trainee-stat-cards', false)
+            ->assertSee('data-trainee-stat-card', false)
+            ->assertSee('data-trainee-stat-icon', false)
+            ->assertSee('data-trainee-stat-body', false)
+            ->assertSee('grid-cols-2 gap-3 xl:grid-cols-4', false);
+
+        $application->forceFill([
+            'learning_status' => \App\Models\EnrollmentApplication::LEARNING_GRADUATED,
+        ])->save();
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertSee('data-trainee-page', false)
+            ->assertSee('data-trainee-stat-cards', false)
+            ->assertSee('data-trainee-stat-card', false)
+            ->assertSee('grid-cols-2 gap-3 xl:grid-cols-3', false);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.grades'))
+            ->assertOk()
+            ->assertSee('data-trainee-page', false)
+            ->assertSee('data-trainee-grade-chips', false);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.career-hub'))
+            ->assertOk()
+            ->assertSee('data-trainee-page', false)
+            ->assertSee('text-2xl font-black text-slate-950 sm:text-3xl', false);
+    }
+
     public function test_module_and_roster_surfaces_render_google_account_avatars_for_both_roles(): void
     {
         $trainer = $this->lmsUser('trainer');

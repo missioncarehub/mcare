@@ -48,7 +48,7 @@ class AccountSettingsTest extends TestCase
             $settings = $this->actingAs($user)
                 ->get(route('account.settings'))
                 ->assertOk()
-                ->assertSee('Night mode')
+                ->assertDontSee('Night mode')
                 ->assertSee('Change password')
                 ->assertSee('Profile photo')
                 ->assertSee('data-dashboard-sidebar', false)
@@ -64,12 +64,21 @@ class AccountSettingsTest extends TestCase
                     ->assertDontSee('Unused approved applications');
             }
 
-            $this->actingAs($user)
+            $help = $this->actingAs($user)
                 ->get(route('account.help'))
                 ->assertOk()
                 ->assertSee('Help for')
+                ->assertDontSee('Account settings')
                 ->assertSee('data-dashboard-sidebar', false)
                 ->assertSee('data-dashboard-role="'.$role.'"', false);
+
+            if ($role === 'admin') {
+                $help->assertSee('Review messages')
+                    ->assertSee(route('admin.contact-messages.index'), false);
+            } else {
+                $help->assertSee('Contact admin')
+                    ->assertSee('data-dashboard-dialog-open="contact-admin-dialog"', false);
+            }
         }
     }
 
@@ -151,7 +160,7 @@ class AccountSettingsTest extends TestCase
         $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
             ->assertSee('Notifications')
-            ->assertSee('Night mode')
+            ->assertDontSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
             ->assertDontSee(route('account.settings').'#change-password', false)
@@ -161,7 +170,7 @@ class AccountSettingsTest extends TestCase
         $this->actingAs($trainer)->get(route('trainer.dashboard'))
             ->assertOk()
             ->assertSee('Notifications')
-            ->assertSee('Night mode')
+            ->assertDontSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
             ->assertDontSee(route('account.settings').'#change-password', false)
@@ -191,7 +200,7 @@ class AccountSettingsTest extends TestCase
         $this->actingAs($trainee)->get(route('trainee.dashboard'))
             ->assertOk()
             ->assertSee('Notifications')
-            ->assertSee('Night mode')
+            ->assertDontSee('Night mode')
             ->assertSee('Settings')
             ->assertSee('Help')
             ->assertDontSee(route('account.settings').'#change-password', false)

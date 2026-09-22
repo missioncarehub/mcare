@@ -55,7 +55,7 @@ class LearningPdfWatermarkTest extends TestCase
         $viewed = $this->responseBody($view);
 
         $this->assertStringContainsString('%PDF', $viewed);
-        $this->assertFalse($this->pdfContains($viewed, '/Subtype /Image'));
+        $this->assertTrue($this->pdfContains($viewed, '/Subtype /Image'));
         $this->assertFalse($this->pdfContains($viewed, 'maria.santos@gmail.com'));
 
         $this->actingAs($trainee)
@@ -111,6 +111,43 @@ class LearningPdfWatermarkTest extends TestCase
         $this->assertSame('png-bytes', Storage::disk('local')->get('training-modules/photo.png'));
     }
 
+    public function test_trainee_image_views_receive_an_embedded_watermark(): void
+    {
+        Storage::fake('local');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        ['user' => $trainee] = $this->lmsTrainee($batch);
+        $path = "training-modules/{$trainer->id}/lesson-photo.png";
+        $original = $this->samplePng();
+        Storage::disk('local')->put($path, $original);
+        $module = $this->lmsModule($trainer, $batch, [
+            'title' => 'Infant care photo',
+            'file_path' => $path,
+            'original_file_name' => 'lesson-photo.png',
+            'mime_type' => 'image/png',
+            'file_size' => strlen($original),
+        ]);
+
+        $this->assertSame($original, Storage::disk('local')->get($path));
+
+        $view = $this->actingAs($trainee)->get(route('trainee.modules.content', $module));
+        $view->assertOk();
+        $viewed = $this->responseBody($view);
+
+        $this->assertNotSame($original, $viewed);
+        $this->assertSame($original, Storage::disk('local')->get($path));
+        $this->assertSame('image/png', $view->headers->get('content-type'));
+
+        $pixels = @imagecreatefromstring($viewed);
+        $this->assertNotFalse($pixels);
+        $this->assertTrue($this->imageHasNonBackgroundPixels($pixels, 248, 250, 252));
+        imagedestroy($pixels);
+
+        $download = $this->actingAs($trainee)->get(route('trainee.modules.download', $module));
+        $download->assertOk();
+        $this->assertNotSame($original, $this->responseBody($download));
+    }
+
     private function pdfUpload(string $filename): UploadedFile
     {
         $path = Storage::disk('local')->path('incoming-'.$filename);
@@ -148,6 +185,40 @@ class LearningPdfWatermarkTest extends TestCase
         $pdf->Cell(200, 20, 'Caregiving lesson body');
 
         return $pdf->Output('S');
+    }
+
+    private function imageHasNonBackgroundPixels(\GdImage $image, int $red, int $green, int $blue): bool
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        for ($x = 0; $x < $width; $x++) {
+            for ($y = 0; $y < $height; $y++) {
+                $color = imagecolorat($image, $x, $y);
+                $pixelRed = ($color >> 16) & 0xFF;
+                $pixelGreen = ($color >> 8) & 0xFF;
+                $pixelBlue = $color & 0xFF;
+
+                if ($pixelRed !== $red || $pixelGreen !== $green || $pixelBlue !== $blue) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function samplePng(): string
+    {
+        $image = imagecreatetruecolor(240, 160);
+        $background = imagecolorallocate($image, 248, 250, 252);
+        imagefilledrectangle($image, 0, 0, 239, 159, $background);
+        ob_start();
+        imagepng($image);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($image);
+
+        return $bytes;
     }
 
     private function responseBody($response): string

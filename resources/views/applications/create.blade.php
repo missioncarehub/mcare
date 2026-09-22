@@ -85,7 +85,7 @@
                         && (string) old('privacy_consent') === '1';
                 @endphp
 
-                <form method="POST" action="{{ route('applications.store') }}" class="enrollment-form space-y-10" data-application-form>
+                <form method="POST" action="{{ route('applications.store') }}" class="enrollment-form space-y-10" data-application-form data-form-draft="applications.create" @if($errors->any()) data-form-draft-server-old="1" @endif>
                     @csrf
                     <section>
                         <div class="enrollment-section-heading border-b border-slate-200 pb-3">

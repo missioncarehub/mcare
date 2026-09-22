@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
+use App\Models\AdminContactMessage;
 use App\Models\PublicSiteSetting;
+use App\Services\AdminOperationsNotifier;
 use App\Services\ProfilePhotoStore;
 use App\Support\AccountPortal;
 use Illuminate\Http\RedirectResponse;
@@ -51,9 +53,65 @@ class AccountSettingsController extends Controller
             ],
         };
 
+        $user = $request->user();
+        $canContactAdmin = $user?->role !== 'admin';
+
         return view('account.help', [
             ...$this->accountContext($request),
             'topics' => $topics,
+            'canContactAdmin' => $canContactAdmin,
+            'contactTopics' => AdminContactMessage::topics(),
+            'contactMessages' => $canContactAdmin
+                ? AdminContactMessage::query()
+                    ->where('user_id', $user->id)
+                    ->latest()
+                    ->limit(8)
+                    ->get()
+                : collect(),
+        ]);
+    }
+
+    public function storeContact(Request $request, AdminOperationsNotifier $adminNotifier): RedirectResponse
+    {
+        abort_if($request->user()?->role === 'admin', 403);
+
+        $validated = $request->validateWithBag('contactAdmin', [
+            'topic' => ['required', Rule::in(array_keys(AdminContactMessage::topics()))],
+            'subject' => ['required', 'string', 'max:160', 'not_regex:/[<>]/u'],
+            'message' => ['required', 'string', 'max:2000', 'not_regex:/[<>]/u'],
+        ], [
+            'not_regex' => 'This field contains characters that are not allowed for security reasons.',
+        ]);
+
+        $user = $request->user();
+
+        $contact = AdminContactMessage::create([
+            'user_id' => $user->id,
+            'topic' => $validated['topic'],
+            'subject' => $validated['subject'],
+            'message' => $validated['message'],
+            'status' => AdminContactMessage::STATUS_PENDING,
+        ]);
+
+        $adminNotifier->notify(
+            title: 'Contact admin message',
+            message: $user->name.' sent a message about '.$contact->topicLabel().'.',
+            url: route('admin.contact-messages.index'),
+            icon: 'message-circle',
+            event: 'account.contact.received',
+            context: [
+                'contact_message_id' => $contact->id,
+                'user_id' => $user->id,
+            ],
+        );
+
+        AdminActivityLog::record($user, 'account.contact.created', $contact, [
+            'topic' => $contact->topic,
+        ]);
+
+        return back()->with([
+            'saved' => 'Your message was sent to MCARE administration.',
+            'saved_icon' => 'circle-check',
         ]);
     }
 

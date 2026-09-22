@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Trainer;
 
 use App\Http\Controllers\Controller;
-use App\Models\EnrollmentApplication;
 use App\Models\TraineeAttendance;
 use App\Models\TrainingBatch;
 use App\Services\AttendanceService;
@@ -49,22 +48,10 @@ class AttendanceController extends Controller
         $trainees = collect();
         $existingAttendances = collect();
         $summary = null;
-
-        $eligibleFromByTrainee = collect();
+        $isFutureDate = $this->attendanceService->isFutureAttendanceDate($selectedDate);
 
         if ($selectedBatch) {
-            $trainees = $selectedBatch->applications()
-                ->where('status', EnrollmentApplication::STATUS_APPROVED)
-                ->where('learning_status', '!=', EnrollmentApplication::LEARNING_GRADUATED)
-                ->with('user')
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get();
-
-            // Path: app/Http/Controllers/Trainer/AttendanceController.php | Label: Newly enrolled attendance eligibility
-            $eligibleFromByTrainee = $trainees->mapWithKeys(fn ($trainee) => [
-                $trainee->id => $this->attendanceService->attendanceEligibleFrom($trainee),
-            ]);
+            $trainees = $this->attendanceService->rosterForDate($selectedBatch, $selectedDate);
 
             $existingAttendances = TraineeAttendance::where('training_batch_id', $selectedBatch->id)
                 ->whereDate('attendance_date', $selectedDate->toDateString())
@@ -86,7 +73,7 @@ class AttendanceController extends Controller
             'existingAttendances' => $existingAttendances,
             'summary' => $summary,
             'statuses' => TraineeAttendance::statuses(),
-            'eligibleFromByTrainee' => $eligibleFromByTrainee,
+            'isFutureDate' => $isFutureDate,
         ]);
     }
 
@@ -102,6 +89,16 @@ class AttendanceController extends Controller
 
         $batch = TrainingBatch::findOrFail($validated['batch_id']);
         $date = Carbon::parse($validated['date']);
+
+        if ($this->attendanceService->isFutureAttendanceDate($date)) {
+            return redirect()
+                ->route('trainer.attendance.index', [
+                    'batch_id' => $batch->id,
+                    'date' => $date->toDateString(),
+                    'tab' => 'sheet',
+                ])
+                ->with('error', 'Attendance status can only be recorded on or after the session date.');
+        }
 
         $savedCount = $this->attendanceService->saveDailyAttendance(
             $batch,

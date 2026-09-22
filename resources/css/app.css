@@ -10,6 +10,7 @@
 
 @layer base {
     html {
+        color-scheme: light;
         font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     }
 
@@ -90,6 +91,14 @@
 
     .competency-legend.is-empty {
         @apply border-dashed border-violet-300 bg-violet-50 text-violet-800;
+    }
+
+    .competency-legend.is-waiting {
+        @apply border-amber-200 bg-amber-50 text-amber-800;
+    }
+
+    .competency-legend.is-locked {
+        @apply border-slate-200 bg-slate-100 text-slate-600;
     }
 
     .competency-scroll-button {
@@ -229,6 +238,16 @@
 
     .competency-record-cell.is-not-yet-competent > button {
         @apply border-rose-200 bg-rose-50 text-rose-800;
+    }
+
+    .competency-record-cell.is-waiting > button,
+    .competency-record-cell.is-module-locked > button {
+        cursor: not-allowed;
+        @apply border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-100 focus:ring-0;
+    }
+
+    .competency-record-cell.is-waiting > button {
+        @apply border-amber-100 bg-amber-50 text-amber-800;
     }
 
     .competency-lock-icon {

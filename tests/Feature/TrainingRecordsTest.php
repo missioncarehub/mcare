@@ -47,7 +47,8 @@ class TrainingRecordsTest extends TestCase
         $trainee = User::factory()->create(['role' => 'trainee']);
         $application = $this->approvedApplication($trainee);
         $unit = CompetencyUnit::query()->with('outcomes')->orderBy('sort_order')->firstOrFail();
-        $this->publishUnitModule($application, $trainer, $unit);
+        $module = $this->publishUnitModule($application, $trainer, $unit);
+        $this->submitModuleForEvaluation($application, $module);
 
         $payload = [
             'unit_id' => $unit->id,
@@ -483,7 +484,8 @@ class TrainingRecordsTest extends TestCase
         $application = $this->approvedApplication($trainee);
         $published = CompetencyUnit::query()->where('code', 'HCS323301')->firstOrFail();
         $hidden = CompetencyUnit::query()->where('code', 'HCS323302')->firstOrFail();
-        $this->publishUnitModule($application, $trainer, $published);
+        $module = $this->publishUnitModule($application, $trainer, $published);
+        $this->submitModuleForEvaluation($application, $module);
 
         $this->actingAs($trainer)
             ->get(route('trainer.competencies.index', ['batch_id' => $application->training_batch_id]))
@@ -562,7 +564,9 @@ class TrainingRecordsTest extends TestCase
             'enrollment_number' => null,
         ])->save();
         $unit = CompetencyUnit::query()->with('outcomes')->orderBy('sort_order')->firstOrFail();
-        $this->publishUnitModule($firstApplication, $trainer, $unit);
+        $module = $this->publishUnitModule($firstApplication, $trainer, $unit);
+        $this->submitModuleForEvaluation($firstApplication, $module);
+        $this->submitModuleForEvaluation($secondApplication, $module);
 
         $this->actingAs($trainer)
             ->patch(route('trainer.competencies.bulk-update'), [
@@ -713,6 +717,95 @@ class TrainingRecordsTest extends TestCase
             'reviewed_at' => now(),
             'learning_started_at' => now(),
         ]);
+    }
+
+    public function test_grading_board_keeps_locked_and_in_progress_cells_closed_until_mark_as_done(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $application = $this->approvedApplication($trainee);
+        $lockedUnit = CompetencyUnit::query()->where('code', 'HCS323301')->firstOrFail();
+        $openUnit = CompetencyUnit::query()->where('code', 'HCS323304')->firstOrFail();
+        $lockedModule = $this->publishUnitModule($application, $trainer, $lockedUnit);
+        $openModule = $this->publishUnitModule($application, $trainer, $openUnit);
+
+        ModuleProgress::create([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $openModule->id,
+            'sequence_number' => 1,
+            'status' => ModuleProgress::STATUS_IN_PROGRESS,
+            'progress_percent' => 10,
+            'assigned_at' => now(),
+            'unlocked_at' => now(),
+        ]);
+        ModuleProgress::create([
+            'enrollment_application_id' => $application->id,
+            'training_module_id' => $lockedModule->id,
+            'sequence_number' => 2,
+            'status' => ModuleProgress::STATUS_LOCKED,
+            'progress_percent' => 0,
+            'assigned_at' => now(),
+        ]);
+
+        $board = $this->actingAs($trainer)
+            ->get(route('trainer.competencies.index', ['batch_id' => $application->training_batch_id]))
+            ->assertOk()
+            ->assertSee('In progress')
+            ->assertSee('Locked')
+            ->assertDontSee('data-competency-cell', false);
+
+        $html = $board->getContent();
+        $this->assertLessThan(
+            strpos($html, 'HCS323301'),
+            strpos($html, 'HCS323304'),
+            'In-progress modules should appear before locked modules on the grading board.',
+        );
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.competencies.update', $application), [
+                'records' => [[
+                    'unit_id' => $openUnit->id,
+                    'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                    'percentage_score' => 90,
+                    'outcomes' => $openUnit->outcomes()->pluck('id')->mapWithKeys(
+                        fn ($id) => [$id => TraineeCompetencyRecord::STATUS_COMPETENT]
+                    )->all(),
+                ]],
+            ])
+            ->assertSessionHasErrors('records');
+
+        $this->submitModuleForEvaluation($application, $openModule);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.competencies.index', ['batch_id' => $application->training_batch_id]))
+            ->assertOk()
+            ->assertSee('Evaluate')
+            ->assertSee('data-competency-cell', false)
+            ->assertSee('Locked');
+    }
+
+    private function submitModuleForEvaluation(
+        EnrollmentApplication $application,
+        TrainingModule $module,
+    ): ModuleProgress {
+        $sequence = ((int) ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->max('sequence_number')) + 1;
+
+        return ModuleProgress::query()->updateOrCreate(
+            [
+                'enrollment_application_id' => $application->id,
+                'training_module_id' => $module->id,
+            ],
+            [
+                'status' => ModuleProgress::STATUS_AWAITING_EVALUATION,
+                'progress_percent' => 95,
+                'sequence_number' => $sequence > 0 ? $sequence : 1,
+                'assigned_at' => now(),
+                'unlocked_at' => now(),
+                'submitted_at' => now(),
+            ]
+        );
     }
 
     private function publishUnitModule(

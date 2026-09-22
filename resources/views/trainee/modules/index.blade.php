@@ -55,6 +55,13 @@
                             $isCompetent = $moduleProgress?->competency_outcome === 'competent';
                             $isCompleted = $moduleProgress?->status === 'completed' || $isCompetent;
                             $isMaterialOnly = !$module->requiresEvaluation();
+                            $isAwaitingEval = ($moduleProgress?->status ?? null) === \App\Models\ModuleProgress::STATUS_AWAITING_EVALUATION;
+                            $isTrainerValidated = $moduleProgress?->isTrainerValidated() ?? false;
+                            $canMarkAsDone = ! $isLocked
+                                && $module->requiresEvaluation()
+                                && ! $isTrainerValidated
+                                && ! $isAwaitingEval
+                                && ! $isCompleted;
                             $isDeferred = (bool) ($moduleProgress?->is_deferred ?? false);
                             $blockerLabel = $blocker ? ($blocker->module_code ?: $blocker->title) : null;
                             $blockerNeedsRemediation = $blocker
@@ -122,13 +129,23 @@
                                     @endif
                                 </div>
                             </div>
-                            @if($isLocked)
-                                <span class="secondary-action text-xs py-2 px-4 shrink-0" aria-disabled="true">Locked</span>
-                            @else
-                                <a href="{{ route('trainee.modules.show', $module) }}" class="{{ $isCompleted ? 'secondary-action' : 'primary-action' }} text-xs py-2 px-4 shrink-0">
-                                    {{ $isCompleted ? 'Review' : 'Open' }}
-                                </a>
-                            @endif
+                            <div class="lms-classwork-actions">
+                                @if($isLocked)
+                                    <span class="secondary-action text-xs py-2 px-4" aria-disabled="true">Locked</span>
+                                @else
+                                    <a href="{{ route('trainee.modules.show', $module) }}" class="{{ $isCompleted ? 'secondary-action' : 'primary-action' }} text-xs py-2 px-4">
+                                        {{ $isCompleted ? 'Review' : 'Open' }}
+                                    </a>
+                                    @if($canMarkAsDone)
+                                        <form method="POST" action="{{ route('trainee.modules.progress', $module) }}" data-confirm="Mark this module as done and send it to your trainer for evaluation? You will not be able to edit it after this.">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="action" value="submit">
+                                            <button type="submit" class="secondary-action text-xs py-2 px-4">Mark as done</button>
+                                        </form>
+                                    @endif
+                                @endif
+                            </div>
                         </article>
                     @endforeach
                 </div>

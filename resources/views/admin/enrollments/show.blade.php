@@ -65,26 +65,42 @@
             'Signature name' => $application->signature_name,
             'Date accomplished' => $application->date_accomplished?->format('M d, Y'),
         ];
+        $releasedForReview = $application->isReleasedForReview();
+        $linkedAdmission = $application->admissionApplication;
     @endphp
 
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap items-center gap-2">
+            @if($linkedAdmission)
+                <a href="{{ route('admin.applications.show', $linkedAdmission) }}" class="secondary-action">
+                    Back to application
+                </a>
+            @endif
             <a href="{{ route('admin.enrollments.index') }}" class="secondary-action">
                 Back to queue
             </a>
-            <form method="POST" action="{{ route('admin.enrollments.destroy', $application) }}" data-confirm-title="{{ $application->accountDeletionTitle() }}" data-confirm="{{ $application->accountDeletionMessage() }}" @if($application->accountDeletionDetail()) data-confirm-detail="{{ $application->accountDeletionDetail() }}" @endif data-confirm-action="{{ $application->accountDeletionAction() }}">
-                @csrf
-                @method('DELETE')
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-50" title="{{ $application->accountDeletionAction() }}">
-                    <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
-                    Delete
-                </button>
-            </form>
+            @if($releasedForReview)
+                <form method="POST" action="{{ route('admin.enrollments.destroy', $application) }}" data-confirm-title="{{ $application->accountDeletionTitle() }}" data-confirm="{{ $application->accountDeletionMessage() }}" @if($application->accountDeletionDetail()) data-confirm-detail="{{ $application->accountDeletionDetail() }}" @endif data-confirm-action="{{ $application->accountDeletionAction() }}">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-50" title="{{ $application->accountDeletionAction() }}">
+                        <x-dashboard-icon name="trash-2" class="h-3.5 w-3.5" />
+                        Delete
+                    </button>
+                </form>
+            @endif
         </div>
         <span class="dashboard-pill {{ $badgeClasses[$application->status] ?? 'bg-slate-50 text-slate-700 ring-slate-100' }}">
             {{ $application->statusLabel() }}
         </span>
     </div>
+
+    @unless($releasedForReview)
+        <div class="mb-6 border border-amber-200 bg-amber-50 p-4" role="status">
+            <p class="text-sm font-bold text-amber-950">This enrollment is not in the review queue yet.</p>
+            <p class="mt-1 text-sm leading-6 text-amber-900">You can view the submitted record here. Document decisions and approval stay locked until payment is verified and the application is released for review.</p>
+        </div>
+    @endunless
 
     <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_22rem]">
         <div class="space-y-6">
@@ -238,7 +254,10 @@
                 @endif
                 <p class="mt-3 text-xs leading-5 text-slate-500">Approved or denied decisions email a verification link. The enrollee can log in only after that email is verified.</p>
 
-                <form method="POST" action="{{ route('admin.enrollments.update', $application) }}" class="mt-6 space-y-4" data-enrollment-decision-form data-documents-reviewed="{{ $documentsReviewed ? '1' : '0' }}" data-documents-review-submitted="{{ $documentReviewSubmitted ? '1' : '0' }}" data-documents-pending="{{ $documentsReadyForApproval ? '0' : '1' }}">
+                @unless($releasedForReview)
+                    <p class="mt-6 text-sm leading-6 text-amber-800">Approval stays unavailable until this enrollment is released for review.</p>
+                @else
+                <form method="POST" action="{{ route('admin.enrollments.update', $application) }}" class="mt-6 space-y-4" data-enrollment-decision-form data-documents-reviewed="{{ $documentsReviewed ? '1' : '0' }}" data-documents-review-submitted="{{ $documentReviewSubmitted ? '1' : '0' }}" data-documents-pending="{{ $documentsReadyForApproval ? '0' : '1' }}" data-form-draft="admin.enrollments.{{ $application->id }}" @if($errors->any()) data-form-draft-server-old="1" @endif>
                     @csrf
                     @method('PATCH')
 
@@ -287,6 +306,7 @@
                         Save decision
                     </button>
                 </form>
+                @endunless
             </section>
 
             <section class="border border-slate-200 bg-white p-6">

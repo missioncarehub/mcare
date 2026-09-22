@@ -3,6 +3,7 @@
 @section('content')
     @php
         $documentsReadyForApproval = $pendingDocumentApprovals === [];
+        $releasedForReview = $application->isReleasedForReview();
     @endphp
 
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -21,13 +22,20 @@
             <p class="mt-2 text-sm leading-6 text-slate-600">Preview each file and mark every required document as Accepted. Document review stays incomplete while any file is still pending.</p>
         </div>
 
+        @unless($releasedForReview)
+            <div class="mt-6 border border-amber-200 bg-amber-50 p-4" role="status">
+                <p class="text-sm font-bold text-amber-950">Document decisions stay locked until this enrollment is released for review.</p>
+                <p class="mt-1 text-sm leading-6 text-amber-900">You can still preview uploaded files. Saving review status or emailing a revision request becomes available after payment is verified.</p>
+            </div>
+        @endunless
+
         @error('documents')
             <div class="mt-6 border border-amber-200 bg-amber-50 p-4" role="alert">
                 <p class="text-sm font-bold text-amber-950">{{ $message }}</p>
             </div>
         @enderror
 
-        <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-6" data-document-review-form>
+        <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-6" data-document-review-form data-form-draft="admin.enrollments.documents.{{ $application->id }}" @if($errors->any()) data-form-draft-server-old="1" @endif>
             @csrf
             @method('PATCH')
             @foreach($documents as $key => $document)
@@ -69,7 +77,7 @@
                 </div>
             @endforeach
             <div class="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <button type="submit" class="primary-action">Done for review</button>
+                <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Done for review</button>
                 @if($documentsReadyForApproval && $application->documents_reviewed_at)
                     <p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>
                 @elseif(! $documentsReadyForApproval)
@@ -99,7 +107,7 @@
             <textarea id="revise-remark" name="remark" rows="3" maxlength="2000" class="w-full border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="Example: Two of your documents were unclear. Please re-upload sharp, complete scans.">{{ old('remark') }}</textarea>
             @error('remark')<p class="text-xs font-bold text-red-700">{{ $message }}</p>@enderror
             <div class="flex flex-wrap items-center gap-3">
-                <button type="submit" class="primary-action">Email revision request</button>
+                <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Email revision request</button>
                 <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's document revision page so they can replace only the files marked Needs replacement.</p>
             </div>
         </form>
