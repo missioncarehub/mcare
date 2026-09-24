@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -33,7 +34,7 @@ class HistoricalAlumniClaimController extends Controller
         $statuses = HistoricalAlumniClaim::statuses();
 
         $query = HistoricalAlumniClaim::query()
-            ->with(['user', 'reviewer', 'onsiteVerifier'])
+            ->with(['user.alumniProfile', 'reviewer', 'onsiteVerifier'])
             ->latest();
 
         if (array_key_exists($selectedStatus, $statuses)) {
@@ -69,9 +70,76 @@ class HistoricalAlumniClaimController extends Controller
         ]);
     }
 
+    public function standing(Request $request): View
+    {
+        $claims = HistoricalAlumniClaim::query()
+            ->with(['user.alumniProfile'])
+            ->latest()
+            ->get()
+            ->map(function (HistoricalAlumniClaim $claim): array {
+                $approved = $claim->status === HistoricalAlumniClaim::STATUS_APPROVED;
+                $rank = $claim->user?->alumniProfile?->rank ?? AlumniProfile::RANK_JUNIOR;
+
+                return [
+                    'name' => $claim->user?->name ?? trim($claim->first_name.' '.$claim->last_name),
+                    'email' => $claim->user?->email,
+                    'source' => 'Alumni claim',
+                    'detail' => $claim->historical_batch_name ?: 'Batch not known',
+                    'status' => $claim->statusLabel(),
+                    'rank' => $approved ? $rank : null,
+                    'promote_url' => $approved && $rank !== AlumniProfile::RANK_SENIOR
+                        ? route('admin.historical-alumni.promote', $claim)
+                        : null,
+                ];
+            });
+
+        $graduates = EnrollmentApplication::query()
+            ->with(['user.alumniProfile', 'batch'])
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED)
+            ->where(function ($graduates): void {
+                $graduates->where('is_historical_record', false)->orWhereNull('is_historical_record');
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function (EnrollmentApplication $graduate): array {
+                $rank = $graduate->user?->alumniProfile?->rank ?? AlumniProfile::RANK_JUNIOR;
+
+                return [
+                    'name' => trim($graduate->first_name.' '.$graduate->last_name),
+                    'email' => $graduate->email,
+                    'source' => 'Training graduate',
+                    'detail' => $graduate->batch?->name ?: '—',
+                    'status' => 'Graduated',
+                    'rank' => $rank,
+                    'promote_url' => $rank !== AlumniProfile::RANK_SENIOR
+                        ? route('admin.alumni-standing.promote', $graduate)
+                        : null,
+                ];
+            });
+
+        $people = $claims
+            ->concat($graduates)
+            ->sortBy(fn (array $person) => mb_strtolower($person['name']))
+            ->values();
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = 20;
+
+        return view('admin.alumni-standing.index', [
+            'people' => new LengthAwarePaginator(
+                $people->forPage($page, $perPage)->values(),
+                $people->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()],
+            ),
+        ]);
+    }
+
     public function show(HistoricalAlumniClaim $historicalAlumniClaim): View
     {
-        $historicalAlumniClaim->load(['user', 'reviewer', 'onsiteVerifier']);
+        $historicalAlumniClaim->load(['user.alumniProfile', 'reviewer', 'onsiteVerifier']);
 
         return view('admin.historical-alumni.show', [
             'claim' => $historicalAlumniClaim,
@@ -173,7 +241,10 @@ class HistoricalAlumniClaimController extends Controller
 
                 AlumniProfile::query()->firstOrCreate(
                     ['user_id' => $claim->user_id],
-                    ['is_available_for_duty' => false],
+                    [
+                        'is_available_for_duty' => false,
+                        'rank' => AlumniProfile::RANK_JUNIOR,
+                    ],
                 );
             } else {
                 $claim->user->forceFill([
@@ -200,6 +271,66 @@ class HistoricalAlumniClaimController extends Controller
             ->with('saved', $validated['decision'] === 'approve'
                 ? "Historical alumni access activated for {$claim->user->name}."
                 : "Historical alumni claim for {$claim->user->name} was returned for follow-up.");
+    }
+
+    public function promote(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): RedirectResponse
+    {
+        abort_unless($historicalAlumniClaim->status === HistoricalAlumniClaim::STATUS_APPROVED, 422);
+        $historicalAlumniClaim->load('user');
+
+        $profile = $this->promoteProfile($request, $historicalAlumniClaim->user_id);
+        $name = $historicalAlumniClaim->user->name;
+
+        AdminActivityLog::record($request->user(), 'historical-alumni.rank.promoted', $historicalAlumniClaim, [
+            'claimant_email' => $historicalAlumniClaim->user->email,
+            'rank' => $profile->rank,
+        ]);
+
+        return back()->with('saved', $profile->wasChanged('rank')
+            ? "{$name} is now a senior alumni."
+            : "{$name} is already a senior alumni.");
+    }
+
+    public function promoteGraduate(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    {
+        abort_unless(
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED
+            && $enrollmentApplication->learning_status === EnrollmentApplication::LEARNING_GRADUATED
+            && ! $enrollmentApplication->is_historical_record,
+            422,
+        );
+
+        $profile = $this->promoteProfile($request, (int) $enrollmentApplication->user_id);
+        $name = trim($enrollmentApplication->first_name.' '.$enrollmentApplication->last_name);
+
+        AdminActivityLog::record($request->user(), 'graduate.rank.promoted', $enrollmentApplication, [
+            'rank' => $profile->rank,
+        ]);
+
+        return back()->with('saved', "{$name} is now a senior alumni.");
+    }
+
+    private function promoteProfile(Request $request, int $userId): AlumniProfile
+    {
+        $profile = AlumniProfile::query()->firstOrCreate(
+            ['user_id' => $userId],
+            [
+                'is_available_for_duty' => false,
+                'rank' => AlumniProfile::RANK_JUNIOR,
+            ],
+        );
+
+        if ($profile->isSenior()) {
+            return $profile;
+        }
+
+        $profile->forceFill([
+            'rank' => AlumniProfile::RANK_SENIOR,
+            'rank_promoted_at' => now(),
+            'rank_promoted_by_id' => $request->user()->id,
+        ])->save();
+
+        return $profile;
     }
 
     public function evidence(Request $request, HistoricalAlumniClaim $historicalAlumniClaim): BinaryFileResponse

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
+use App\Models\AlumniProfile;
 use App\Models\CompetencyOutcome;
 use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
@@ -216,7 +217,10 @@ class AdminLearningSystemController extends Controller
                 $user->notifications()
                     ->where('type', LmsQuizPublished::class)
                     ->delete();
-                $user->alumniProfile()->firstOrCreate([], ['is_available_for_duty' => false]);
+                $user->alumniProfile()->firstOrCreate([], [
+                    'is_available_for_duty' => false,
+                    'rank' => AlumniProfile::RANK_JUNIOR,
+                ]);
             } elseif ($user && $previousStatus === EnrollmentApplication::LEARNING_GRADUATED
                 && $validated['learning_status'] !== EnrollmentApplication::LEARNING_GRADUATED) {
                 $user->alumniProfile()->update([

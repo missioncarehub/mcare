@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AlumniProfile;
 use App\Models\CareerOpportunity;
 use App\Models\EnrollmentApplication;
 use App\Models\User;
@@ -31,7 +32,9 @@ class CareerGraduateNotifier
             return ['sent' => (int) $opportunity->sms_sent_count, 'skipped' => (int) $opportunity->sms_skipped_count, 'delivered' => (bool) $opportunity->sms_sent_at];
         }
 
-        $graduates = $this->graduates()->with('enrollmentApplication')->get();
+        $graduates = $this->graduates($opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE)
+            ->with('enrollmentApplication')
+            ->get();
         $numbers = [];
         $skipped = 0;
 
@@ -107,15 +110,21 @@ class CareerGraduateNotifier
             ->get();
     }
 
-    private function graduates()
+    private function graduates(bool $seniorsOnly = false)
     {
-        return User::query()->where(function ($query) {
-            $query->where('trainee_status', EnrollmentApplication::LEARNING_GRADUATED)
-                ->orWhereHas('enrollmentApplication', function ($enrollment) {
-                    $enrollment
-                        ->where('status', EnrollmentApplication::STATUS_APPROVED)
-                        ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED);
+        return User::query()
+            ->where(function ($query) {
+                $query->where('trainee_status', EnrollmentApplication::LEARNING_GRADUATED)
+                    ->orWhereHas('enrollmentApplication', function ($enrollment) {
+                        $enrollment
+                            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                            ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED);
+                    });
+            })
+            ->when($seniorsOnly, function ($query) {
+                $query->whereHas('alumniProfile', function ($profile) {
+                    $profile->where('rank', AlumniProfile::RANK_SENIOR);
                 });
-        });
+            });
     }
 }

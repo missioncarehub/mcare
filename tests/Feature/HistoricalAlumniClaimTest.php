@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AlumniProfile;
 use App\Models\EnrollmentApplication;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\TrainingModule;
@@ -152,7 +153,10 @@ class HistoricalAlumniClaimTest extends TestCase
             'is_historical_record' => true,
             'training_batch_id' => null,
         ]);
-        $this->assertDatabaseHas('alumni_profiles', ['user_id' => $user->id]);
+        $this->assertDatabaseHas('alumni_profiles', [
+            'user_id' => $user->id,
+            'rank' => AlumniProfile::RANK_JUNIOR,
+        ]);
         $this->assertSame('trainee', $user->fresh()->role);
         Notification::assertSentTo($user, HistoricalAlumniClaimStatusUpdated::class);
 
@@ -256,6 +260,94 @@ class HistoricalAlumniClaimTest extends TestCase
             ->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Type', 'application/pdf');
+    }
+
+    public function test_admin_can_promote_a_verified_alumni_and_a_graduate_to_senior(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $claimant = User::factory()->create([
+            'name' => 'Legacy Graduate',
+            'email' => 'senior.claim@example.test',
+            'email_verified_at' => now(),
+            'role' => 'applicant',
+        ]);
+        $claim = $this->createClaim($claimant, HistoricalAlumniClaim::STATUS_APPROVED);
+        AlumniProfile::query()->create([
+            'user_id' => $claimant->id,
+            'rank' => AlumniProfile::RANK_JUNIOR,
+            'is_available_for_duty' => false,
+        ]);
+
+        $graduateUser = User::factory()->create(['role' => 'trainee', 'email' => 'class.graduate@example.test']);
+        $graduate = EnrollmentApplication::create([
+            'user_id' => $graduateUser->id,
+            'email' => $graduateUser->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Class',
+            'last_name' => 'Graduate',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'street' => 'Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            'is_historical_record' => false,
+        ]);
+        AlumniProfile::query()->create([
+            'user_id' => $graduateUser->id,
+            'rank' => AlumniProfile::RANK_JUNIOR,
+            'is_available_for_duty' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.historical-alumni.index'))
+            ->assertOk()
+            ->assertDontSee('Promote to senior')
+            ->assertDontSee('Class Graduate');
+
+        $this->actingAs($admin)
+            ->get(route('admin.alumni-standing.index'))
+            ->assertOk()
+            ->assertSee('Junior and senior alumni')
+            ->assertSee('Alumni claim')
+            ->assertSee('Training graduate')
+            ->assertSee('Legacy Graduate')
+            ->assertSee('Class Graduate')
+            ->assertSee('Promote to senior');
+
+        $this->actingAs($admin)
+            ->patch(route('admin.historical-alumni.promote', $claim))
+            ->assertRedirect()
+            ->assertSessionHas('saved', 'Legacy Graduate is now a senior alumni.');
+
+        $this->assertDatabaseHas('alumni_profiles', [
+            'user_id' => $claimant->id,
+            'rank' => AlumniProfile::RANK_SENIOR,
+            'rank_promoted_by_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.alumni-standing.promote', $graduate))
+            ->assertRedirect()
+            ->assertSessionHas('saved', 'Class Graduate is now a senior alumni.');
+
+        $this->assertDatabaseHas('alumni_profiles', [
+            'user_id' => $graduateUser->id,
+            'rank' => AlumniProfile::RANK_SENIOR,
+        ]);
+
+        $pending = $this->createClaim(User::factory()->create(['role' => 'applicant']));
+        $this->actingAs($admin)
+            ->patch(route('admin.historical-alumni.promote', $pending))
+            ->assertStatus(422);
     }
 
     public function test_non_admin_cannot_open_alumni_claims(): void

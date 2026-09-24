@@ -294,10 +294,11 @@ class AdminCareerHubController extends Controller
         }
 
         if ($sms['delivered'] && $sms['sent'] > 0) {
-            $note = 'SMS sent to '.$sms['sent'].' '.str('graduate')->plural($sms['sent']).'.';
+            $audience = $opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE ? 'senior alumni' : 'alumni';
+            $note = 'SMS sent to '.$sms['sent'].' '.$audience.'.';
 
             return $sms['skipped'] > 0
-                ? $note.' '.$sms['skipped'].' '.str('graduate')->plural($sms['skipped']).' had no valid contact number.'
+                ? $note.' '.$sms['skipped'].' '.$audience.' had no valid contact number.'
                 : $note;
         }
 

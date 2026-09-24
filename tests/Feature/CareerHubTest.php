@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AlumniProfile;
 use App\Models\CareerInquiry;
 use App\Models\CareerOpportunity;
 use App\Models\EnrollmentApplication;
@@ -97,9 +98,12 @@ class CareerHubTest extends TestCase
         ]);
 
         $admin = User::factory()->create(['role' => 'admin']);
-        $graduate = $this->graduatedUser();
-        $this->graduatedUser([
+        $graduate = $this->seniorAlumni();
+        $this->seniorAlumni([
             'contact_number' => '',
+        ]);
+        $junior = $this->graduatedUser([
+            'contact_number' => '09171111111',
         ]);
         $this->activeTrainee();
 
@@ -115,7 +119,7 @@ class CareerHubTest extends TestCase
                 'sms_send_immediately' => '1',
             ])
             ->assertRedirect()
-            ->assertSessionHas('saved', 'Career opportunity published and alumni were notified. SMS sent to 1 graduate. 1 graduate had no valid contact number.');
+            ->assertSessionHas('saved', 'Career opportunity published and alumni were notified. SMS sent to 1 senior alumni. 1 senior alumni had no valid contact number.');
 
         $opportunity = CareerOpportunity::query()->firstOrFail();
         $this->assertSame(CareerOpportunity::SMS_IMMEDIATE, $opportunity->sms_mode);
@@ -123,12 +127,15 @@ class CareerHubTest extends TestCase
         $this->assertSame(1, $opportunity->sms_sent_count);
         $this->assertSame(1, $opportunity->sms_skipped_count);
 
-        Http::assertSent(function ($request) use ($graduate): bool {
+        $juniorNumber = app(SemaphoreSmsService::class)->normalizePhilippineNumber('09171111111');
+
+        Http::assertSent(function ($request) use ($graduate, $juniorNumber): bool {
             $number = app(SemaphoreSmsService::class)->normalizePhilippineNumber(
                 $graduate->fresh()->contact_number
             );
 
             return $request->url() === SemaphoreSmsService::ENDPOINT
+                && ! str_contains((string) $request['number'], (string) $juniorNumber)
                 && $request['apikey'] === 'testing-semaphore-key'
                 && $request['number'] === $number
                 && str_contains((string) $request['message'], 'Dear Alumni, we have a job offer for you: Home caregiver, Pili')
@@ -172,7 +179,8 @@ class CareerHubTest extends TestCase
         ]);
 
         $admin = User::factory()->create(['role' => 'admin']);
-        $this->graduatedUser();
+        $junior = $this->graduatedUser(['contact_number' => '09171111111']);
+        $senior = $this->seniorAlumni(['contact_number' => '09172222222']);
         $sendAt = now()->addDay()->seconds(0);
 
         $this->actingAs($admin)
@@ -192,10 +200,15 @@ class CareerHubTest extends TestCase
         $this->assertSame(CareerOpportunity::SMS_SCHEDULED, $opportunity->sms_mode);
         $this->assertNotNull($opportunity->sms_sent_at);
 
-        Http::assertSent(function ($request) use ($sendAt): bool {
+        $sms = app(SemaphoreSmsService::class);
+        $juniorNumber = $sms->normalizePhilippineNumber($junior->enrollmentApplication->contact_number);
+        $seniorNumber = $sms->normalizePhilippineNumber($senior->enrollmentApplication->contact_number);
+
+        Http::assertSent(function ($request) use ($sendAt, $juniorNumber, $seniorNumber): bool {
             return $request->url() === SemaphoreSmsService::ENDPOINT
                 && $request['scheduled'] === $sendAt->timezone(config('app.timezone'))->format('Y-m-d H:i:s')
-                && str_contains((string) $request['number'], '63');
+                && str_contains((string) $request['number'], (string) $juniorNumber)
+                && str_contains((string) $request['number'], (string) $seniorNumber);
         });
     }
 
@@ -208,7 +221,7 @@ class CareerHubTest extends TestCase
         ]);
 
         $admin = User::factory()->create(['role' => 'admin']);
-        $this->graduatedUser();
+        $this->seniorAlumni();
 
         $this->actingAs($admin)
             ->post(route('admin.learning.alumni-jobs.store'), [
@@ -562,6 +575,18 @@ class CareerHubTest extends TestCase
     private function graduatedUser(array $overrides = []): User
     {
         return $this->makeTrainee(EnrollmentApplication::LEARNING_GRADUATED, $overrides);
+    }
+
+    private function seniorAlumni(array $overrides = []): User
+    {
+        $user = $this->graduatedUser($overrides);
+        AlumniProfile::query()->create([
+            'user_id' => $user->id,
+            'rank' => AlumniProfile::RANK_SENIOR,
+            'is_available_for_duty' => false,
+        ]);
+
+        return $user;
     }
 
     private function activeTrainee(array $overrides = []): User

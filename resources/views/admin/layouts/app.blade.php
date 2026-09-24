@@ -30,6 +30,7 @@
             ['label' => 'Applications', 'icon' => 'fa-clipboard-list', 'href' => route('admin.applications.index'), 'active' => request()->routeIs('admin.applications.*')],
             ['label' => 'Enrollments', 'icon' => 'fa-user-check', 'href' => route('admin.enrollments.index'), 'active' => request()->routeIs('admin.enrollments.*')],
             ['label' => 'Alumni claims', 'icon' => 'fa-user-check', 'href' => route('admin.historical-alumni.index'), 'active' => request()->routeIs('admin.historical-alumni.*')],
+            ['label' => 'Alumni standing', 'icon' => 'fa-award', 'href' => route('admin.alumni-standing.index'), 'active' => request()->routeIs('admin.alumni-standing.*')],
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('admin.payment-schedules.index'), 'active' => request()->routeIs('admin.payment-schedules.*')],
             ['label' => 'Announcements', 'icon' => 'fa-bullhorn', 'href' => route('admin.announcements.index'), 'active' => request()->routeIs('admin.announcements.*')],
             ['label' => 'Contact admin', 'icon' => 'fa-message-circle', 'href' => route('admin.contact-messages.index'), 'active' => request()->routeIs('admin.contact-messages.*')],

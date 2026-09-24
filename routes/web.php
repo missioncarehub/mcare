@@ -586,6 +586,15 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::patch('/historical-alumni/{historicalAlumniClaim}', [AdminHistoricalAlumniClaimController::class, 'update'])
                     ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('historical-alumni.update');
+                Route::patch('/historical-alumni/{historicalAlumniClaim}/rank', [AdminHistoricalAlumniClaimController::class, 'promote'])
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
+                    ->name('historical-alumni.promote');
+                Route::get('/alumni-standing', [AdminHistoricalAlumniClaimController::class, 'standing'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('alumni-standing.index');
+                Route::patch('/alumni-standing/{enrollmentApplication}/rank', [AdminHistoricalAlumniClaimController::class, 'promoteGraduate'])
+                    ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
+                    ->name('alumni-standing.promote');
                 Route::get('/historical-alumni/{historicalAlumniClaim}/evidence', [AdminHistoricalAlumniClaimController::class, 'evidence'])
                     ->middleware(['permission:accounts.manage', 'throttle:document-downloads'])
                     ->name('historical-alumni.evidence');
