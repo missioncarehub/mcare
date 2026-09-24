@@ -83,7 +83,7 @@ class AttendanceController extends Controller
             'batch_id' => ['required', 'integer', 'exists:training_batches,id'],
             'date' => ['required', 'date'],
             'records' => ['required', 'array'],
-            'records.*.status' => ['required', 'string', 'in:present,late,absent,excused'],
+            'records.*.status' => ['nullable', 'string', 'in:present,late,absent,excused'],
             'records.*.notes' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -106,6 +106,16 @@ class AttendanceController extends Controller
             $validated['records'],
             $request->user()
         );
+
+        if ($savedCount === 0) {
+            return redirect()
+                ->route('trainer.attendance.index', [
+                    'batch_id' => $batch->id,
+                    'date' => $date->toDateString(),
+                    'tab' => 'sheet',
+                ])
+                ->with('error', 'Mark a status for at least one trainee before saving attendance.');
+        }
 
         return redirect()
             ->route('trainer.attendance.index', [

@@ -580,25 +580,15 @@
                 return (b/1024/1024).toFixed(2) + ' MB';
             };
 
-            const renderPreview = (file) => {
-                if (!file) {
-                    panel.classList.add('hidden');
-                    if (bodyEl) bodyEl.innerHTML = '';
-                    return;
-                }
-                panel.classList.remove('hidden');
-                if (nameEl) nameEl.textContent = file.name;
-                if (sizeEl) sizeEl.textContent = formatBytes(file.size);
-                if (!bodyEl) return;
+            const showFile = (file, url) => {
                 bodyEl.innerHTML = '';
-                const url = URL.createObjectURL(file);
                 if (file.type.startsWith('image/')) {
                     const img = document.createElement('img');
                     img.src = url;
                     img.alt = file.name;
                     img.className = 'max-h-72 w-auto rounded-lg border border-slate-200 bg-white';
                     bodyEl.appendChild(img);
-                } else if (file.type === 'application/pdf') {
+                } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
                     const embed = document.createElement('iframe');
                     embed.src = url;
                     embed.title = file.name;
@@ -609,6 +599,41 @@
                     note.className = 'text-xs text-slate-500';
                     note.textContent = 'Preview not available for this file type — the file will still be uploaded.';
                     bodyEl.appendChild(note);
+                }
+            };
+
+            const renderPreview = async (file) => {
+                if (!file) {
+                    panel.classList.add('hidden');
+                    if (bodyEl) bodyEl.innerHTML = '';
+                    return;
+                }
+                panel.classList.remove('hidden');
+                if (nameEl) nameEl.textContent = file.name;
+                if (sizeEl) sizeEl.textContent = formatBytes(file.size);
+                if (!bodyEl) return;
+                const localUrl = URL.createObjectURL(file);
+                const canStamp = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') || file.type.startsWith('image/');
+                const previewUrl = input.dataset.watermarkPreviewUrl;
+                if (!canStamp || !previewUrl) {
+                    showFile(file, localUrl);
+                    return;
+                }
+                bodyEl.innerHTML = '<p class="text-xs font-semibold text-slate-500">Embedding watermark...</p>';
+                try {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                    const body = new FormData();
+                    body.append('module_file', file);
+                    const response = await fetch(previewUrl, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/pdf, image/*, application/json' },
+                        body,
+                    });
+                    if (!response.ok) throw new Error('watermark failed');
+                    const stamped = URL.createObjectURL(await response.blob());
+                    showFile(file, stamped);
+                } catch (error) {
+                    showFile(file, localUrl);
                 }
             };
 

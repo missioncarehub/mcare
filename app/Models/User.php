@@ -229,6 +229,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return [
             EnrollmentApplication::LEARNING_ACTIVE => 'Active student',
             EnrollmentApplication::LEARNING_PAUSED => 'Paused',
+            EnrollmentApplication::LEARNING_PENDING_GRADUATE => 'Pending graduate',
             EnrollmentApplication::LEARNING_GRADUATED => 'Graduate',
             EnrollmentApplication::LEARNING_WITHDRAWN => 'Withdrawn',
         ];

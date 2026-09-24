@@ -12,11 +12,13 @@ use App\Models\TrainingModule;
 use App\Models\TrainingSubmodule;
 use App\Models\TrainingSubmoduleProgress;
 use App\Rules\TrainingModuleFileType;
+use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -27,6 +29,19 @@ use Illuminate\Validation\ValidationException;
 
 class TrainingModuleController extends Controller
 {
+    public function previewWatermark(Request $request, LearningPdfWatermark $watermark): BinaryFileResponse
+    {
+        $request->validate([
+            'module_file' => ['required', 'file', 'max:'.TrainingModuleFiles::MAX_UPLOAD_KB, new TrainingModuleFileType],
+        ]);
+
+        $lines = $request->user()?->role === 'admin'
+            ? ['Enrollment number', 'Student number']
+            : ['Enrollment number', 'Trainee name'];
+
+        return $watermark->previewUpload($request->file('module_file'), $lines);
+    }
+
     public function store(
         Request $request,
         RollingModuleReleaseService $releases,

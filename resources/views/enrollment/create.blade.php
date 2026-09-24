@@ -124,11 +124,11 @@
             <header class="enrollment-intro">
                 <p class="enrollment-kicker">Official TESDA NC II applicant profile</p>
                 <h1>
-                    {{ $enrollmentBatch?->program?->name ?? 'Choose Your Training Program' }} Enrollment
+                    {{ $selectedProgramName ?? $enrollmentBatch?->program?->name ?? 'Training Program' }} Enrollment
                 </h1>
                 <p class="enrollment-lede">
                     @if ($canCompleteEnrollment)
-                        Choose an active batch published by MCARE, then complete the official applicant profile. After the application is saved, you may use the same registered email with Google sign-in.
+                        Your program is already selected from the application. Choose a batch for that program, then complete the official applicant profile. After the application is saved, you may use the same registered email with Google sign-in.
                     @else
                         Enter the approved application number from the applications page. The enrollment form opens only after MCARE approves that application.
                     @endif
@@ -136,7 +136,7 @@
                 <dl class="enrollment-status-row">
                     <div>
                         <dt>Program</dt>
-                        <dd>{{ $enrollmentBatch?->program?->name ?? ($unlockedAdmission?->program ?? 'Select an available batch') }}</dd>
+                        <dd>{{ $selectedProgramName ?? $enrollmentBatch?->program?->name ?? 'From your application' }}</dd>
                     </div>
                     <div>
                         <dt>Current step</dt>
@@ -184,15 +184,14 @@
             <section class="enrollment-batches" aria-labelledby="available-batches-title">
                 <div class="enrollment-section-heading">
                     <p>Admin-published enrollment</p>
-                    <h2 id="available-batches-title">Available active batches</h2>
-                    <p>{{ $availableBatches->count() }} available. After submission, continue to payment. The application becomes available to Admin Review only after the required payment is verified.</p>
+                    <h2 id="available-batches-title">Choose a batch</h2>
+                    <p>{{ $availableBatches->count() }} {{ str('batch')->plural($availableBatches->count()) }} for {{ $selectedProgramName ?? 'your selected program' }}. The program comes from your application and cannot be changed here.</p>
                 </div>
 
                 @if ($application && $enrollmentBatch)
                     <div class="enrollment-batch-option is-selected">
                         <p class="enrollment-kicker">Your saved batch</p>
-                        <p class="enrollment-batch-title">{{ $enrollmentBatch->program?->name ?? $application->program }}</p>
-                        <p class="enrollment-batch-meta">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
+                        <p class="enrollment-batch-title">{{ $enrollmentBatch->name }} {{ $enrollmentBatch->year }}</p>
                         <p class="enrollment-batch-meta">
                             <strong class="text-purple-700">Enrollment deadline:</strong>
                             {{ $enrollmentBatch->is_continuous_enrollment ? 'Continuous enrollment · no deadline' : ($enrollmentBatch->enrollment_ends_at?->format('M d, Y g:i A') ?? 'To be announced') }}
@@ -207,8 +206,8 @@
                             <a href="{{ route('enrollment.create', ['batch' => $availableBatch->id]).'#enrollment-form' }}" class="enrollment-batch-option{{ $isSelectedBatch ? ' is-selected' : '' }}" @if($isSelectedBatch) aria-current="true" @endif>
                                 <div class="enrollment-batch-option-top">
                                     <div>
-                                        <p class="enrollment-batch-title">{{ $availableBatch->program?->name }}</p>
-                                        <p class="enrollment-batch-meta">{{ $availableBatch->name }} {{ $availableBatch->year }}</p>
+                                        <p class="enrollment-batch-title">{{ $availableBatch->name }} {{ $availableBatch->year }}</p>
+                                        <p class="enrollment-batch-meta">{{ $availableBatch->scheduleLabelFor('AM') }} · {{ $availableBatch->scheduleLabelFor('PM') }}</p>
                                     </div>
                                     <span class="enrollment-batch-flag">{{ $isSelectedBatch ? 'Selected' : 'Choose' }}</span>
                                 </div>
@@ -223,7 +222,7 @@
                         @endforeach
                     </div>
                 @else
-                    <p class="enrollment-notice enrollment-notice-amber">No active batch is currently published for enrollment. Please wait for MCARE to open and show the next batch.</p>
+                    <p class="enrollment-notice enrollment-notice-amber">No active batch is currently published for {{ $selectedProgramName ?? 'this program' }}. Please wait for MCARE to open the next batch.</p>
                 @endif
             </section>
 

@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\LmsModulePublished;
 use App\Rules\TrainingModuleFileType;
 use App\Services\ClassroomComments;
+use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
 use App\Services\ModuleSubmoduleService;
 use App\Services\TrainingCalendarService;
@@ -27,6 +28,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrainerDashboardController extends Controller
 {
@@ -326,7 +328,7 @@ class TrainerDashboardController extends Controller
         ]);
     }
 
-    public function supplementaryDownload(Request $request, TrainingModule $module, int $index): BinaryFileResponse
+    public function supplementaryDownload(Request $request, TrainingModule $module, int $index, LearningPdfWatermark $watermark): BinaryFileResponse|StreamedResponse
     {
         abort_unless($module->trainer_id === $request->user()->id, 403);
         $list = $module->supplementaryList();
@@ -340,18 +342,16 @@ class TrainerDashboardController extends Controller
             'filename' => $attachment['original_name'] ?? 'supplementary',
         ]);
 
-        $filename = basename($attachment['original_name'] ?? 'attachment');
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
-
-        return response()->file(Storage::disk('local')->path($path), [
-            'Content-Type' => ($attachment['mime_type'] ?? null) ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $watermark->respond(
+            $path,
+            basename($attachment['original_name'] ?? 'attachment'),
+            $attachment['mime_type'] ?? null,
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+            $this->watermarkLines($module),
+        );
     }
 
-    public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
+    public function moduleContent(Request $request, TrainingModule $module, LearningPdfWatermark $watermark): BinaryFileResponse|StreamedResponse
     {
         abort_unless($module->trainer_id === $request->user()->id, 403);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
@@ -361,13 +361,10 @@ class TrainerDashboardController extends Controller
             'range_request' => $request->hasHeader('Range'),
         ]);
 
-        $filename = basename($module->original_file_name);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
-
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE, $watermark);
     }
 
-    public function moduleDownload(Request $request, TrainingModule $module): BinaryFileResponse
+    public function moduleDownload(Request $request, TrainingModule $module, LearningPdfWatermark $watermark): BinaryFileResponse|StreamedResponse
     {
         abort_unless($module->trainer_id === $request->user()->id, 403);
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
@@ -376,24 +373,38 @@ class TrainerDashboardController extends Controller
             'mime_type' => $module->mime_type,
         ]);
 
-        $filename = basename($module->original_file_name);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
-
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT, $filename, $fallbackFilename);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT, $watermark);
     }
 
     private function moduleFileResponse(
         TrainingModule $module,
         string $disposition,
-        string $filename,
-        string $fallbackFilename,
-    ): BinaryFileResponse {
-        return response()->file(Storage::disk('local')->path($module->file_path), [
-            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        LearningPdfWatermark $watermark,
+    ): BinaryFileResponse|StreamedResponse {
+        return $watermark->respond(
+            $module->file_path,
+            basename($module->original_file_name),
+            $module->mime_type,
+            $disposition,
+            $this->watermarkLines($module),
+        );
+    }
+
+    /** @return list<string> */
+    private function watermarkLines(TrainingModule $module): array
+    {
+        $application = $module->target_enrollment_application_id
+            ? EnrollmentApplication::query()->find($module->target_enrollment_application_id)
+            : null;
+
+        if ($application === null) {
+            return ['Enrollment number', 'Trainee name'];
+        }
+
+        return array_values(array_filter([
+            $application->enrollment_number,
+            trim($application->first_name.' '.$application->last_name),
+        ]));
     }
 
     private function approvedTraineesFor(?TrainingBatch $activeBatch)

@@ -5,6 +5,7 @@
         $statusStyles = [
             \App\Models\EnrollmentApplication::LEARNING_ACTIVE => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
             \App\Models\EnrollmentApplication::LEARNING_PAUSED => 'bg-amber-50 text-amber-900 ring-amber-200',
+            \App\Models\EnrollmentApplication::LEARNING_PENDING_GRADUATE => 'bg-indigo-50 text-indigo-800 ring-indigo-200',
             \App\Models\EnrollmentApplication::LEARNING_GRADUATED => 'bg-purple-50 text-purple-800 ring-purple-200',
             \App\Models\EnrollmentApplication::LEARNING_WITHDRAWN => 'bg-slate-100 text-slate-700 ring-slate-200',
         ];
@@ -94,19 +95,27 @@
 
         <div class="dashboard-panel">
             <p class="text-sm font-bold text-slate-950">Lifecycle controls</p>
-            <p class="mt-1 text-xs leading-5 text-slate-500">Pause, resume, graduate, or permanently delete this trainee.</p>
+            <p class="mt-1 text-xs leading-5 text-slate-500">Pause, resume, mark completion progress, or permanently delete this trainee. Official graduation and alumni access open only after every required module is complete.</p>
             <div class="mt-3 flex flex-wrap gap-2">
                 @if ($trainee->learning_status === \App\Models\EnrollmentApplication::LEARNING_ACTIVE)
                     <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}">@csrf @method('PATCH')<input type="hidden" name="learning_status" value="paused"><button class="min-h-10 rounded-lg border border-amber-200 bg-amber-50 px-4 text-xs font-bold text-amber-900 hover:bg-amber-100">Pause</button></form>
-                @else
+                @elseif ($trainee->learning_status !== \App\Models\EnrollmentApplication::LEARNING_GRADUATED)
                     <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}">@csrf @method('PATCH')<input type="hidden" name="learning_status" value="active"><button class="min-h-10 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-800 hover:bg-emerald-100">Resume</button></form>
                 @endif
                 @if ($trainee->learning_status !== \App\Models\EnrollmentApplication::LEARNING_GRADUATED)
-                    <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}" data-confirm="Graduate {{ $trainee->first_name }} {{ $trainee->last_name }}? If requirements were completed offline or on-site, competencies will be marked Competent and COTC will be available online.">
-                        @csrf @method('PATCH')
-                        <input type="hidden" name="learning_status" value="graduated">
-                        <button class="min-h-10 rounded-lg border border-purple-200 bg-purple-50 px-4 text-xs font-bold text-purple-800 hover:bg-purple-100">Graduate</button>
-                    </form>
+                    @if ($modulesComplete)
+                        <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}" data-confirm="Graduate {{ $trainee->first_name }} {{ $trainee->last_name }}? Required modules are complete, so this unlocks the official graduate record and alumni access.">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="learning_status" value="graduated">
+                            <button class="min-h-10 rounded-lg border border-purple-200 bg-purple-50 px-4 text-xs font-bold text-purple-800 hover:bg-purple-100">Graduate</button>
+                        </form>
+                    @elseif ($trainee->learning_status !== \App\Models\EnrollmentApplication::LEARNING_PENDING_GRADUATE)
+                        <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}" data-confirm="Mark {{ $trainee->first_name }} {{ $trainee->last_name }} as Pending Graduate? Required modules are still incomplete, so they will not be counted as a graduate or alumni.">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="learning_status" value="pending_graduate">
+                            <button class="min-h-10 rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-xs font-bold text-indigo-800 hover:bg-indigo-100">Pending Graduate</button>
+                        </form>
+                    @endif
                 @endif
                 <form method="POST" action="{{ route('admin.learning.trainees.destroy', $trainee) }}" data-confirm-title="{{ $trainee->accountDeletionTitle() }}" data-confirm="{{ $trainee->accountDeletionMessage() }}" @if($trainee->accountDeletionDetail()) data-confirm-detail="{{ $trainee->accountDeletionDetail() }}" @endif data-confirm-action="{{ $trainee->accountDeletionAction() }}">
                     @csrf

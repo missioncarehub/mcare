@@ -281,8 +281,8 @@ class LmsResponsiveRenderingTest extends TestCase
         $this->assertStringNotContainsString('pdf.worker.min.mjs?url', $script);
         $this->assertFileExists(public_path('vendor/pdfjs/pdf.worker.min.js'));
         $this->assertStringContainsString('data-pdf-scroll-sizer', $traineeShow);
-        $this->assertStringContainsString('pdf-page-watermark', $traineeShow);
-        $this->assertStringContainsString('pdf-page-watermark', $preview);
+        $this->assertStringNotContainsString('pdf-page-watermark', $traineeShow);
+        $this->assertStringNotContainsString('pdf-page-watermark', $preview);
         $this->assertStringNotContainsString('items-start justify-center overflow-auto', $preview);
     }
 }

@@ -898,7 +898,7 @@ class TrainingRecordsTest extends TestCase
         });
     }
 
-    public function test_admin_can_graduate_trainee_directly_and_fulfill_competencies_without_blocking(): void
+    public function test_incomplete_trainee_is_marked_pending_graduate_instead_of_alumni(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -913,18 +913,21 @@ class TrainingRecordsTest extends TestCase
             ->assertSessionHas('saved');
 
         $application->refresh();
-        $this->assertSame('graduated', $application->learning_status);
+        $this->assertSame(EnrollmentApplication::LEARNING_PENDING_GRADUATE, $application->learning_status);
+        $this->assertFalse($trainee->fresh()->isGraduate());
+        $this->assertDatabaseMissing('alumni_profiles', [
+            'user_id' => $trainee->id,
+        ]);
+        $this->assertDatabaseCount('trainee_competency_records', 0);
 
-        // Competency records are marked Competent
-        $compRecords = TraineeCompetencyRecord::where('enrollment_application_id', $application->id)->get();
-        $this->assertNotEmpty($compRecords);
-        $this->assertTrue($compRecords->every(fn ($r) => $r->status === 'competent'));
-
-        // Trainee can open grades page with official notice
-        $this->actingAs($trainee)
-            ->get(route('trainee.grades'))
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees', ['tab' => 'graduated']))
             ->assertOk()
-            ->assertSee('Official Certificate and Transcript of Records (TOR) Notice');
+            ->assertDontSee($application->email);
+
+        $this->actingAs($trainee->fresh())
+            ->get(route('alumni.dashboard'))
+            ->assertForbidden();
     }
 
     public function test_tor_requires_graduation_and_all_completion_checks(): void

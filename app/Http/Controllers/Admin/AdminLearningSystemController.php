@@ -20,6 +20,7 @@ use App\Rules\TrainingModuleFileType;
 use App\Services\AccountDeletionService;
 use App\Services\CompetencyCatalogService;
 use App\Services\CompletionEligibilityService;
+use App\Services\LearningPdfWatermark;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\TraineeRosterCsv;
@@ -85,6 +86,7 @@ class AdminLearningSystemController extends Controller
             'trainee' => $enrollmentApplication,
             'summary' => $this->summarizeTrainee($enrollmentApplication),
             'learningStatuses' => EnrollmentApplication::learningStatuses(),
+            'modulesComplete' => app(CompletionEligibilityService::class)->requiredModulesCompleted($enrollmentApplication),
             'rosterTab' => $enrollmentApplication->learning_status === EnrollmentApplication::LEARNING_GRADUATED
                 ? 'graduated'
                 : 'current',
@@ -127,6 +129,13 @@ class AdminLearningSystemController extends Controller
 
         $previousStatus = $enrollmentApplication->learning_status ?: EnrollmentApplication::LEARNING_ACTIVE;
         $isExpeditedGraduation = false;
+        $heldAsPendingGraduate = false;
+
+        if ($validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED
+            && ! $eligibility->requiredModulesCompleted($enrollmentApplication->fresh('batch'))) {
+            $validated['learning_status'] = EnrollmentApplication::LEARNING_PENDING_GRADUATE;
+            $heldAsPendingGraduate = true;
+        }
 
         if ($validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED) {
             $completion = $eligibility->evaluate($enrollmentApplication->fresh('batch'));
@@ -230,9 +239,13 @@ class AdminLearningSystemController extends Controller
             'career_hub_unlocked' => $validated['learning_status'] === EnrollmentApplication::LEARNING_GRADUATED,
         ]);
 
+        $statusMessage = $heldAsPendingGraduate
+            ? "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now Pending Graduate. Official graduation and alumni access stay locked until every required module is complete."
+            : "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.";
+
         return redirect()
             ->route('admin.learning.trainees.show', $enrollmentApplication)
-            ->with('saved', "{$enrollmentApplication->first_name} {$enrollmentApplication->last_name} is now {$enrollmentApplication->learningStatusLabel()}.");
+            ->with('saved', $statusMessage);
     }
 
     public function destroyTrainee(
@@ -833,7 +846,7 @@ class AdminLearningSystemController extends Controller
         ]);
     }
 
-    public function moduleContent(Request $request, TrainingModule $module): BinaryFileResponse
+    public function moduleContent(Request $request, TrainingModule $module, LearningPdfWatermark $watermark): BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
 
@@ -841,10 +854,10 @@ class AdminLearningSystemController extends Controller
             'mime_type' => $module->mime_type,
         ]);
 
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_INLINE, $watermark);
     }
 
-    public function downloadModule(Request $request, TrainingModule $module): BinaryFileResponse
+    public function downloadModule(Request $request, TrainingModule $module, LearningPdfWatermark $watermark): BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
         abort_unless(Storage::disk('local')->exists($module->file_path), 404);
 
@@ -852,20 +865,28 @@ class AdminLearningSystemController extends Controller
             'mime_type' => $module->mime_type,
         ]);
 
-        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT);
+        return $this->moduleFileResponse($module, HeaderUtils::DISPOSITION_ATTACHMENT, $watermark);
     }
 
-    private function moduleFileResponse(TrainingModule $module, string $disposition): BinaryFileResponse
+    private function moduleFileResponse(TrainingModule $module, string $disposition, LearningPdfWatermark $watermark): BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $filename = basename($module->original_file_name);
-        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+        $application = $module->target_enrollment_application_id
+            ? EnrollmentApplication::query()->find($module->target_enrollment_application_id)
+            : null;
+        $lines = $application
+            ? array_values(array_filter([
+                $application->enrollment_number,
+                'Student No. '.$application->user_id,
+            ]))
+            : ['Enrollment number', 'Student number'];
 
-        return response()->file(Storage::disk('local')->path($module->file_path), [
-            'Content-Type' => $module->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $filename, $fallbackFilename),
-            'Accept-Ranges' => 'bytes',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $watermark->respond(
+            $module->file_path,
+            basename($module->original_file_name),
+            $module->mime_type,
+            $disposition,
+            $lines,
+        );
     }
 
     public function destroyModule(

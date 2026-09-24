@@ -484,6 +484,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])
                     ->middleware('permission:modules.manage')
                     ->name('learning.modules');
+                Route::post('/learning/modules/preview-watermark', [TrainerTrainingModuleController::class, 'previewWatermark'])
+                    ->middleware(['permission:modules.manage', 'throttle:20,1'])
+                    ->name('learning.modules.preview-watermark');
                 Route::post('/learning/modules/store', [AdminLearningSystemController::class, 'storeModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.store');
@@ -723,6 +726,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/certificates', [TrainerPortalController::class, 'certificates'])->name('certificates');
                 Route::get('/reports', [TrainerPortalController::class, 'reports'])->name('reports');
 
+                Route::post('/modules/preview-watermark', [TrainerTrainingModuleController::class, 'previewWatermark'])
+                    ->middleware(['permission:modules.publish', 'throttle:20,1'])
+                    ->name('modules.preview-watermark');
                 Route::post('/modules', [TrainerTrainingModuleController::class, 'store'])
                     ->middleware(['permission:modules.publish', 'throttle:8,1'])
                     ->name('modules.store');

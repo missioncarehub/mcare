@@ -668,6 +668,7 @@ class TraineeDashboardController extends Controller
             $filename,
             $attachment['mime_type'] ?? null,
             HeaderUtils::DISPOSITION_ATTACHMENT,
+            $this->traineeWatermarkLines($application),
         );
     }
 
@@ -927,6 +928,17 @@ class TraineeDashboardController extends Controller
         return $progress;
     }
 
+    /** @return list<string> */
+    private function traineeWatermarkLines(EnrollmentApplication $application): array
+    {
+        $name = trim($application->first_name.' '.$application->last_name);
+
+        return array_values(array_filter([
+            $application->enrollment_number,
+            $name !== '' ? $name : null,
+        ]));
+    }
+
     private function moduleFileResponse(
         TrainingModule $module,
         string $disposition,
@@ -937,6 +949,7 @@ class TraineeDashboardController extends Controller
             basename($module->original_file_name),
             $module->mime_type,
             $disposition,
+            $this->traineeWatermarkLines($this->approvedApplicationFor(request())),
         );
     }
 

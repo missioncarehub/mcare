@@ -37,9 +37,9 @@ class AttendanceService
                 continue;
             }
 
-            $status = $record['status'] ?? TraineeAttendance::STATUS_PRESENT;
-            if (! array_key_exists($status, TraineeAttendance::statuses())) {
-                $status = TraineeAttendance::STATUS_PRESENT;
+            $status = $record['status'] ?? null;
+            if (! is_string($status) || ! array_key_exists($status, TraineeAttendance::statuses())) {
+                continue;
             }
 
             $notes = filled($record['notes'] ?? null) ? trim((string) $record['notes']) : null;

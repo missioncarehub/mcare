@@ -5,6 +5,7 @@
         $statusStyles = [
             \App\Models\EnrollmentApplication::LEARNING_ACTIVE => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
             \App\Models\EnrollmentApplication::LEARNING_PAUSED => 'bg-amber-50 text-amber-900 ring-amber-200',
+            \App\Models\EnrollmentApplication::LEARNING_PENDING_GRADUATE => 'bg-indigo-50 text-indigo-800 ring-indigo-200',
             \App\Models\EnrollmentApplication::LEARNING_GRADUATED => 'bg-purple-50 text-purple-800 ring-purple-200',
             \App\Models\EnrollmentApplication::LEARNING_WITHDRAWN => 'bg-slate-100 text-slate-700 ring-slate-200',
         ];
@@ -18,7 +19,7 @@
     <section class="space-y-6">
         <p class="max-w-3xl text-sm leading-6 text-slate-600">Use the roster table to scan payment, module completion, and assessment status. Open View details for the full trainee record.</p>
 
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             @foreach ($learningStatuses as $value => $label)
                 @php
                     $statusSelected = $value === \App\Models\EnrollmentApplication::LEARNING_GRADUATED
@@ -34,7 +35,7 @@
                         <p class="dashboard-stat-value text-2xl">{{ $statusCounts[$value] ?? 0 }}</p>
                     </div>
                     @php
-                        $statusIcons = ['active' => 'users', 'paused' => 'circle-minus', 'graduated' => 'award', 'withdrawn' => 'xmark'];
+                        $statusIcons = ['active' => 'users', 'paused' => 'circle-minus', 'pending_graduate' => 'clock', 'graduated' => 'award', 'withdrawn' => 'xmark'];
                     @endphp
                     <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1 {{ $statusStyles[$value] }}"><x-dashboard-icon :name="$statusIcons[$value] ?? 'circle-question'" /></span>
                 </a>

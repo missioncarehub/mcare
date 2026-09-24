@@ -60,6 +60,82 @@ class WatermarkedFpdi extends Fpdi
         $this->setAlpha(1);
     }
 
+    /** @param list<string> $lines */
+    public function paintIdentity(array $lines): void
+    {
+        $lines = array_values(array_filter(array_map(
+            fn ($line) => $this->pdfText((string) $line),
+            $lines,
+        ), fn (string $line) => $line !== ''));
+
+        if ($lines === []) {
+            return;
+        }
+
+        $this->SetAutoPageBreak(false);
+        $this->SetMargins(0, 0, 0);
+        $this->SetFont('Helvetica', 'B', 22);
+        $this->SetTextColor(80, 80, 80);
+        $this->setAlpha(0.55);
+
+        $text = implode('   |   ', $lines);
+        $x = max(28, $this->w - 28);
+        $y = min($this->h - 36, max(36, $this->h * 0.78));
+        $this->rotate(90, $x, $y);
+        $this->Text($x, $y, $text);
+        $this->rotate(0);
+        $this->setAlpha(1);
+        $this->SetTextColor(0, 0, 0);
+    }
+
+    public function useTemplateAboveIdentity(int|string $template): void
+    {
+        // Darken keeps the lesson ink on top of the side text. White page
+        // fills no longer cover the watermark that was painted first.
+        $this->setAlpha(1, 'Darken');
+        $this->useTemplate($template);
+        $this->setAlpha(1, 'Normal');
+    }
+
+    private float $rotationAngle = 0;
+
+    private function rotate(float $angle, float $x = 0, float $y = 0): void
+    {
+        if ($this->rotationAngle !== 0.0) {
+            $this->_out('Q');
+        }
+
+        $this->rotationAngle = $angle;
+        if ($angle === 0.0) {
+            return;
+        }
+
+        $angle *= M_PI / 180;
+        $c = cos($angle);
+        $s = sin($angle);
+        $cx = $x * $this->k;
+        $cy = ($this->h - $y) * $this->k;
+        $this->_out(sprintf(
+            'q %.5F %.5F %.5F %.5F %.5F %.5F cm 1 0 0 1 %.5F %.5F cm',
+            $c,
+            $s,
+            -$s,
+            $c,
+            $cx,
+            $cy,
+            -$cx,
+            -$cy,
+        ));
+    }
+
+    private function pdfText(string $value): string
+    {
+        $value = trim(str_replace(["\r", "\n", '(', ')', '\\'], ' ', $value));
+        $converted = iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $value);
+
+        return is_string($converted) ? trim($converted) : $value;
+    }
+
     protected function _enddoc(): void
     {
         if ($this->extGStates !== [] && $this->PDFVersion < '1.4') {

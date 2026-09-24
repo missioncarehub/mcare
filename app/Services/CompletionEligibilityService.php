@@ -132,6 +132,11 @@ class CompletionEligibilityService
         ];
     }
 
+    public function requiredModulesCompleted(EnrollmentApplication $application): bool
+    {
+        return (bool) ($this->evaluate($application)['checks']['modules']['passed'] ?? false);
+    }
+
     /**
      * TOR issue / preview / download requires both graduation and a full
      * completion-check pass. Graduating early does not skip unfinished checks.

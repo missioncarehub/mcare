@@ -544,6 +544,69 @@ class EnrollmentSubmissionTest extends TestCase
             ->assertSessionHasErrors(['first_name', 'barangay']);
     }
 
+    public function test_enrollment_lists_only_batches_for_the_application_program(): void
+    {
+        $selected = TrainingProgram::query()->create([
+            'name' => 'Caregiving NC II',
+            'code' => 'CAREGIVING-NC-II-ENROLL',
+            'description' => 'Selected application program.',
+            'total_program_fee' => 20000,
+            'downpayment_amount' => 2000,
+            'is_active' => true,
+        ]);
+        $other = TrainingProgram::query()->create([
+            'name' => 'Caregiving NC III',
+            'code' => 'CAREGIVING-NC-III-ENROLL',
+            'description' => 'A different program.',
+            'total_program_fee' => 30000,
+            'downpayment_amount' => 3000,
+            'is_active' => true,
+        ]);
+        $matching = TrainingBatch::create([
+            'training_program_id' => $selected->id,
+            'name' => 'Selected Program Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+        TrainingBatch::create([
+            'training_program_id' => $other->id,
+            'name' => 'Other Program Batch',
+            'year' => 2026,
+            'is_active' => true,
+            'show_on_enrollment_page' => true,
+            'enrollment_starts_at' => now()->subDay(),
+            'enrollment_ends_at' => now()->addWeek(),
+        ]);
+        $admission = $this->makeApprovedAdmission([
+            'training_program_id' => $selected->id,
+            'program' => $selected->name,
+        ]);
+
+        $this->withSession(['enrollment.admission_application_id' => $admission->id])
+            ->get(route('enrollment.create'))
+            ->assertOk()
+            ->assertSee('Choose a batch')
+            ->assertSee('Selected Program Batch')
+            ->assertDontSee('Other Program Batch')
+            ->assertDontSee('Choose Your Training Program');
+
+        $this->withSession(['enrollment.admission_application_id' => $admission->id])
+            ->post(route('enrollment.store'), $this->validEnrollmentPayload([
+                'admission' => $admission,
+                'training_batch_id' => TrainingBatch::query()->where('name', 'Other Program Batch')->value('id'),
+                'email' => $admission->email,
+            ]))
+            ->assertSessionHasErrors('training_batch_id');
+
+        $this->assertDatabaseMissing('enrollment_applications', [
+            'training_batch_id' => TrainingBatch::query()->where('name', 'Other Program Batch')->value('id'),
+        ]);
+        $this->assertNotNull($matching->id);
+    }
+
     public function test_submit_stays_disabled_until_the_certification_checkbox_is_checked(): void
     {
         $batch = TrainingBatch::create([

@@ -40,8 +40,15 @@ class EnrollmentController extends Controller
         $unlockedAdmission = $this->unlockedAdmission($request, $application);
         $lockedEducationalAttainment = $this->lockedEducationalAttainment($application, $unlockedAdmission);
 
+        $selectedProgramId = $application?->training_program_id ?: $unlockedAdmission?->training_program_id;
+        $selectedProgramName = $application?->program ?: $unlockedAdmission?->program;
         $availableBatches = TrainingBatch::query()
             ->publishedForEnrollment()
+            ->when($selectedProgramId, fn ($query) => $query->where('training_program_id', $selectedProgramId))
+            ->when(! $selectedProgramId && filled($selectedProgramName), fn ($query) => $query->whereHas(
+                'program',
+                fn ($program) => $program->where('name', $selectedProgramName),
+            ))
             ->with('program')
             ->orderBy('enrollment_ends_at')
             ->orderBy('training_starts_at')
@@ -70,6 +77,7 @@ class EnrollmentController extends Controller
             'availableBatches' => $availableBatches,
             'canCompleteEnrollment' => $application !== null || $unlockedAdmission !== null,
             'enrollmentBatch' => $enrollmentBatch,
+            'selectedProgramName' => $selectedProgramName,
             'unlockedAdmission' => $unlockedAdmission,
             'user' => $request->user(),
             'googleIdentity' => $this->googleIdentity($request),
@@ -329,6 +337,13 @@ class EnrollmentController extends Controller
         $validated = $validator->validated();
         $admission = $currentApplication?->admissionApplication
             ?: $this->approvedAdmissionForEnrollment($request, $validated['email'], $validated['application_number'] ?? null);
+        $lockedProgramId = $currentApplication?->training_program_id ?: $admission?->training_program_id;
+
+        if ($lockedProgramId && $enrollmentBatch && (int) $enrollmentBatch->training_program_id !== (int) $lockedProgramId) {
+            throw ValidationException::withMessages([
+                'training_batch_id' => 'Choose a batch for the program selected on your application.',
+            ]);
+        }
 
         $user = $currentUser ?? new User;
         $userData = [
@@ -375,8 +390,8 @@ class EnrollmentController extends Controller
             ->merge([
                 'user_id' => $user->id,
                 'admission_application_id' => $currentApplication?->admission_application_id ?: $admission?->id,
-                'program' => $currentApplication?->program ?: $enrollmentBatch?->program?->name,
-                'training_program_id' => $currentApplication?->training_program_id ?: $enrollmentBatch?->training_program_id,
+                'program' => $currentApplication?->program ?: ($admission?->program ?: $enrollmentBatch?->program?->name),
+                'training_program_id' => $currentApplication?->training_program_id ?: ($admission?->training_program_id ?: $enrollmentBatch?->training_program_id),
                 'training_batch_id' => $currentApplication?->training_batch_id ?: $enrollmentBatch?->id,
                 'total_program_fee' => $currentApplication?->total_program_fee ?: $enrollmentBatch?->program?->total_program_fee,
                 'downpayment_amount' => $currentApplication?->downpayment_amount ?: $enrollmentBatch?->program?->downpayment_amount,

@@ -142,7 +142,7 @@
                                 @foreach($trainees as $index => $trainee)
                                     @php
                                         $att = $existingAttendances->get($trainee->id);
-                                        $currentStatus = $att?->status ?? 'present';
+                                        $currentStatus = $att?->status;
                                     @endphp
                                     <tr class="hover:bg-slate-50/60 transition">
                                         <td class="py-3.5 px-4 font-medium text-slate-400">{{ $index + 1 }}</td>

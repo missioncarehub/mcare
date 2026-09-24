@@ -130,7 +130,7 @@
 
     <div>
         <label class="mb-2 block text-xs font-bold uppercase text-slate-500">{{ \App\Support\TrainingModuleFiles::humanLabel() }}</label>
-        <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" @required(! $isEdit) data-file-preview-input="{{ $previewKey }}">
+        <input name="module_file" type="file" accept="{{ \App\Support\TrainingModuleFiles::acceptAttribute() }}" class="form-field" @required(! $isEdit) data-file-preview-input="{{ $previewKey }}" data-watermark-preview-url="{{ route('admin.learning.modules.preview-watermark') }}">
         @if($isEdit && filled($module->original_file_name))
             <p class="mt-1 text-xs text-slate-500">Current file: {{ $module->original_file_name }}. Leave empty to keep it.</p>
         @endif

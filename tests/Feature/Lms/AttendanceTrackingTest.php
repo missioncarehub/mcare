@@ -27,7 +27,8 @@ class AttendanceTrackingTest extends TestCase
             ->assertSee('Maria Santos')
             ->assertSee('Juan Dela Cruz')
             ->assertSee('Daily Sheet')
-            ->assertSee('Mark All as Present');
+            ->assertSee('Mark All as Present')
+            ->assertDontSee('value="present" class="status-radio text-emerald-600 focus:ring-emerald-500" checked', false);
 
         $response = $this->actingAs($trainer)
             ->post(route('trainer.attendance.store'), [
@@ -75,6 +76,25 @@ class AttendanceTrackingTest extends TestCase
             'enrollment_application_id' => $traineeB->id,
             'status' => 'late',
             'notes' => '15 mins late due to traffic',
+        ]);
+
+        ['application' => $unmarked] = $this->lmsTrainee($batch, ['first_name' => 'Unmarked', 'last_name' => 'Learner']);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.attendance.store'), [
+                'batch_id' => $batch->id,
+                'date' => now()->addDay()->subDay()->toDateString(),
+                'records' => [
+                    $unmarked->id => [
+                        'status' => '',
+                        'notes' => '',
+                    ],
+                ],
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseMissing('trainee_attendances', [
+            'enrollment_application_id' => $unmarked->id,
         ]);
     }
 

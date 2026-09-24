@@ -56,20 +56,44 @@ class LearningPdfWatermarkTest extends TestCase
 
         $this->assertStringContainsString('%PDF', $viewed);
         $this->assertTrue($this->pdfContains($viewed, '/Subtype /Image'));
+        $this->assertTrue($this->pdfContains($viewed, (string) $application->enrollment_number));
+        $this->assertTrue($this->pdfContains($viewed, 'Maria Santos'));
         $this->assertFalse($this->pdfContains($viewed, 'maria.santos@gmail.com'));
 
         $this->actingAs($trainee)
             ->get(route('trainee.modules.show', $module))
             ->assertOk()
-            ->assertSee('pdf-page-watermark', false);
+            ->assertDontSee('pdf-page-watermark', false);
 
         $download = $this->actingAs($trainee)->get(route('trainee.modules.download', $module));
         $download->assertOk();
         $downloaded = $this->responseBody($download);
 
-        $this->assertTrue($this->pdfContains($downloaded, '/Subtype /Image'));
+        $this->assertTrue($this->pdfContains($downloaded, (string) $application->enrollment_number));
+        $this->assertTrue($this->pdfContains($downloaded, 'Maria Santos'));
         $this->assertFalse($this->pdfContains($downloaded, 'maria.santos@gmail.com'));
         $this->assertFalse($this->pdfContains($downloaded, 'MCARE Mission Care Training Center'));
+    }
+
+    public function test_primary_lesson_preview_embeds_the_watermark_with_fpdi(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $admin = $this->lmsUser('admin');
+
+        foreach ([
+            route('trainer.modules.preview-watermark') => $trainer,
+            route('admin.learning.modules.preview-watermark') => $admin,
+        ] as $url => $user) {
+            $preview = $this->actingAs($user)->post($url, [
+                'module_file' => $this->pdfUpload('primary-lesson.pdf'),
+            ]);
+
+            $preview->assertOk();
+            $body = $this->responseBody($preview);
+            $this->assertStringContainsString('%PDF', $body);
+            $this->assertTrue($this->pdfContains($body, '/Subtype /Image'));
+            $this->assertTrue($this->pdfContains($body, 'Enrollment number'));
+        }
     }
 
     public function test_large_lesson_pdfs_are_served_without_live_stamping(): void

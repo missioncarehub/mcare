@@ -28,6 +28,8 @@ class EnrollmentApplication extends Model
 
     public const LEARNING_GRADUATED = 'graduated';
 
+    public const LEARNING_PENDING_GRADUATE = 'pending_graduate';
+
     public const LEARNING_WITHDRAWN = 'withdrawn';
 
     public const PAYMENT_NOT_SELECTED = 'not_selected';
@@ -263,6 +265,7 @@ class EnrollmentApplication extends Model
         return [
             self::LEARNING_ACTIVE => 'Active',
             self::LEARNING_PAUSED => 'Paused',
+            self::LEARNING_PENDING_GRADUATE => 'Pending Graduate',
             self::LEARNING_GRADUATED => 'Graduated',
             self::LEARNING_WITHDRAWN => 'Withdrawn',
         ];
