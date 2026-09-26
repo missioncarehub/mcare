@@ -117,10 +117,10 @@
                         </form>
                     @endif
                 @endif
-                <form method="POST" action="{{ route('admin.learning.trainees.destroy', $trainee) }}" data-confirm-title="{{ $trainee->accountDeletionTitle() }}" data-confirm="{{ $trainee->accountDeletionMessage() }}" @if($trainee->accountDeletionDetail()) data-confirm-detail="{{ $trainee->accountDeletionDetail() }}" @endif data-confirm-action="{{ $trainee->accountDeletionAction() }}">
+                <form method="POST" action="{{ route('admin.learning.trainees.destroy', $trainee) }}" data-confirm-title="{{ $trainee->archiveTitle() }}" data-confirm="{{ $trainee->archiveMessage() }}" data-confirm-action="Archive trainee">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="min-h-10 rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-800 hover:bg-red-100">{{ $trainee->accountDeletionAction() }}</button>
+                    <button type="submit" class="min-h-10 rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-800 hover:bg-red-100">Archive trainee</button>
                 </form>
             </div>
             <form method="POST" action="{{ route('admin.learning.trainees.status', $trainee) }}" class="mt-3 grid max-w-3xl gap-2 sm:grid-cols-[12rem_minmax(14rem,1fr)_auto]">

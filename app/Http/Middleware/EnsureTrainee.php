@@ -23,6 +23,10 @@ class EnsureTrainee
             abort(403);
         }
 
+        if ($user?->enrollmentApplication?->archived_at) {
+            abort(403, 'This trainee record is archived.');
+        }
+
         if ($isCurrentTrainee && $user) {
             $cacheKey = 'announcement-catchup:v2:'.$user->id;
             if (! Cache::has($cacheKey)) {

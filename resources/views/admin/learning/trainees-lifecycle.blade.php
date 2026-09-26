@@ -100,6 +100,7 @@
         <nav class="lms-context-tabs" aria-label="Trainee roster sections">
             <a href="{{ route('admin.learning.trainees', $rosterBaseQuery + ['tab' => 'current']) }}" class="{{ $isGraduatedTab ? '' : 'is-active' }}" @unless($isGraduatedTab) aria-current="page" @endunless>Current trainees ({{ $currentCount }})</a>
             <a href="{{ route('admin.learning.trainees', $rosterBaseQuery + ['tab' => 'graduated']) }}" class="{{ $isGraduatedTab ? 'is-active' : '' }}" @if($isGraduatedTab) aria-current="page" @endif>Graduates ({{ $graduatedCount }})</a>
+            <a href="{{ route('admin.learning.trainees.archive') }}">Archive</a>
         </nav>
 
         <div class="dashboard-table-wrap overflow-x-auto" data-trainee-roster>
@@ -155,10 +156,10 @@
                             </td>
                             <td>
                                 <div class="flex flex-wrap items-center justify-end gap-2">
-                                    <form method="POST" action="{{ route('admin.learning.trainees.destroy', $trainee) }}" class="inline-flex" data-confirm-title="{{ $trainee->accountDeletionTitle() }}" data-confirm="{{ $trainee->accountDeletionMessage() }}" @if($trainee->accountDeletionDetail()) data-confirm-detail="{{ $trainee->accountDeletionDetail() }}" @endif data-confirm-action="{{ $trainee->accountDeletionAction() }}">
+                                    <form method="POST" action="{{ route('admin.learning.trainees.destroy', $trainee) }}" class="inline-flex" data-confirm-title="{{ $trainee->archiveTitle() }}" data-confirm="{{ $trainee->archiveMessage() }}" data-confirm-action="Archive trainee">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold uppercase tracking-wide text-red-700 hover:bg-red-50" aria-label="{{ $trainee->accountDeletionAction() }} {{ $trainee->first_name }} {{ $trainee->last_name }}">
+                                        <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold uppercase tracking-wide text-red-700 hover:bg-red-50" aria-label="Archive {{ $trainee->first_name }} {{ $trainee->last_name }}">
                                             <x-dashboard-icon name="trash-2" class="h-4 w-4" />
                                             <span>Delete</span>
                                         </button>

@@ -36,6 +36,7 @@
             : route('trainee.dashboard');
         $traineePrimaryNav = $isGraduate ? [
             ['label' => 'Career Hub', 'short' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('trainee.career-hub'), 'active' => request()->routeIs('trainee.career-hub')],
+            ['label' => 'Achievements', 'short' => 'Achievements', 'icon' => 'fa-award', 'href' => route('trainee.achievements'), 'active' => request()->routeIs('trainee.achievements')],
             ['label' => 'Grades', 'short' => 'Grades', 'icon' => 'fa-chart-column', 'href' => route('trainee.grades'), 'active' => request()->routeIs('trainee.grades')],
             ['label' => 'Calendar', 'short' => 'Calendar', 'icon' => 'fa-calendar-days', 'href' => route('trainee.schedule'), 'active' => request()->routeIs('trainee.schedule')],
         ] : ($isApprovedTrainee ? [
@@ -56,7 +57,7 @@
         ];
         $traineeAllNav = collect(array_merge($traineePrimaryNav, $traineeSecondaryNav))->keyBy('label');
         $traineeMobileLabels = $isGraduate
-            ? ['Home', 'Career Hub', 'Grades', 'Documents']
+            ? ['Home', 'Career Hub', 'Achievements', 'Grades']
             : ($isApprovedTrainee ? ['Home', 'Stream', 'Classwork'] : ['Home', 'Payments', 'Documents']);
         $traineeMobilePrimary = collect($traineeMobileLabels)
             ->map(fn (string $label) => $traineeAllNav->get($label))

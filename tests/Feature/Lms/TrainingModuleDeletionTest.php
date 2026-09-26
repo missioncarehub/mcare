@@ -279,7 +279,7 @@ class TrainingModuleDeletionTest extends TestCase
         $this->assertDatabaseMissing('training_modules', ['id' => $module->id]);
     }
 
-    public function test_active_cotc_and_tor_records_block_deletion_without_deleting_or_mixing_them(): void
+    public function test_connected_trainees_and_official_records_do_not_block_admin_deletion(): void
     {
         Storage::fake('local');
         $admin = $this->lmsUser('admin');
@@ -323,22 +323,19 @@ class TrainingModuleDeletionTest extends TestCase
         $tor = $this->officialDocument($application, OfficialDocument::TYPE_TOR, OfficialDocument::STATUS_GENERATED, 'TOR');
         $cotc = $this->officialDocument($application, OfficialDocument::TYPE_COTC, OfficialDocument::STATUS_RELEASED, 'COTC');
 
-        $response = $this->actingAs($admin)
+        $this->actingAs($admin)
             ->delete(route('admin.learning.modules.destroy', $module), ['confirmation' => 'DELETE'])
             ->assertRedirect(route('admin.learning.modules'))
-            ->assertSessionHasErrors(['module']);
+            ->assertSessionHas('saved');
 
-        $message = $response->getSession()->get('errors')->first('module');
-        $this->assertStringContainsString('locked competency record', $message);
-        $this->assertStringContainsString('TOR generated', $message);
-        $this->assertStringContainsString('COTC released', $message);
-        $this->assertDatabaseHas('training_modules', ['id' => $module->id]);
-        $this->assertDatabaseHas('module_progress', ['id' => $progress->id]);
-        $this->assertDatabaseHas('trainee_outcome_results', ['id' => $result->id, 'training_module_id' => $module->id]);
+        $this->assertDatabaseMissing('training_modules', ['id' => $module->id]);
+        $this->assertDatabaseMissing('module_progress', ['id' => $progress->id]);
+        $this->assertDatabaseMissing('trainee_outcome_results', ['id' => $result->id]);
+        $this->assertDatabaseHas('trainee_competency_records', ['id' => $record->id]);
         $this->assertDatabaseHas('official_documents', ['id' => $tor->id, 'type' => OfficialDocument::TYPE_TOR]);
         $this->assertDatabaseHas('official_documents', ['id' => $cotc->id, 'type' => OfficialDocument::TYPE_COTC]);
-        Storage::disk('local')->assertExists($module->file_path);
-        $this->assertNotNull($submodule->fresh());
+        Storage::disk('local')->assertMissing($module->file_path);
+        $this->assertNull($submodule->fresh());
     }
 
     public function test_a_supplemental_module_is_not_blocked_by_an_unrelated_official_document(): void

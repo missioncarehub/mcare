@@ -96,8 +96,9 @@ class HistoricalAlumniClaimController extends Controller
         $graduates = EnrollmentApplication::query()
             ->with(['user.alumniProfile', 'batch'])
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
-            ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED)
-            ->where(function ($graduates): void {
+                ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED)
+                ->whereNull('archived_at')
+                ->where(function ($graduates): void {
                 $graduates->where('is_historical_record', false)->orWhereNull('is_historical_record');
             })
             ->orderBy('last_name')

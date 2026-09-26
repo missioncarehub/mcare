@@ -34,6 +34,19 @@ class AlumniCareerHubController extends Controller
         ]);
     }
 
+    public function achievements(Request $request): View
+    {
+        $achievements = CareerInquiry::query()
+            ->with('opportunity')
+            ->where('user_id', $request->user()->id)
+            ->latest()
+            ->paginate(12);
+
+        return view('trainee.achievements', [
+            'achievements' => $achievements,
+        ]);
+    }
+
     public function updateAvailability(Request $request): RedirectResponse
     {
         $validated = $request->validate([

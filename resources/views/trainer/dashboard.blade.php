@@ -140,7 +140,7 @@
                                     <div class="min-w-0">
                                         <p class="truncate font-bold text-stone-950">{{ $learner['name'] }}</p>
                                         @if($learner['is_graduate'] ?? false)
-                                            <span class="mt-1 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">Graduated in this batch</span>
+                                            <span class="mt-1 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200">{{ $learner['graduate_label'] ?? 'Verified graduate' }}</span>
                                         @endif
                                         <p class="mt-1 text-sm text-stone-600">{{ $learner['action'] }}</p>
                                     </div>

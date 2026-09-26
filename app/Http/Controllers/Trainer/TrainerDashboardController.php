@@ -53,7 +53,12 @@ class TrainerDashboardController extends Controller
                 'schedule' => $application->batch?->scheduleLabelFor($application->schedule_preference)
                     ?? $application->schedule_preference,
                 'is_graduate' => $isGraduate,
-                'status' => $isGraduate ? 'Graduated in this batch' : 'Assigned',
+                'graduate_label' => $isGraduate
+                    ? ($application->batch
+                        ? 'Graduated in '.trim($application->batch->name.' '.$application->batch->year)
+                        : 'Verified graduate')
+                    : null,
+                'status' => $isGraduate ? 'Graduated' : 'Assigned',
             ];
         });
 

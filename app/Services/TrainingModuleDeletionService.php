@@ -96,19 +96,6 @@ class TrainingModuleDeletionService
             }
 
             $snapshot = $this->snapshot($lockedModule, true);
-            $blockers = $this->officialRecordBlockers(
-                $snapshot['unit'],
-                $snapshot['application_ids'],
-                true,
-            );
-
-            if ($blockers !== []) {
-                throw ValidationException::withMessages([
-                    'module' => 'Permanent deletion is blocked because '.$this->joinBlockers($blockers)
-                        .' Revoke the affected official record through the existing workflow before deleting this module.',
-                ]);
-            }
-
             $paths = $snapshot['file_paths']->all();
 
             $this->deleteRows('trainee_attendances', $snapshot['attendance']->pluck('id'));
@@ -386,15 +373,6 @@ class TrainingModuleDeletionService
         }
 
         return $blockers;
-    }
-
-    private function joinBlockers(array $blockers): string
-    {
-        return match (count($blockers)) {
-            1 => $blockers[0].'.',
-            2 => $blockers[0].' and '.$blockers[1].'.',
-            default => implode(', ', array_slice($blockers, 0, -1)).', and '.end($blockers).'.',
-        };
     }
 
     private function relatedCommentRows(

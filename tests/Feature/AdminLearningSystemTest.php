@@ -248,13 +248,31 @@ class AdminLearningSystemTest extends TestCase
             ->assertRedirect(route('admin.learning.trainees', ['tab' => 'current']))
             ->assertSessionHas('saved');
 
-        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
-        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
-        $this->assertFalse(Storage::disk('local')->exists($photoPath));
-        $this->assertTrue(AdminActivityLog::query()
-            ->where('action', 'admin.account.deleted')
-            ->where('subject_id', $trainee->id)
-            ->exists());
+        $this->assertDatabaseHas('users', ['id' => $trainee->id]);
+        $this->assertNotNull($application->fresh()->archived_at);
+        $this->assertTrue(Storage::disk('local')->exists($photoPath));
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees'))
+            ->assertOk()
+            ->assertDontSee('lifecycle.trainee@gmail.com');
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees.archive'))
+            ->assertOk()
+            ->assertSee('lifecycle.trainee@gmail.com')
+            ->assertSee('Restore');
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.trainees.restore', $application))
+            ->assertRedirect(route('admin.learning.trainees.archive'))
+            ->assertSessionHas('saved');
+
+        $this->assertNull($application->fresh()->archived_at);
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees'))
+            ->assertOk()
+            ->assertSee('lifecycle.trainee@gmail.com');
     }
 
     public function test_non_admin_cannot_delete_a_trainee_from_the_roster(): void
@@ -299,10 +317,8 @@ class AdminLearningSystemTest extends TestCase
             ->get(route('admin.learning.trainees', ['tab' => 'graduated']))
             ->assertOk()
             ->assertSee($trainee->email)
-            ->assertSee('Delete verified alumni record?')
-            ->assertSee('verified historical alumni claim')
-            ->assertSee('uploaded certificate or TOR evidence')
-            ->assertSee('Delete alumni record');
+            ->assertSee('Archive this trainee?')
+            ->assertSee('trainee archive');
 
         $this->actingAs($admin)
             ->from(route('admin.learning.trainees', ['tab' => 'graduated']))
@@ -310,8 +326,8 @@ class AdminLearningSystemTest extends TestCase
             ->assertRedirect(route('admin.learning.trainees', ['tab' => 'graduated']))
             ->assertSessionHas('saved');
 
-        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
-        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertDatabaseHas('users', ['id' => $trainee->id]);
+        $this->assertNotNull($application->fresh()->archived_at);
     }
 
     public function test_graduation_unlocks_career_hub_on_the_same_trainee_account_and_a_correction_locks_it_again(): void

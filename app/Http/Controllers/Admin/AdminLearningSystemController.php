@@ -18,7 +18,6 @@ use App\Models\User;
 use App\Notifications\LmsQuizPublished;
 use App\Notifications\TrainerModuleAssignedByAdmin;
 use App\Rules\TrainingModuleFileType;
-use App\Services\AccountDeletionService;
 use App\Services\CompetencyCatalogService;
 use App\Services\CompletionEligibilityService;
 use App\Services\LearningPdfWatermark;
@@ -64,6 +63,7 @@ class AdminLearningSystemController extends Controller
             'learningStatuses' => EnrollmentApplication::learningStatuses(),
             'statusCounts' => EnrollmentApplication::query()
                 ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                ->whereNull('archived_at')
                 ->selectRaw('learning_status, count(*) as aggregate')
                 ->groupBy('learning_status')
                 ->pluck('aggregate', 'learning_status'),
@@ -77,7 +77,8 @@ class AdminLearningSystemController extends Controller
     public function showTrainee(EnrollmentApplication $enrollmentApplication): View
     {
         abort_unless(
-            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED
+            && $enrollmentApplication->archived_at === null,
             404
         );
 
@@ -255,7 +256,6 @@ class AdminLearningSystemController extends Controller
     public function destroyTrainee(
         Request $request,
         EnrollmentApplication $enrollmentApplication,
-        AccountDeletionService $accounts,
     ): RedirectResponse {
         abort_unless(
             $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED,
@@ -263,36 +263,69 @@ class AdminLearningSystemController extends Controller
             'Only approved trainees can be deleted from trainee records.'
         );
 
+        abort_if($enrollmentApplication->archived_at !== null, 422, 'This trainee is already archived.');
+
         $traineeName = trim($enrollmentApplication->first_name.' '.$enrollmentApplication->last_name);
-        $wasHistoricalAlumni = $enrollmentApplication->is_historical_record;
-        $user = $enrollmentApplication->user;
+        $wasGraduate = $enrollmentApplication->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
 
-        if (! $user) {
-            return redirect()
-                ->route('admin.learning.trainees')
-                ->withErrors([
-                    'trainee' => "{$traineeName} has no linked account and cannot be deleted from trainee records.",
-                ]);
-        }
+        $enrollmentApplication->forceFill([
+            'archived_at' => now(),
+            'archived_by_id' => $request->user()->id,
+        ])->save();
 
-        try {
-            $deleted = $accounts->delete($user, $request->user());
-        } catch (ValidationException $exception) {
-            return redirect()
-                ->route('admin.learning.trainees')
-                ->withErrors($exception->errors());
-        }
+        AdminActivityLog::record($request->user(), 'trainee.archived', $enrollmentApplication, [
+            'email' => $enrollmentApplication->email,
+            'learning_status' => $enrollmentApplication->learning_status,
+        ]);
 
         return redirect()
             ->route('admin.learning.trainees', [
-                'tab' => $wasHistoricalAlumni ? 'graduated' : 'current',
+                'tab' => $wasGraduate ? 'graduated' : 'current',
             ])
-            ->with(
-                'saved',
-                $wasHistoricalAlumni
-                    ? "Verified alumni record for {$traineeName} ({$deleted['email']}) was permanently removed."
-                    : "Trainee {$traineeName} ({$deleted['email']}) and related records were permanently removed."
-            );
+            ->with('saved', "{$traineeName} was moved to the trainee archive.");
+    }
+
+    public function archivedTrainees(): View
+    {
+        $trainees = EnrollmentApplication::query()
+            ->with(['batch', 'user', 'archivedBy'])
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNotNull('archived_at')
+            ->latest('archived_at')
+            ->paginate(20);
+
+        return view('admin.learning.trainees-archive', [
+            'trainees' => $trainees,
+        ]);
+    }
+
+    public function restoreTrainee(Request $request, EnrollmentApplication $enrollmentApplication): RedirectResponse
+    {
+        abort_unless(
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED
+            && $enrollmentApplication->archived_at !== null,
+            422,
+            'Only archived trainees can be restored.'
+        );
+
+        $enrollmentApplication->forceFill([
+            'archived_at' => null,
+            'archived_by_id' => null,
+        ])->save();
+
+        AdminActivityLog::record($request->user(), 'trainee.restored', $enrollmentApplication, [
+            'email' => $enrollmentApplication->email,
+            'learning_status' => $enrollmentApplication->learning_status,
+        ]);
+
+        $traineeName = trim($enrollmentApplication->first_name.' '.$enrollmentApplication->last_name);
+        $tab = $enrollmentApplication->learning_status === EnrollmentApplication::LEARNING_GRADUATED
+            ? 'graduated'
+            : 'current';
+
+        return redirect()
+            ->route('admin.learning.trainees.archive')
+            ->with('saved', "{$traineeName} was restored to the {$tab} roster.");
     }
 
     public function modules(Request $request, TrainingModuleDeletionService $deletion, CompetencyCatalogService $catalog): View
@@ -1237,6 +1270,7 @@ class AdminLearningSystemController extends Controller
     {
         $query = EnrollmentApplication::query()
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNull('archived_at')
             ->latest('reviewed_at');
 
         if ($batchId = $filters['batch_id'] ?? null) {

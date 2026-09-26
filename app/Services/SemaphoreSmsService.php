@@ -12,6 +12,8 @@ class SemaphoreSmsService
 {
     public const ENDPOINT = 'https://api.semaphore.co/api/v4/messages';
 
+    public const PRIORITY_ENDPOINT = 'https://api.semaphore.co/api/v4/priority';
+
     public function configured(): bool
     {
         return filled(config('services.semaphore.key'));
@@ -21,7 +23,7 @@ class SemaphoreSmsService
      * @param  list<string>  $numbers
      * @return array{sent: bool, status: ?int, error: ?string}
      */
-    public function send(array $numbers, string $message, ?string $scheduledAt = null): array
+    public function send(array $numbers, string $message, ?string $scheduledAt = null, bool $priority = false): array
     {
         $recipients = array_values(array_unique(array_filter($numbers)));
 
@@ -53,7 +55,7 @@ class SemaphoreSmsService
                 ->acceptJson()
                 ->connectTimeout(5)
                 ->timeout(20)
-                ->post(self::ENDPOINT, $payload);
+                ->post($priority && ! filled($scheduledAt) ? self::PRIORITY_ENDPOINT : self::ENDPOINT, $payload);
         } catch (ConnectionException $exception) {
             Log::warning('Semaphore SMS could not be reached.', [
                 'error' => $exception->getMessage(),

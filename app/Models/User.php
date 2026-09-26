@@ -258,6 +258,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
             : $this->enrollmentApplication()->first();
 
         return $application?->status === EnrollmentApplication::STATUS_APPROVED
+            && $application->archived_at === null
             && $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED;
     }
 
@@ -269,6 +270,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
             ? $this->enrollmentApplication
             : $this->enrollmentApplication()->first();
 
-        return $application?->status === EnrollmentApplication::STATUS_APPROVED;
+        return $application?->status === EnrollmentApplication::STATUS_APPROVED
+            && $application->archived_at === null;
     }
 }

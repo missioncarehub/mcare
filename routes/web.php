@@ -463,6 +463,12 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/trainees/export', [AdminLearningSystemController::class, 'exportTrainees'])
                     ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.trainees.export');
+                Route::get('/learning/trainees/archive', [AdminLearningSystemController::class, 'archivedTrainees'])
+                    ->middleware('permission:trainees.manage')
+                    ->name('learning.trainees.archive');
+                Route::patch('/learning/trainees/{enrollmentApplication}/restore', [AdminLearningSystemController::class, 'restoreTrainee'])
+                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.trainees.restore');
                 Route::get('/learning/trainees/{enrollmentApplication}', [AdminLearningSystemController::class, 'showTrainee'])
                     ->middleware('permission:trainees.manage')
                     ->name('learning.trainees.show');
@@ -870,6 +876,8 @@ Route::middleware('throttle:global-web')->group(function () {
                         Route::post('/career-hub/{careerOpportunity}/contact', [AlumniCareerHubController::class, 'contact'])
                             ->middleware('throttle:sensitive-mutation')
                             ->name('career-hub.contact');
+                        Route::get('/achievements', [AlumniCareerHubController::class, 'achievements'])
+                            ->name('achievements');
                     });
                 });
             });

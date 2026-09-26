@@ -441,11 +441,10 @@
                     </dl>
                 </div>
 
-                @if($impact['official_record_blocked'] ?? false)
-                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{{ $impact['official_record_reason'] }} Deletion is unavailable until the affected official record is handled through the existing revoke workflow.</p>
-                @else
-                    <p class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">This action cannot be undone. Existing official documents are never removed by this action.</p>
+                @if(($impact['affected_trainees'] ?? 0) > 0)
+                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{{ $impact['affected_trainees'] }} connected trainee(s) will lose this module’s progress, grades, and quiz history. Existing official COTC and TOR documents stay on file.</p>
                 @endif
+                <p class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">This action cannot be undone. Existing official documents are never removed by this action.</p>
 
                 <form method="POST" action="{{ route('admin.learning.modules.destroy', $module) }}" class="space-y-4" data-dashboard-dialog-form data-submit-label="Deleting module...">
                     @csrf
@@ -456,7 +455,7 @@
                     </div>
                     <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                         <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                        <button type="submit" data-action-button class="min-h-10 rounded-lg border border-red-700 bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50" @disabled($impact['official_record_blocked'] ?? false)>Permanently delete module</button>
+                        <button type="submit" data-action-button class="min-h-10 rounded-lg border border-red-700 bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-800">Permanently delete module</button>
                     </div>
                 </form>
             </div>

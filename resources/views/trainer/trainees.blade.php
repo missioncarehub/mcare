@@ -80,7 +80,6 @@
                         <td>
                             @if($isGraduated)
                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-200">Graduated</span>
-                                <x-graduate-batch-badge :application="$trainee" class="mt-2" />
                             @else
                                 <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">In progress</span>
                             @endif

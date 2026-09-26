@@ -107,6 +107,8 @@ class EnrollmentApplication extends Model
         'learning_status_notes',
         'learning_status_changed_at',
         'learning_status_changed_by_id',
+        'archived_at',
+        'archived_by_id',
         'payment_method',
         'total_program_fee',
         'downpayment_amount',
@@ -218,6 +220,7 @@ class EnrollmentApplication extends Model
             'reviewed_at' => 'datetime',
             'learning_started_at' => 'datetime',
             'learning_status_changed_at' => 'datetime',
+            'archived_at' => 'datetime',
             'year_graduated' => 'integer',
         ];
     }
@@ -277,6 +280,11 @@ class EnrollmentApplication extends Model
             ?? str($this->learning_status)->headline()->toString();
     }
 
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
+    }
+
     public function accountDeletionTitle(): string
     {
         return $this->is_historical_record
@@ -307,6 +315,18 @@ class EnrollmentApplication extends Model
     public function accountDeletionAction(): string
     {
         return $this->is_historical_record ? 'Delete alumni record' : 'Delete trainee';
+    }
+
+    public function archiveTitle(): string
+    {
+        return 'Archive this trainee?';
+    }
+
+    public function archiveMessage(): string
+    {
+        $name = trim($this->first_name.' '.$this->last_name) ?: 'This trainee';
+
+        return "{$name} will leave the roster and move to the trainee archive. Their account and records stay saved, and you can restore them later.";
     }
 
     public static function paymentStatuses(): array
@@ -483,6 +503,11 @@ class EnrollmentApplication extends Model
     public function learningStatusChangedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'learning_status_changed_by_id');
+    }
+
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by_id');
     }
 
     public function batch(): BelongsTo

@@ -41,7 +41,7 @@
         ];
 
         $capstoneNav = [
-            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees', 'admin.learning.trainees.show')],
+            ['label' => 'Trainees', 'icon' => 'fa-users', 'href' => route('admin.learning.trainees'), 'active' => request()->routeIs('admin.learning.trainees', 'admin.learning.trainees.show', 'admin.learning.trainees.archive')],
             ['label' => 'Attendance', 'icon' => 'fa-clipboard-user', 'href' => route('admin.learning.attendance'), 'active' => request()->routeIs('admin.learning.attendance*')],
             ['label' => 'LMS Modules', 'icon' => 'fa-book-open', 'href' => route('admin.learning.modules'), 'active' => request()->routeIs('admin.learning.modules')],
             ['label' => 'Training Records', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates', 'admin.learning.documents.*', 'admin.learning.batch-exports.*')],

@@ -64,7 +64,12 @@ class CareerGraduateNotifier
                 ? $opportunity->sms_scheduled_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s')
                 : null;
 
-            $result = $this->sms->send($numbers, $opportunity->graduateSmsMessage(), $scheduledAt);
+            $result = $this->sms->send(
+                $numbers,
+                $opportunity->graduateSmsMessage(),
+                $scheduledAt,
+                $opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE,
+            );
             $delivered = $result['sent'];
             $error = $result['error'] ?? null;
         }
@@ -118,6 +123,7 @@ class CareerGraduateNotifier
                     ->orWhereHas('enrollmentApplication', function ($enrollment) {
                         $enrollment
                             ->where('status', EnrollmentApplication::STATUS_APPROVED)
+                            ->whereNull('archived_at')
                             ->where('learning_status', EnrollmentApplication::LEARNING_GRADUATED);
                     });
             })

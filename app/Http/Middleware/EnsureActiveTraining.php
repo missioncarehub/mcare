@@ -22,6 +22,7 @@ class EnsureActiveTraining
         $hasApprovedEnrollment = EnrollmentApplication::query()
             ->where('user_id', $user->id)
             ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNull('archived_at')
             ->exists();
 
         if (! $hasApprovedEnrollment) {

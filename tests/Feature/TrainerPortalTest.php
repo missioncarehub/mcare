@@ -75,13 +75,13 @@ class TrainerPortalTest extends TestCase
             ->get(route('trainer.dashboard'))
             ->assertOk()
             ->assertSee('Ana')
-            ->assertSee('Graduated in this batch')
+            ->assertSee('Graduated in Batch 1 2026')
             ->assertSee('MWF | 8:00 AM - 12:00 PM');
 
         $this->actingAs($trainer)
             ->get(route('trainer.trainees'))
             ->assertOk()
-            ->assertSee('Graduated in this batch');
+            ->assertSee('Graduated in Batch 1 2026');
     }
 
     public function test_trainer_can_upload_private_module(): void

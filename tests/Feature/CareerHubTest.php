@@ -134,7 +134,7 @@ class CareerHubTest extends TestCase
                 $graduate->fresh()->contact_number
             );
 
-            return $request->url() === SemaphoreSmsService::ENDPOINT
+            return $request->url() === SemaphoreSmsService::PRIORITY_ENDPOINT
                 && ! str_contains((string) $request['number'], (string) $juniorNumber)
                 && $request['apikey'] === 'testing-semaphore-key'
                 && $request['number'] === $number
@@ -448,6 +448,13 @@ class CareerHubTest extends TestCase
             'admin_notes' => 'Called the graduate to confirm availability.',
             'reviewed_by_id' => $admin->id,
         ]);
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.achievements'))
+            ->assertOk()
+            ->assertSee('Achievements history')
+            ->assertSee('Live-in caregiver, Pili')
+            ->assertSee('₱18,000 / month');
 
         $this->actingAs($graduate)
             ->get(route('alumni.dashboard'))
