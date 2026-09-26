@@ -92,6 +92,10 @@ class TraineeClassworkSequence
 
     public function blockingPredecessor(EnrollmentApplication $application, TrainingModule $module): ?TrainingModule
     {
+        if (! $module->locksUntilPreviousFinished()) {
+            return null;
+        }
+
         foreach ($this->stateFor($application)['ordered'] as $candidate) {
             if ((int) $candidate->id === (int) $module->id) {
                 return null;
@@ -176,7 +180,9 @@ class TraineeClassworkSequence
                 continue;
             }
 
-            $shouldAccess = $progress->isTrainerValidated() || $blocking === null;
+            $shouldAccess = $progress->isTrainerValidated()
+                || $blocking === null
+                || ! $module->locksUntilPreviousFinished();
 
             if ($shouldAccess) {
                 $wasInaccessible = $progress->status === ModuleProgress::STATUS_LOCKED
@@ -218,6 +224,27 @@ class TraineeClassworkSequence
         $this->forget($application);
 
         return $newlyUnlocked;
+    }
+
+    public function syncAssigned(TrainingModule $module): void
+    {
+        if (! $module->training_batch_id) {
+            return;
+        }
+
+        EnrollmentApplication::query()
+            ->where('training_batch_id', $module->training_batch_id)
+            ->where('status', EnrollmentApplication::STATUS_APPROVED)
+            ->whereNull('archived_at')
+            ->orderBy('id')
+            ->each(function (EnrollmentApplication $application) use ($module): void {
+                if ($module->target_enrollment_application_id
+                    && (int) $module->target_enrollment_application_id !== (int) $application->id) {
+                    return;
+                }
+
+                $this->syncLocks($application);
+            });
     }
 
     public function forget(?EnrollmentApplication $application = null): void

@@ -112,6 +112,7 @@ class AdminLearningSystemTest extends TestCase
             ->get(route('admin.learning.modules'))
             ->assertOk()
             ->assertSee('Add a learning module')
+            ->assertSee('Lock this module until earlier modules are finished')
             ->assertSee('lms-composer-form', false)
             ->assertSee('PDF or image')
             ->assertSee('.pdf,.jpg,.jpeg,.png,.webp,.gif', false)

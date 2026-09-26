@@ -8,6 +8,7 @@
     $currentCategory = old('competency_category', $isEdit ? ($module->competency_category ?: 'custom') : 'custom');
     $currentCompletion = old('completion_mode', $isEdit ? $module->completion_mode : 'assessed');
     $isPublished = filter_var(old('is_published', $isEdit ? $module->is_published : true), FILTER_VALIDATE_BOOLEAN);
+    $lockUntilPrevious = filter_var(old('lock_until_previous', $isEdit ? $module->locksUntilPreviousFinished() : true), FILTER_VALIDATE_BOOLEAN);
     $submoduleTitles = old(
         'submodule_titles',
         $isEdit ? ($module->submodules->pluck('title')->filter()->values()->all() ?: ['']) : ['']
@@ -166,6 +167,20 @@
         <input type="hidden" name="is_published" value="0">
         <input name="is_published" type="checkbox" value="1" @checked($isPublished)> Publish as the current active batch module
     </label>
+
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 md:col-span-2 xl:col-span-3">
+        <label class="flex items-start gap-3 text-sm font-semibold text-slate-800">
+            <input type="hidden" name="lock_until_previous" value="0">
+            <input name="lock_until_previous" type="checkbox" value="1" class="mt-1" @checked($lockUntilPrevious)>
+            <span>
+                Lock this module until earlier modules are finished
+                <span class="mt-1 block text-xs font-normal leading-5 text-slate-600">
+                    Checked: trainees cannot open this module until they finish the modules before it. The first module in the batch stays open on its own.
+                    Unchecked: trainees can open this module even when an earlier module is still unfinished. Later modules stay locked when their own lock is checked.
+                </span>
+            </span>
+        </label>
+    </div>
 
     <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 md:col-span-2 md:flex-row md:justify-end xl:col-span-3">
         <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>

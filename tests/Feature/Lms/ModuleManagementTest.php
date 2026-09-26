@@ -653,4 +653,71 @@ class ModuleManagementTest extends TestCase
         $this->assertSame(99, $progress->progress_percent);
         $this->assertNull($progress->completed_at);
     }
+
+    public function test_a_module_can_open_while_an_earlier_module_is_still_unfinished(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['user' => $trainee, 'application' => $application] = $this->lmsTrainee($batch);
+        $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323301',
+            'title' => 'First required module',
+        ]);
+        $next = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323302',
+            'title' => 'Optional early module',
+        ]);
+        $later = $this->lmsModule($trainer, $batch, [
+            'module_code' => 'HCS323303',
+            'title' => 'Still waits for earlier modules',
+        ]);
+
+        $lockedNext = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $next->id)
+            ->firstOrFail();
+        $this->assertSame(ModuleProgress::STATUS_LOCKED, $lockedNext->status);
+
+        $this->actingAs($trainer)
+            ->patch(route('trainer.modules.update', $next), [
+                'audience_type' => 'batch',
+                'training_batch_id' => $batch->id,
+                'title' => 'Optional early module',
+                'description' => 'Opens without waiting for the module before it.',
+                'is_published' => '1',
+                'lock_until_previous' => '0',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertFalse($next->fresh()->lock_until_previous);
+        $this->assertTrue($later->fresh()->locksUntilPreviousFinished());
+
+        $opened = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $next->id)
+            ->firstOrFail();
+        $stillLocked = ModuleProgress::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('training_module_id', $later->id)
+            ->firstOrFail();
+
+        $this->assertNotSame(ModuleProgress::STATUS_LOCKED, $opened->status);
+        $this->assertNotNull($opened->unlocked_at);
+        $this->assertSame(ModuleProgress::STATUS_LOCKED, $stillLocked->status);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $next))
+            ->assertOk();
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.modules.show', $later))
+            ->assertRedirect(route('trainee.modules.index'));
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.resources'))
+            ->assertOk()
+            ->assertSee('Lock this module until earlier modules are finished')
+            ->assertSee('Opens even if an earlier module is unfinished');
+    }
 }

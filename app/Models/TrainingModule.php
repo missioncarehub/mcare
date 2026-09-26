@@ -59,6 +59,7 @@ class TrainingModule extends Model
         'file_size',
         'supplementary_files',
         'is_published',
+        'lock_until_previous',
         'delivery_status',
         'published_at',
         'activated_at',
@@ -72,6 +73,7 @@ class TrainingModule extends Model
     {
         return [
             'is_published' => 'boolean',
+            'lock_until_previous' => 'boolean',
             'published_at' => 'datetime',
             'activated_at' => 'datetime',
             'closed_at' => 'datetime',
@@ -81,6 +83,18 @@ class TrainingModule extends Model
             'estimated_hours' => 'integer',
             'supplementary_files' => 'array',
         ];
+    }
+
+    public function locksUntilPreviousFinished(): bool
+    {
+        return $this->lock_until_previous !== false;
+    }
+
+    public function lockSettingLabel(): string
+    {
+        return $this->locksUntilPreviousFinished()
+            ? 'Locked until earlier modules are finished'
+            : 'Opens even if an earlier module is unfinished';
     }
 
     public function trainer(): BelongsTo

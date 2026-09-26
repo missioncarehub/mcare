@@ -16,6 +16,7 @@ use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
+use App\Services\TraineeClassworkSequence;
 use App\Support\TrainingModuleFiles;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -46,6 +47,7 @@ class TrainingModuleController extends Controller
         Request $request,
         RollingModuleReleaseService $releases,
         ModuleSubmoduleService $submodules,
+        TraineeClassworkSequence $sequence,
     ): RedirectResponse {
         $validated = $this->validatedPayload($request, true);
         $this->assertCustomAudience($validated);
@@ -109,6 +111,9 @@ class TrainingModuleController extends Controller
                     'file_size' => $file->getSize() ?: 0,
                     'supplementary_files' => $supplementaryList,
                     'is_published' => $published,
+                    'lock_until_previous' => array_key_exists('lock_until_previous', $validated)
+                        ? filter_var($validated['lock_until_previous'], FILTER_VALIDATE_BOOLEAN)
+                        : true,
                     'published_at' => $published ? now() : null,
                 ]);
 
@@ -137,6 +142,8 @@ class TrainingModuleController extends Controller
             $releases->activate($module);
         }
 
+        $sequence->syncAssigned($module->fresh());
+
         return redirect()
             ->route('trainer.resources')
             ->with('saved', $module->is_published
@@ -149,6 +156,7 @@ class TrainingModuleController extends Controller
         TrainingModule $module,
         RollingModuleReleaseService $releases,
         ModuleSubmoduleService $submodules,
+        TraineeClassworkSequence $sequence,
     ): RedirectResponse {
         $this->authorize('update', $module);
 
@@ -246,6 +254,13 @@ class TrainingModuleController extends Controller
                     'published_at' => $published ? ($module->published_at ?? now()) : null,
                 ];
 
+                if (array_key_exists('lock_until_previous', $validated)) {
+                    $attributes['lock_until_previous'] = filter_var(
+                        $validated['lock_until_previous'],
+                        FILTER_VALIDATE_BOOLEAN,
+                    );
+                }
+
                 if ($replacement && $replacementPath) {
                     $attributes = [
                         ...$attributes,
@@ -284,6 +299,8 @@ class TrainingModuleController extends Controller
         } elseif (! $wasPublished && $module->is_published) {
             $releases->activate($module);
         }
+
+        $sequence->syncAssigned($module->fresh());
 
         if ($request->boolean('_return_to_module')) {
             return redirect()
@@ -617,6 +634,7 @@ class TrainingModuleController extends Controller
             'due_at' => ['nullable', 'date'],
             'position' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'is_published' => ['nullable', 'boolean'],
+            'lock_until_previous' => ['nullable', 'boolean'],
             '_return_to_module' => ['nullable', 'boolean'],
         ], [
             'module_file.max' => 'Learning materials must not exceed 38MB on the current MCARE server.',

@@ -209,6 +209,14 @@
                     <input type="checkbox" name="is_published" value="1" @checked(old('is_published', true))>
                     <span data-module-publication-copy>Make this the active batch module. The previous active delivery closes only to future enrollees.</span>
                 </label>
+                <label class="lms-check">
+                    <input type="hidden" name="lock_until_previous" value="0">
+                    <input type="checkbox" name="lock_until_previous" value="1" @checked(filter_var(old('lock_until_previous', true), FILTER_VALIDATE_BOOLEAN))>
+                    <span>
+                        Lock this module until earlier modules are finished
+                        <span class="mt-1 block text-xs font-normal leading-5 text-slate-600">Checked: trainees cannot open this module until they finish the modules before it. The first module in the batch stays open on its own. Unchecked: trainees can open this module even when an earlier module is still unfinished. Later modules stay locked when their own lock is checked.</span>
+                    </span>
+                </label>
             </div>
             <div class="lms-form-actions lms-field-wide">
                 <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
@@ -369,6 +377,7 @@
                             </a>
                         </h3>
                         <p class="line-clamp-2">{{ str($module->description)->limit(150) }}</p>
+                        <p class="mt-2 text-xs font-semibold {{ $module->locksUntilPreviousFinished() ? 'text-amber-800' : 'text-sky-800' }}">{{ $module->lockSettingLabel() }}</p>
                     </div>
 
                     <dl class="lms-module-meta">
@@ -408,6 +417,7 @@
                                         <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
                                         <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
+                                        <input type="hidden" name="lock_until_previous" value="{{ $module->locksUntilPreviousFinished() ? 1 : 0 }}">
                                         <button>{{ $module->isSupplemental() ? ($module->is_published ? 'Remove from class' : 'Make available to class') : ($module->delivery_status === 'active' ? 'Close to new enrollees' : 'Publish as active') }}</button>
                                     </form>
                                     @endif

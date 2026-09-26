@@ -366,6 +366,7 @@
                                 {{ $module->deliveryStatusLabel() }}
                             </span>
                             <p class="mt-2 text-xs text-slate-500">{{ $module->published_at?->format('M d, Y g:i A') ?? 'Not published' }}</p>
+                            <p class="mt-1 text-xs font-semibold {{ $module->locksUntilPreviousFinished() ? 'text-amber-800' : 'text-sky-800' }}">{{ $module->lockSettingLabel() }}</p>
                         </td>
                         <td>
                             <div class="flex flex-wrap gap-2" aria-label="Module actions">

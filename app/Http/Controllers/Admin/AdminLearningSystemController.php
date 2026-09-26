@@ -23,6 +23,7 @@ use App\Services\CompletionEligibilityService;
 use App\Services\LearningPdfWatermark;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
+use App\Services\TraineeClassworkSequence;
 use App\Services\TraineeRosterCsv;
 use App\Services\TrainingModuleDeletionService;
 use App\Support\CaregivingNcIiCatalog;
@@ -588,6 +589,7 @@ class AdminLearningSystemController extends Controller
         Request $request,
         RollingModuleReleaseService $releases,
         ModuleSubmoduleService $submodules,
+        TraineeClassworkSequence $sequence,
     ): RedirectResponse {
         $request->merge([
             'completion_mode' => $request->input('completion_mode', TrainingModule::COMPLETION_ASSESSED),
@@ -647,6 +649,8 @@ class AdminLearningSystemController extends Controller
             $releases->activate($module);
         }
 
+        $sequence->syncAssigned($module->fresh());
+
         $module->loadMissing(['batch', 'trainer']);
         $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
 
@@ -659,6 +663,7 @@ class AdminLearningSystemController extends Controller
         TrainingModule $module,
         RollingModuleReleaseService $releases,
         ModuleSubmoduleService $submodules,
+        TraineeClassworkSequence $sequence,
     ): RedirectResponse {
         $request->merge([
             'completion_mode' => $request->input('completion_mode', $module->completion_mode ?: TrainingModule::COMPLETION_ASSESSED),
@@ -785,6 +790,8 @@ class AdminLearningSystemController extends Controller
             $releases->activate($module);
         }
 
+        $sequence->syncAssigned($module->fresh());
+
         $module->loadMissing(['batch', 'trainer']);
         if ((int) $module->trainer_id !== (int) $previousTrainerId) {
             $module->trainer?->notify(new TrainerModuleAssignedByAdmin($module));
@@ -858,6 +865,7 @@ class AdminLearningSystemController extends Controller
                 new TrainingModuleFileType,
             ],
             'is_published' => ['nullable', 'boolean'],
+            'lock_until_previous' => ['nullable', 'boolean'],
         ];
     }
 

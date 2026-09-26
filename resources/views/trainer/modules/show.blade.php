@@ -68,6 +68,34 @@
                         @if($module->available_at) · Opens {{ $module->available_at->format('M d, Y') }} @endif
                         @if($module->due_at) · Due {{ $module->due_at->format('M d, Y') }} @endif
                     </p>
+                    <form method="POST" action="{{ route('trainer.modules.update', $module) }}" class="mt-3 max-w-xl rounded-xl border border-stone-200 bg-stone-50 p-3">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="module_code" value="{{ $module->module_code }}">
+                        <input type="hidden" name="competency_category" value="{{ $module->competency_category }}">
+                        <input type="hidden" name="completion_mode" value="{{ $module->completion_mode ?? 'assessed' }}">
+                        <input type="hidden" name="title" value="{{ $module->title }}">
+                        <input type="hidden" name="description" value="{{ $module->description }}">
+                        <input type="hidden" name="topic" value="{{ $module->topic }}">
+                        <input type="hidden" name="estimated_hours" value="{{ $module->estimated_hours }}">
+                        <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
+                        <input type="hidden" name="audience_type" value="{{ $isPrivate ? 'trainee' : 'batch' }}">
+                        <input type="hidden" name="training_batch_id" value="{{ $module->training_batch_id }}">
+                        <input type="hidden" name="target_enrollment_application_id" value="{{ $module->target_enrollment_application_id }}">
+                        <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
+                        <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
+                        <input type="hidden" name="is_published" value="{{ $module->is_published ? 1 : 0 }}">
+                        <input type="hidden" name="_return_to_module" value="1">
+                        <label class="flex items-start gap-3 text-sm font-semibold text-stone-800">
+                            <input type="hidden" name="lock_until_previous" value="0">
+                            <input type="checkbox" name="lock_until_previous" value="1" class="mt-1" @checked($module->locksUntilPreviousFinished())>
+                            <span>
+                                Lock this module until earlier modules are finished
+                                <span class="mt-1 block text-xs font-normal leading-5 text-stone-600">Checked: trainees cannot open this module until they finish the modules before it. The first module in the batch stays open on its own. Unchecked: trainees can open this module even when an earlier module is still unfinished. Later modules stay locked when their own lock is checked.</span>
+                            </span>
+                        </label>
+                        <button class="secondary-action mt-3 text-xs">Save lock setting</button>
+                    </form>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -89,6 +117,7 @@
                         <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
                         <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
                         <input type="hidden" name="is_published" value="{{ $module->is_published ? 0 : 1 }}">
+                        <input type="hidden" name="lock_until_previous" value="{{ $module->locksUntilPreviousFinished() ? 1 : 0 }}">
                         <input type="hidden" name="_return_to_module" value="1">
                         <button class="secondary-action text-xs">
                             {{ $module->delivery_status === 'active' ? 'Close to new' : 'Publish' }}
@@ -181,6 +210,8 @@
                     <input type="hidden" name="position" value="{{ $module->position ?? 0 }}">
                     <input type="hidden" name="available_at" value="{{ $module->available_at?->format('Y-m-d\TH:i') }}">
                     <input type="hidden" name="due_at" value="{{ $module->due_at?->format('Y-m-d\TH:i') }}">
+                    <input type="hidden" name="is_published" value="{{ $module->is_published ? 1 : 0 }}">
+                    <input type="hidden" name="lock_until_previous" value="{{ $module->locksUntilPreviousFinished() ? 1 : 0 }}">
                     <input type="hidden" name="_return_to_module" value="1">
                     <div>
                         <label class="block text-xs font-semibold text-stone-700 mb-1">Select files to append</label>
