@@ -4,7 +4,6 @@ use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminAnnouncementController;
-use App\Http\Controllers\Admin\AdminAttendanceController;
 use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminContactMessageController;
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -478,15 +477,6 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/trainees/{enrollmentApplication}', [AdminLearningSystemController::class, 'destroyTrainee'])
                     ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.trainees.destroy');
-                Route::get('/learning/attendance', [AdminAttendanceController::class, 'index'])
-                    ->middleware('permission:trainees.manage')
-                    ->name('learning.attendance');
-                Route::post('/learning/attendance', [AdminAttendanceController::class, 'store'])
-                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
-                    ->name('learning.attendance.store');
-                Route::get('/learning/attendance/export/{batch}', [AdminAttendanceController::class, 'export'])
-                    ->middleware(['permission:reports.export', 'throttle:document-downloads'])
-                    ->name('learning.attendance.export');
                 Route::get('/learning/modules', [AdminLearningSystemController::class, 'modules'])
                     ->middleware('permission:modules.manage')
                     ->name('learning.modules');

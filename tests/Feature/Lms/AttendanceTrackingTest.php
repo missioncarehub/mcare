@@ -230,7 +230,7 @@ class AttendanceTrackingTest extends TestCase
             ->assertDontSee('Graduated Alumnus');
     }
 
-    public function test_trainer_and_admin_can_export_batch_attendance_xlsx_and_csv(): void
+    public function test_trainer_can_export_batch_attendance_and_admin_has_no_attendance_page(): void
     {
         $trainer = $this->lmsUser('trainer');
         $admin = $this->lmsUser('admin');
@@ -254,11 +254,14 @@ class AttendanceTrackingTest extends TestCase
         $trainerXlsxResponse->assertOk();
         $trainerXlsxResponse->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-        $adminXlsxResponse = $this->actingAs($admin)
-            ->get(route('admin.learning.attendance.export', $batch));
+        $this->actingAs($admin)
+            ->get('/admin/learning/attendance')
+            ->assertNotFound();
 
-        $adminXlsxResponse->assertOk();
-        $adminXlsxResponse->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->actingAs($admin)
+            ->get(route('admin.learning.trainees'))
+            ->assertOk()
+            ->assertDontSee('/admin/learning/attendance', false);
 
         // CSV export via format=csv
         $trainerCsvResponse = $this->actingAs($trainer)
