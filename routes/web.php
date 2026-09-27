@@ -324,7 +324,7 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware('permission:enrollments.review')
                     ->name('enrollments.document-review');
 
-                Route::patch('/enrollments/{enrollmentApplication}/documents/review', [EnrollmentReviewController::class, 'updateDocumentReview'])
+                Route::match(['post', 'patch'], '/enrollments/{enrollmentApplication}/documents/review', [EnrollmentReviewController::class, 'updateDocumentReview'])
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
                     ->name('enrollments.documents.review');
 

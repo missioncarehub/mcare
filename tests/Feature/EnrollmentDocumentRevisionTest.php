@@ -36,6 +36,12 @@ class EnrollmentDocumentRevisionTest extends TestCase
             ->assertRedirect(route('admin.enrollments.document-review', $application))
             ->assertSessionHas('saved', fn (string $message): bool => str_contains($message, 'document revision page'));
 
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.document-review', $application))
+            ->assertOk()
+            ->assertSee('Save review')
+            ->assertSee('saves the statuses first', false);
+
         Notification::assertSentTo(
             $applicant,
             EnrollmentDocumentsReviseRequestedNotification::class,
@@ -53,6 +59,74 @@ class EnrollmentDocumentRevisionTest extends TestCase
                 return true;
             },
         );
+    }
+
+    public function test_revision_email_saves_needs_replacement_before_sending(): void
+    {
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->revisionApplication($applicant, [
+            'birth-certificate' => ['status' => 'accepted', 'note' => null],
+            'education-document' => ['status' => 'accepted', 'note' => null],
+            'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+            'id-photo' => ['status' => 'accepted', 'note' => null],
+            'signature' => ['status' => 'accepted', 'note' => null],
+        ]);
+        $application->forceFill([
+            'documents_reviewed_at' => now(),
+            'documents_reviewed_by_id' => $admin->id,
+        ])->save();
+
+        $documents = [
+            'birth-certificate' => ['status' => 'replace', 'note' => 'Image is blurry.'],
+            'education-document' => ['status' => 'accepted', 'note' => null],
+            'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+            'id-photo' => ['status' => 'accepted', 'note' => null],
+            'signature' => ['status' => 'accepted', 'note' => null],
+        ];
+
+        $this->actingAs($admin)
+            ->post(route('admin.enrollments.documents.review', $application), [
+                'review_action' => 'save',
+                'documents' => $documents,
+            ])
+            ->assertRedirect(route('admin.enrollments.document-review', $application))
+            ->assertSessionHas('saved', fn (string $message): bool => str_contains($message, 'Document statuses saved'));
+
+        $application->refresh();
+        $this->assertSame('replace', $application->document_review['birth-certificate']['status']);
+        $this->assertSame('Image is blurry.', $application->document_review['birth-certificate']['note']);
+        $this->assertNull($application->documents_reviewed_at);
+
+        $application->forceFill([
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                'education-document' => ['status' => 'accepted', 'note' => null],
+                'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                'id-photo' => ['status' => 'accepted', 'note' => null],
+                'signature' => ['status' => 'accepted', 'note' => null],
+            ],
+        ])->save();
+
+        $this->actingAs($admin)
+            ->post(route('admin.enrollments.documents.request-revisions', $application), [
+                'remark' => 'Please replace the blurry birth certificate.',
+                'documents' => $documents,
+            ])
+            ->assertRedirect(route('admin.enrollments.document-review', $application))
+            ->assertSessionHas('saved');
+
+        $application->refresh();
+        $this->assertSame('replace', $application->document_review['birth-certificate']['status']);
+        $this->assertSame('Image is blurry.', $application->document_review['birth-certificate']['note']);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.document-review', $application))
+            ->assertOk()
+            ->assertSee('value="replace" selected', false);
+
+        Notification::assertSentTo($applicant, EnrollmentDocumentsReviseRequestedNotification::class);
     }
 
     public function test_signed_revision_link_shows_only_documents_marked_for_replacement(): void

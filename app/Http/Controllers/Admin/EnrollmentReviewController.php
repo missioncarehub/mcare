@@ -391,21 +391,8 @@ class EnrollmentReviewController extends Controller
     {
         $this->ensureReleasedForReview($enrollmentApplication);
 
-        $validated = $request->validate([
-            'documents' => ['required', 'array'],
-            'documents.*.status' => ['required', Rule::in(['unreviewed', 'accepted', 'replace', 'missing'])],
-            'documents.*.note' => ['nullable', 'string', 'max:500'],
-        ]);
-        $review = [];
-
-        // Only the five known enrollment documents can enter the stored review payload.
-        foreach ($this->documentFields() as $key => $definition) {
-            $submitted = $validated['documents'][$key] ?? [];
-            $review[$key] = [
-                'status' => $submitted['status'] ?? ($enrollmentApplication->{$definition['field']} ? 'unreviewed' : 'missing'),
-                'note' => trim((string) ($submitted['note'] ?? '')) ?: null,
-            ];
-        }
+        $review = $this->validatedDocumentReview($request, $enrollmentApplication);
+        $saveOnly = $request->input('review_action') === 'save';
 
         $enrollmentApplication->forceFill([
             'document_review' => $review,
@@ -418,6 +405,12 @@ class EnrollmentReviewController extends Controller
                 'documents_reviewed_at' => null,
                 'documents_reviewed_by_id' => null,
             ])->save();
+
+            if ($saveOnly) {
+                return redirect()
+                    ->route('admin.enrollments.document-review', $enrollmentApplication)
+                    ->with('saved', 'Document statuses saved. Needs replacement stays selected, and you can email the revision request next.');
+            }
 
             $message = 'Document review cannot be completed while required documents are pending: '.implode(', ', $pending).'. Accept every required document first.';
 
@@ -454,9 +447,24 @@ class EnrollmentReviewController extends Controller
     {
         $this->ensureReleasedForReview($enrollmentApplication);
 
-        $validated = $request->validate([
+        $rules = [
             'remark' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ];
+
+        if ($request->exists('documents')) {
+            $rules['documents'] = ['required', 'array'];
+            $rules['documents.*.status'] = ['required', Rule::in(['unreviewed', 'accepted', 'replace', 'missing'])];
+            $rules['documents.*.note'] = ['nullable', 'string', 'max:500'];
+        }
+
+        $validated = $request->validate($rules);
+
+        if (isset($validated['documents'])) {
+            $enrollmentApplication->forceFill([
+                'document_review' => $this->reviewPayload($enrollmentApplication, $validated['documents']),
+            ])->save();
+            $enrollmentApplication->refresh();
+        }
 
         $review = $enrollmentApplication->document_review ?? [];
         $labels = [];
@@ -469,6 +477,7 @@ class EnrollmentReviewController extends Controller
         if ($labels === []) {
             return redirect()
                 ->route('admin.enrollments.document-review', $enrollmentApplication)
+                ->withInput()
                 ->withErrors([
                     'documents' => 'Mark at least one document as "Needs replacement" (with an optional note) before requesting revisions.',
                 ]);
@@ -551,6 +560,39 @@ class EnrollmentReviewController extends Controller
             'Content-Type' => $this->documentMimeType($path) ?: 'application/octet-stream',
             'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
         ]);
+    }
+
+    /**
+     * @return array<string, array{status: string, note: ?string}>
+     */
+    private function validatedDocumentReview(Request $request, EnrollmentApplication $enrollmentApplication): array
+    {
+        $validated = $request->validate([
+            'documents' => ['required', 'array'],
+            'documents.*.status' => ['required', Rule::in(['unreviewed', 'accepted', 'replace', 'missing'])],
+            'documents.*.note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        return $this->reviewPayload($enrollmentApplication, $validated['documents']);
+    }
+
+    /**
+     * @param  array<string, array{status?: string, note?: ?string}>  $documents
+     * @return array<string, array{status: string, note: ?string}>
+     */
+    private function reviewPayload(EnrollmentApplication $enrollmentApplication, array $documents): array
+    {
+        $review = [];
+
+        foreach ($this->documentFields() as $key => $definition) {
+            $submitted = $documents[$key] ?? [];
+            $review[$key] = [
+                'status' => $submitted['status'] ?? ($enrollmentApplication->{$definition['field']} ? 'unreviewed' : 'missing'),
+                'note' => trim((string) ($submitted['note'] ?? '')) ?: null,
+            ];
+        }
+
+        return $review;
     }
 
     private function documentDefinition(string $document): array

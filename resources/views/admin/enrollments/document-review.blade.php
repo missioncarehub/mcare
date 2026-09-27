@@ -35,9 +35,8 @@
             </div>
         @enderror
 
-        <form method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-6" data-document-review-form data-form-draft="admin.enrollments.documents.{{ $application->id }}" @if($errors->any()) data-form-draft-server-old="1" @endif>
+        <form id="document-review-form" method="POST" action="{{ route('admin.enrollments.documents.review', $application) }}" class="mt-6" data-document-review-form data-form-draft="admin.enrollments.documents.{{ $application->id }}" @if($errors->any()) data-form-draft-server-old="1" @endif>
             @csrf
-            @method('PATCH')
             @foreach($documents as $key => $document)
                 @php
                     $storedReview = data_get($application->document_review, $key, []);
@@ -77,39 +76,37 @@
                 </div>
             @endforeach
             <div class="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Done for review</button>
+                <div class="flex flex-wrap gap-3">
+                    <button type="submit" name="review_action" value="save" class="secondary-action" @disabled(! $releasedForReview)>Save review</button>
+                    <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Done for review</button>
+                </div>
                 @if($documentsReadyForApproval && $application->documents_reviewed_at)
                     <p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>
                 @elseif(! $documentsReadyForApproval)
                     <p class="text-xs text-amber-700">Accept every required document before this review can be completed.</p>
                 @endif
             </div>
-        </form>
-    </section>
 
-    {{-- Path: resources/views/admin/enrollments/document-review.blade.php | Label: Request revisions block --}}
-    <section class="mt-6 border border-amber-200 bg-amber-50/40 p-6">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-amber-900">Request revisions from the applicant</h2>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-amber-900/90">
-                    First mark each problem document above as <strong>Needs replacement</strong> and add a short note explaining what to correct. Then click the button below to email the applicant a direct link to re-upload the flagged files.
-                </p>
-            </div>
-            @error('documents_request')
-                <p class="text-xs font-bold text-red-700">{{ $message }}</p>
-            @enderror
-        </div>
+            <section class="mt-6 border border-amber-200 bg-amber-50/40 p-6">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-amber-900">Request revisions from the applicant</h2>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-amber-900/90">
+                            Mark each problem document as <strong>Needs replacement</strong> and add a short note. <strong>Save review</strong> keeps that choice. <strong>Email revision request</strong> saves the statuses first, then emails the applicant a link to re-upload only the flagged files.
+                        </p>
+                    </div>
+                </div>
 
-        <form method="POST" action="{{ route('admin.enrollments.documents.request-revisions', $application) }}" class="mt-4 space-y-3">
-            @csrf
-            <label for="revise-remark" class="block text-xs font-bold uppercase tracking-wider text-amber-900">Overall remark (optional)</label>
-            <textarea id="revise-remark" name="remark" rows="3" maxlength="2000" class="w-full border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="Example: Two of your documents were unclear. Please re-upload sharp, complete scans.">{{ old('remark') }}</textarea>
-            @error('remark')<p class="text-xs font-bold text-red-700">{{ $message }}</p>@enderror
-            <div class="flex flex-wrap items-center gap-3">
-                <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Email revision request</button>
-                <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's document revision page so they can replace only the files marked Needs replacement.</p>
-            </div>
+                <div class="mt-4 space-y-3">
+                    <label for="revise-remark" class="block text-xs font-bold uppercase tracking-wider text-amber-900">Overall remark (optional)</label>
+                    <textarea id="revise-remark" name="remark" rows="3" maxlength="2000" class="w-full border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500" placeholder="Example: Two of your documents were unclear. Please re-upload sharp, complete scans.">{{ old('remark') }}</textarea>
+                    @error('remark')<p class="text-xs font-bold text-red-700">{{ $message }}</p>@enderror
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="submit" class="primary-action" formmethod="post" formaction="{{ route('admin.enrollments.documents.request-revisions', $application) }}" @disabled(! $releasedForReview)>Email revision request</button>
+                        <p class="text-xs text-amber-900/80">The email includes a link that opens the applicant's document revision page so they can replace only the files marked Needs replacement.</p>
+                    </div>
+                </div>
+            </section>
         </form>
     </section>
 
