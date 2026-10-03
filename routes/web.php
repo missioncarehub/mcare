@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminAnnouncementController;
+use App\Http\Controllers\Admin\AdminAlumniController;
 use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminContactMessageController;
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -571,6 +572,16 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/alumni-jobs/inquiries/{careerInquiry}', [AdminCareerHubController::class, 'destroyInquiry'])
                     ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.alumni-jobs.inquiries.destroy');
+                Route::get('/learning/alumni-jobs/inquiries/{careerInquiry}/credential/{index}', [AdminCareerHubController::class, 'credential'])
+                    ->middleware('permission:alumni.jobs.manage')
+                    ->where('index', '[0-9]+')
+                    ->name('learning.alumni-jobs.inquiries.credential');
+                Route::get('/learning/alumni-jobs/inquiries/{careerInquiry}/placement-certificate', [AdminCareerHubController::class, 'placementCertificate'])
+                    ->middleware('permission:alumni.jobs.manage')
+                    ->name('learning.alumni-jobs.inquiries.placement-certificate');
+                Route::patch('/learning/alumni-jobs/inquiries/{careerInquiry}/certificate', [AdminCareerHubController::class, 'updateCertificateReview'])
+                    ->middleware(['permission:alumni.jobs.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.alumni-jobs.inquiries.certificate.update');
                 Route::get('/learning/reports', [AdminLearningSystemController::class, 'reports'])->name('learning.reports');
 
                 Route::get('/historical-alumni', [AdminHistoricalAlumniClaimController::class, 'index'])
@@ -588,6 +599,12 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/alumni-standing', [AdminHistoricalAlumniClaimController::class, 'standing'])
                     ->middleware('permission:accounts.manage')
                     ->name('alumni-standing.index');
+                Route::get('/alumni', [AdminAlumniController::class, 'index'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('alumni.index');
+                Route::get('/alumni/{user}', [AdminAlumniController::class, 'show'])
+                    ->middleware('permission:accounts.manage')
+                    ->name('alumni.show');
                 Route::patch('/alumni-standing/{enrollmentApplication}/rank', [AdminHistoricalAlumniClaimController::class, 'promoteGraduate'])
                     ->middleware(['permission:accounts.manage', 'throttle:sensitive-mutation'])
                     ->name('alumni-standing.promote');
@@ -863,11 +880,26 @@ Route::middleware('throttle:global-web')->group(function () {
                         Route::patch('/career-hub/availability', [AlumniCareerHubController::class, 'updateAvailability'])
                             ->middleware('throttle:sensitive-mutation')
                             ->name('career-hub.availability');
+                        Route::get('/career-hub/{careerOpportunity}/apply', [AlumniCareerHubController::class, 'showApplyForm'])
+                            ->name('career-hub.apply-form');
+                        Route::post('/career-hub/{careerOpportunity}/apply', [AlumniCareerHubController::class, 'apply'])
+                            ->middleware('throttle:sensitive-mutation')
+                            ->name('career-hub.apply');
                         Route::post('/career-hub/{careerOpportunity}/contact', [AlumniCareerHubController::class, 'contact'])
                             ->middleware('throttle:sensitive-mutation')
                             ->name('career-hub.contact');
                         Route::get('/achievements', [AlumniCareerHubController::class, 'achievements'])
                             ->name('achievements');
+                        Route::post('/achievements/{careerInquiry}/certificate', [AlumniCareerHubController::class, 'uploadPlacementCertificate'])
+                            ->middleware('throttle:sensitive-mutation')
+                            ->name('achievements.upload-certificate');
+                        Route::get('/achievements/{careerInquiry}/certificate', [AlumniCareerHubController::class, 'placementCertificate'])
+                            ->name('achievements.placement-certificate');
+                        Route::get('/applications', [AlumniCareerHubController::class, 'applications'])
+                            ->name('applications');
+                        Route::get('/applications/{careerInquiry}/credential/{index}', [AlumniCareerHubController::class, 'credential'])
+                            ->where('index', '[0-9]+')
+                            ->name('applications.credential');
                     });
                 });
             });

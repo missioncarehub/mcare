@@ -37,13 +37,10 @@
                 <p class="mt-1 text-sm text-slate-500">{{ $alumniProfile->availability_updated_at ? 'Updated '.$alumniProfile->availability_updated_at->diffForHumans() : 'Set your current duty status.' }}</p>
             </div>
         </div>
-        <form method="POST" action="{{ route('trainee.career-hub.availability') }}" data-confirm="Update your caregiver availability?">
-            @csrf @method('PATCH')
-            <input type="hidden" name="is_available_for_duty" value="{{ $alumniProfile->is_available_for_duty ? '0' : '1' }}">
-            <button type="submit" data-action-button class="{{ $alumniProfile->is_available_for_duty ? 'secondary-action' : 'primary-action' }} w-full whitespace-normal sm:w-auto sm:whitespace-nowrap">
-                {{ $alumniProfile->is_available_for_duty ? 'Mark unavailable' : 'Mark Available for Duty' }}
-            </button>
-        </form>
+        @include('trainee.partials.career-availability-toggle', [
+            'action' => route('trainee.career-hub.availability'),
+            'alumniProfile' => $alumniProfile,
+        ])
     </section>
 @endunless
 

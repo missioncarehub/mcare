@@ -38,60 +38,23 @@
         <p class="mt-4 {{ $job->postingSummary() ? 'border-t border-slate-100 pt-4' : '' }} text-sm leading-6 text-slate-600"><span class="font-bold text-slate-900">Requirements:</span> {{ $job->specific_contraptions }}</p>
     @endif
 
+    @php
+        $applicationStatus = $applicationStatuses[$job->id] ?? null;
+    @endphp
+
     <div class="mt-6 {{ $job->postingSummary() || $job->specific_contraptions ? '' : 'flex-1' }} flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
         @unless ($isAdminPreview ?? false)
-            @if (in_array((int) $job->id, array_map('intval', $contactedJobIds ?? []), true))
-                <span class="secondary-action inline-flex items-center text-sm">Inquiry sent</span>
+            @if ($applicationStatus === 'approved')
+                <span class="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-200"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approved</span>
+            @elseif ($applicationStatus === 'rejected')
+                <span class="inline-flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200"><x-dashboard-icon name="xmark" class="h-4 w-4" />Not approved</span>
+            @elseif ($applicationStatus === 'pending')
+                <span class="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 ring-1 ring-amber-200"><x-dashboard-icon name="clock" class="h-4 w-4" />Application pending</span>
             @else
-                <button type="button" data-dashboard-dialog-open="career-contact-{{ $job->id }}" class="secondary-action inline-flex items-center text-sm">Contact MCARE for details</button>
+                <a href="{{ route('trainee.career-hub.apply-form', $job) }}" class="primary-action inline-flex items-center gap-2 text-sm"><x-dashboard-icon name="briefcase" class="h-4 w-4" />Apply for this career</a>
             @endif
         @else
-            <span class="secondary-action inline-flex items-center text-sm">Contact MCARE for details</span>
+            <span class="secondary-action inline-flex items-center text-sm">Apply for this career</span>
         @endunless
     </div>
-
-    @unless ($isAdminPreview ?? false)
-        @php
-            $contactUser = auth()->user()?->loadMissing('enrollmentApplication');
-            $contactErrors = $errors->getBag('careerContact');
-            $openContactForm = $contactErrors->any() && (int) old('inquiry_job_id') === (int) $job->id;
-        @endphp
-        <dialog id="career-contact-{{ $job->id }}" data-dashboard-dialog data-auto-open="{{ $openContactForm ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(96vw,32rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-contact-title-{{ $job->id }}">
-            <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
-                <div>
-                    <h2 id="career-contact-title-{{ $job->id }}" class="font-display text-xl font-bold text-slate-900">Contact MCARE</h2>
-                    <p class="mt-1 text-xs text-slate-500">This inquiry is saved for administration against {{ $job->listingTitle() }}.</p>
-                </div>
-                <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close contact form"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
-            </div>
-            <form method="POST" action="{{ route('trainee.career-hub.contact', $job) }}" class="grid gap-4 p-6" data-dashboard-dialog-form data-submit-label="Sending inquiry...">
-                @csrf
-                <input type="hidden" name="inquiry_job_id" value="{{ $job->id }}">
-                <div>
-                    <label for="career-contact-name-{{ $job->id }}" class="form-label">Full name</label>
-                    <input id="career-contact-name-{{ $job->id }}" name="name" type="text" maxlength="120" required class="form-field" value="{{ old('name', $contactUser?->name) }}">
-                    @if ($openContactForm) @error('name', 'careerContact')<p class="form-error">{{ $message }}</p>@enderror @endif
-                </div>
-                <div>
-                    <label for="career-contact-email-{{ $job->id }}" class="form-label">Email</label>
-                    <input id="career-contact-email-{{ $job->id }}" name="email" type="email" maxlength="255" required class="form-field" value="{{ old('email', $contactUser?->email) }}">
-                    @if ($openContactForm) @error('email', 'careerContact')<p class="form-error">{{ $message }}</p>@enderror @endif
-                </div>
-                <div>
-                    <label for="career-contact-number-{{ $job->id }}" class="form-label">Contact number</label>
-                    <input id="career-contact-number-{{ $job->id }}" name="contact_number" type="text" maxlength="30" required class="form-field" value="{{ old('contact_number', $contactUser?->contact_number ?: $contactUser?->enrollmentApplication?->contact_number) }}">
-                    @if ($openContactForm) @error('contact_number', 'careerContact')<p class="form-error">{{ $message }}</p>@enderror @endif
-                </div>
-                <div>
-                    <label for="career-contact-message-{{ $job->id }}" class="form-label">Message</label>
-                    <textarea id="career-contact-message-{{ $job->id }}" name="message" rows="4" maxlength="1000" required class="form-field" placeholder="Tell MCARE why you are interested in this career.">{{ $openContactForm ? old('message') : '' }}</textarea>
-                    @if ($openContactForm) @error('message', 'careerContact')<p class="form-error">{{ $message }}</p>@enderror @endif
-                </div>
-                <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
-                    <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                    <button type="submit" data-action-button class="primary-action">Send inquiry</button>
-                </div>
-            </form>
-        </dialog>
-    @endunless
 </article>

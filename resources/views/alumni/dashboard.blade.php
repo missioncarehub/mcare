@@ -30,11 +30,11 @@
                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {{ $alumniProfile->is_available_for_duty ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500' }}"><x-dashboard-icon :name="$alumniProfile->is_available_for_duty ? 'circle-check' : 'circle-minus'" class="h-5 w-5" /></span>
                 <div><p class="dashboard-section-kicker">Caregiver availability</p><h2 id="availability-title" class="mt-1 text-xl font-black text-slate-950">{{ $alumniProfile->is_available_for_duty ? 'Available for Duty' : 'Currently unavailable' }}</h2><p class="mt-1 text-sm text-slate-500">{{ $alumniProfile->availability_updated_at ? 'Updated '.$alumniProfile->availability_updated_at->diffForHumans() : 'Set your current duty status.' }}</p></div>
             </div>
-            <form method="POST" action="{{ route('alumni.availability.update') }}">
-                @csrf @method('PATCH')
-                <input type="hidden" name="is_available_for_duty" value="{{ $alumniProfile->is_available_for_duty ? '0' : '1' }}">
-                <button type="submit" data-action-button class="{{ $alumniProfile->is_available_for_duty ? 'secondary-action' : 'primary-action' }} whitespace-nowrap">{{ $alumniProfile->is_available_for_duty ? 'Mark unavailable' : 'Mark Available for Duty' }}</button>
-            </form>
+            @include('trainee.partials.career-availability-toggle', [
+                'action' => route('alumni.availability.update'),
+                'alumniProfile' => $alumniProfile,
+                'confirm' => false,
+            ])
         </section>
     @endunless
 

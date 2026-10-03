@@ -52,7 +52,7 @@
         <article class="dashboard-stat"><div><p class="dashboard-stat-label">Available for Duty</p><p class="dashboard-stat-value">{{ $availableAlumni }}</p><p class="dashboard-stat-help">Alumni accepting placement</p></div><span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"><x-dashboard-icon name="circle-check" class="h-5 w-5" /></span></article>
         <article class="dashboard-stat"><div><p class="dashboard-stat-label">Published careers</p><p class="dashboard-stat-value">{{ $publishedJobs }}</p><p class="dashboard-stat-help">Visible on the alumni board</p></div><span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100"><x-dashboard-icon name="briefcase" class="h-5 w-5" /></span></article>
         <article class="dashboard-stat"><div><p class="dashboard-stat-label">Draft careers</p><p class="dashboard-stat-value">{{ $draftJobs }}</p><p class="dashboard-stat-help">Awaiting privacy review</p></div><span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100"><x-dashboard-icon name="pencil" class="h-5 w-5" /></span></article>
-        <article class="dashboard-stat"><div><p class="dashboard-stat-label">Pending inquiries</p><p class="dashboard-stat-value">{{ $pendingInquiryCount }}</p><p class="dashboard-stat-help">Alumni contact forms to review</p></div><span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-700 ring-1 ring-violet-100"><x-dashboard-icon name="message-circle" class="h-5 w-5" /></span></article>
+        <article class="dashboard-stat"><div><p class="dashboard-stat-label">Pending applications</p><p class="dashboard-stat-value">{{ $pendingInquiryCount }}</p><p class="dashboard-stat-help">Career applications to review</p></div><span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-700 ring-1 ring-violet-100"><x-dashboard-icon name="message-circle" class="h-5 w-5" /></span></article>
     </div>
 
     <dialog id="career-opportunity-dialog" data-dashboard-dialog data-auto-open="{{ $careerCreateErrors->any() ? 'true' : 'false' }}" class="career-form-dialog m-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-opportunity-form-title">
@@ -164,18 +164,20 @@
         @if ($jobs->hasPages())<div class="mt-6 border-t border-slate-100 pt-5">{{ $jobs->links() }}</div>@endif
     </section>
 
-    <section class="dashboard-panel" aria-labelledby="career-inquiries-title">
+    <section class="dashboard-panel" aria-labelledby="career-applications-title">
         <div class="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
-            <div><p class="dashboard-section-kicker">Alumni contact</p><h2 id="career-inquiries-title" class="dashboard-section-title text-xl">Career inquiries</h2></div>
+            <div><p class="dashboard-section-kicker">Alumni applications</p><h2 id="career-applications-title" class="dashboard-section-title text-xl">Career applications</h2></div>
             <span class="text-sm text-slate-500">{{ $inquiries->total() }} total records</span>
         </div>
         <div class="mt-5 overflow-x-auto">
             <table class="min-w-full text-left text-sm">
                 <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
                     <tr>
-                        <th class="px-3 py-3 font-bold">Alumni</th>
+                        <th class="px-3 py-3 font-bold">Applicant</th>
                         <th class="px-3 py-3 font-bold">Career</th>
                         <th class="px-3 py-3 font-bold">Contact</th>
+                        <th class="px-3 py-3 font-bold">Credentials</th>
+                        <th class="px-3 py-3 font-bold">Certificate</th>
                         <th class="px-3 py-3 font-bold">Status</th>
                         <th class="px-3 py-3 font-bold">Submitted</th>
                         <th class="px-3 py-3 font-bold"><span class="sr-only">Actions</span></th>
@@ -190,17 +192,52 @@
                             </td>
                             <td class="px-3 py-4 font-semibold text-slate-800">{{ $inquiry->opportunity?->listingTitle() ?? 'Removed career' }}</td>
                             <td class="px-3 py-4 text-slate-600">{{ $inquiry->contact_number }}</td>
-                            <td class="px-3 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $inquiry->isPending() ? 'bg-amber-50 text-amber-700' : ($inquiry->status === \App\Models\CareerInquiry::STATUS_CLOSED ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700') }}">{{ $inquiry->statusLabel() }}</span></td>
+                            <td class="px-3 py-4">
+                                @if (is_array($inquiry->credential_paths) && count($inquiry->credential_paths) > 0)
+                                    <span class="text-xs font-semibold text-purple-700">{{ count($inquiry->credential_paths) }} {{ str('file')->plural(count($inquiry->credential_paths)) }}</span>
+                                @else
+                                    <span class="text-xs text-slate-400">None</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-4">
+                                @if ($inquiry->isApproved() && $inquiry->certificate_status)
+                                    <span class="text-xs font-semibold
+                                        {{ $inquiry->isCareerAwarded() ? 'text-emerald-700' :
+                                           ($inquiry->certificateIsPendingReview() ? 'text-amber-700' :
+                                           ($inquiry->certificate_status === \App\Models\CareerInquiry::CERT_REJECTED ? 'text-red-700' : 'text-sky-700')) }}">
+                                        {{ $inquiry->certificateStatusLabel() }}
+                                    </span>
+                                @else
+                                    <span class="text-xs text-slate-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-4">
+                                <span class="rounded-full px-2.5 py-1 text-xs font-bold
+                                    {{ $inquiry->isPending() ? 'bg-amber-50 text-amber-700' :
+                                       ($inquiry->isApproved() ? 'bg-emerald-50 text-emerald-700' :
+                                       ($inquiry->isRejected() ? 'bg-red-50 text-red-700' :
+                                       ($inquiry->status === \App\Models\CareerInquiry::STATUS_CLOSED ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'))) }}">
+                                    {{ $inquiry->statusLabel() }}
+                                </span>
+                            </td>
                             <td class="px-3 py-4 text-slate-500">{{ $inquiry->created_at?->format('M d, Y g:i A') }}</td>
                             <td class="px-3 py-4">
                                 <div class="flex flex-wrap justify-end gap-2">
+                                    @if ($inquiry->certificateIsPendingReview())
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Approve this placement certificate and award the career in alumni history?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Return this certificate to the alumni for resubmission?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return cert</button></form>
+                                    @endif
+                                    @if ($inquiry->isPending())
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Approve this application? The career will appear in the alumni career history so they can submit a placement certificate.">@csrf @method('PATCH')<input type="hidden" name="status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approve</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Reject this application?">@csrf @method('PATCH')<input type="hidden" name="status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Reject</button></form>
+                                    @endif
                                     <button type="button" data-dashboard-dialog-open="career-inquiry-{{ $inquiry->id }}" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="pencil" class="h-4 w-4" />Review</button>
-                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.destroy', $inquiry) }}" data-confirm="Remove this inquiry?">@csrf @method('DELETE')<button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50">Remove</button></form>
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.destroy', $inquiry) }}" data-confirm="Remove this application?">@csrf @method('DELETE')<button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50">Remove</button></form>
                                 </div>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-3 py-10 text-center text-slate-500">No alumni inquiries yet.</td></tr>
+                        <tr><td colspan="8" class="px-3 py-10 text-center text-slate-500">No career applications yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -209,21 +246,55 @@
             <dialog id="career-inquiry-{{ $inquiry->id }}" data-dashboard-dialog class="m-auto max-h-[90vh] w-[min(96vw,36rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-inquiry-title-{{ $inquiry->id }}">
                 <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
                     <div>
-                        <h2 id="career-inquiry-title-{{ $inquiry->id }}" class="font-display text-xl font-bold text-slate-900">Inquiry review</h2>
+                        <h2 id="career-inquiry-title-{{ $inquiry->id }}" class="font-display text-xl font-bold text-slate-900">Review application</h2>
                         <p class="mt-1 text-xs text-slate-500">{{ $inquiry->opportunity?->listingTitle() ?? 'Removed career' }}</p>
                     </div>
-                    <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close inquiry"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
+                    <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close application review"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
                 </div>
-                <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" class="grid gap-4 p-6" data-dashboard-dialog-form data-submit-label="Saving inquiry...">
+                <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" class="grid gap-4 p-6" data-dashboard-dialog-form data-submit-label="Saving decision...">
                     @csrf @method('PATCH')
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                        <p><span class="font-bold text-slate-900">Alumni:</span> {{ $inquiry->name }}</p>
+                        <p><span class="font-bold text-slate-900">Applicant:</span> {{ $inquiry->name }}</p>
                         <p class="mt-1"><span class="font-bold text-slate-900">Email:</span> {{ $inquiry->email }}</p>
                         <p class="mt-1"><span class="font-bold text-slate-900">Contact number:</span> {{ $inquiry->contact_number }}</p>
                         <p class="mt-3 whitespace-pre-line">{{ $inquiry->message }}</p>
                     </div>
+                    @if (is_array($inquiry->credential_paths) && count($inquiry->credential_paths) > 0)
+                        <div class="rounded-lg border border-purple-100 bg-purple-50 p-4">
+                            <p class="text-xs font-bold uppercase tracking-wide text-purple-700">Attached credentials</p>
+                            <ul class="mt-2 space-y-1.5">
+                                @foreach ($inquiry->credential_paths as $idx => $credential)
+                                    <li class="flex items-center gap-2 text-sm">
+                                        <x-dashboard-icon name="file-text" class="h-4 w-4 shrink-0 text-purple-600" />
+                                        <a href="{{ route('admin.learning.alumni-jobs.inquiries.credential', [$inquiry, $idx]) }}" target="_blank" class="truncate font-semibold text-purple-700 underline decoration-purple-200 hover:text-purple-900">{{ data_get($credential, 'name', 'Credential '.($idx + 1)) }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                    @if ($inquiry->isApproved())
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Placement certificate</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-900">{{ $inquiry->certificateStatusLabel() ?? 'Not started' }}</p>
+                            @if ($inquiry->placement_certificate)
+                                <a href="{{ route('admin.learning.alumni-jobs.inquiries.placement-certificate', $inquiry) }}" target="_blank" class="mt-2 inline-flex items-center gap-1 text-sm font-bold text-purple-700 underline decoration-purple-200 hover:text-purple-900">
+                                    <x-dashboard-icon name="file-text" class="h-4 w-4" />
+                                    View placement certificate
+                                </a>
+                            @endif
+                            @if ($inquiry->certificate_admin_notes)
+                                <p class="mt-3 text-sm leading-6 text-slate-700"><span class="font-bold text-slate-900">Certificate remarks:</span> {{ $inquiry->certificate_admin_notes }}</p>
+                            @endif
+                            @if ($inquiry->certificateIsPendingReview())
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Approve this placement certificate and award the career?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button></form>
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Return this certificate for resubmission?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return certificate</button></form>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
                     <div>
-                        <label for="inquiry-status-{{ $inquiry->id }}" class="form-label">Status</label>
+                        <label for="inquiry-status-{{ $inquiry->id }}" class="form-label">Decision</label>
                         <select id="inquiry-status-{{ $inquiry->id }}" name="status" required class="form-field">
                             @foreach ($inquiryStatuses as $value => $label)
                                 <option value="{{ $value }}" @selected($inquiry->status === $value)>{{ $label }}</option>
@@ -236,7 +307,7 @@
                     </div>
                     <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                         <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                        <button type="submit" data-action-button class="primary-action">Save review</button>
+                        <button type="submit" data-action-button class="primary-action">Save decision</button>
                     </div>
                 </form>
             </dialog>

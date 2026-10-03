@@ -29,15 +29,15 @@
             ['label' => 'Dashboard', 'icon' => 'fa-gauge-high', 'href' => route('admin.dashboard'), 'active' => request()->routeIs('admin.dashboard')],
             ['label' => 'Applications', 'icon' => 'fa-clipboard-list', 'href' => route('admin.applications.index'), 'active' => request()->routeIs('admin.applications.*')],
             ['label' => 'Enrollments', 'icon' => 'fa-user-check', 'href' => route('admin.enrollments.index'), 'active' => request()->routeIs('admin.enrollments.*')],
-            ['label' => 'Alumni claims', 'icon' => 'fa-user-check', 'href' => route('admin.historical-alumni.index'), 'active' => request()->routeIs('admin.historical-alumni.*')],
-            ['label' => 'Alumni standing', 'icon' => 'fa-award', 'href' => route('admin.alumni-standing.index'), 'active' => request()->routeIs('admin.alumni-standing.*')],
             ['label' => 'Payments', 'icon' => 'fa-credit-card', 'href' => route('admin.payment-schedules.index'), 'active' => request()->routeIs('admin.payment-schedules.*')],
             ['label' => 'Announcements', 'icon' => 'fa-bullhorn', 'href' => route('admin.announcements.index'), 'active' => request()->routeIs('admin.announcements.*')],
             ['label' => 'Contact admin', 'icon' => 'fa-message-circle', 'href' => route('admin.contact-messages.index'), 'active' => request()->routeIs('admin.contact-messages.*')],
-            ['label' => 'Public Settings', 'icon' => 'fa-gear', 'href' => route('admin.public-settings.index'), 'active' => request()->routeIs('admin.public-settings.*')],
-            ['label' => 'Programs', 'icon' => 'fa-file-text', 'href' => route('admin.training-programs.index'), 'active' => request()->routeIs('admin.training-programs.*')],
-            ['label' => 'Batches', 'icon' => 'fa-folder-open', 'href' => route('admin.batches.index'), 'active' => request()->routeIs('admin.batches.*')],
-            ['label' => 'Schedules', 'icon' => 'fa-calendar-days', 'href' => route('admin.schedules.index'), 'active' => request()->routeIs('admin.schedules.*')],
+        ];
+
+        $alumniNav = [
+            ['label' => 'Alumni list', 'icon' => 'fa-users', 'href' => route('admin.alumni.index'), 'active' => request()->routeIs('admin.alumni.*')],
+            ['label' => 'Alumni claims', 'icon' => 'fa-user-check', 'href' => route('admin.historical-alumni.index'), 'active' => request()->routeIs('admin.historical-alumni.*')],
+            ['label' => 'Alumni standing', 'icon' => 'fa-award', 'href' => route('admin.alumni-standing.index'), 'active' => request()->routeIs('admin.alumni-standing.*')],
         ];
 
         $capstoneNav = [
@@ -46,12 +46,25 @@
             ['label' => 'Training Records', 'icon' => 'fa-award', 'href' => route('admin.learning.certificates'), 'active' => request()->routeIs('admin.learning.certificates', 'admin.learning.documents.*', 'admin.learning.batch-exports.*')],
             ['label' => 'Career Hub', 'icon' => 'fa-briefcase', 'href' => route('admin.learning.alumni-jobs'), 'active' => request()->routeIs('admin.learning.alumni-jobs')],
             ['label' => 'Reports', 'icon' => 'fa-chart-column', 'href' => route('admin.learning.reports'), 'active' => request()->routeIs('admin.learning.reports')],
+        ];
+
+        $configNav = [
+            ['label' => 'Programs', 'icon' => 'fa-file-text', 'href' => route('admin.training-programs.index'), 'active' => request()->routeIs('admin.training-programs.*')],
+            ['label' => 'Batches', 'icon' => 'fa-folder-open', 'href' => route('admin.batches.index'), 'active' => request()->routeIs('admin.batches.*')],
+            ['label' => 'Schedules', 'icon' => 'fa-calendar-days', 'href' => route('admin.schedules.index'), 'active' => request()->routeIs('admin.schedules.*')],
+            ['label' => 'Public Settings', 'icon' => 'fa-gear', 'href' => route('admin.public-settings.index'), 'active' => request()->routeIs('admin.public-settings.*')],
             ['label' => 'Accounts', 'icon' => 'fa-users', 'href' => route('admin.accounts.index'), 'active' => request()->routeIs('admin.accounts.*')],
         ];
+
+        $configDrawerOpen = collect($configNav)->contains('active', true);
+        $learningDrawerOpen = collect($capstoneNav)->contains('active', true);
+
         $adminMobilePrimary = array_slice($primaryNav, 0, 3);
         $adminMobileMore = array_merge(
             array_slice($primaryNav, 3),
+            $alumniNav,
             $capstoneNav,
+            $configNav,
             [
                 ['label' => 'Admin logs', 'icon' => 'fa-shield-halved', 'href' => route('admin.logs.index'), 'active' => request()->routeIs('admin.logs.*')],
                 ['label' => 'Public site', 'icon' => 'fa-arrow-up-right-from-square', 'href' => route('landing'), 'active' => false],
@@ -84,10 +97,10 @@
                 </div>
             </div>
 
-            <div>
-                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Learning system</p>
+            <div class="border-t border-slate-200 pt-3">
+                <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Alumni</p>
                 <div class="mt-2 space-y-1">
-                    @foreach ($capstoneNav as $item)
+                    @foreach ($alumniNav as $item)
                         <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
                             <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
                             <span>{{ $item['label'] }}</span>
@@ -96,7 +109,41 @@
                 </div>
             </div>
 
-            <div class="border-t border-slate-200 pt-4">
+            <div class="border-t border-slate-200 pt-3">
+                <details class="group" @if($learningDrawerOpen) open @endif>
+                    <summary class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:bg-slate-50 hover:text-slate-600">
+                        <span class="flex-1">Learning system</span>
+                        <x-dashboard-icon name="chevron-down" class="h-3 w-3 transition group-open:rotate-180" />
+                    </summary>
+                    <div class="mt-1 space-y-1">
+                        @foreach ($capstoneNav as $item)
+                            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                                <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                                <span>{{ $item['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </details>
+            </div>
+
+            <div class="border-t border-slate-200 pt-3">
+                <details class="group" @if($configDrawerOpen) open @endif>
+                    <summary class="flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 hover:bg-slate-50 hover:text-slate-600">
+                        <span class="flex-1">Configuration</span>
+                        <x-dashboard-icon name="chevron-down" class="h-3 w-3 transition group-open:rotate-180" />
+                    </summary>
+                    <div class="mt-1 space-y-1">
+                        @foreach ($configNav as $item)
+                            <a href="{{ $item['href'] }}" data-dashboard-prefetch data-dashboard-nav-key="admin-{{ str($item['label'])->slug() }}" class="{{ $navClass }} {{ $item['active'] ? $navActive : $navIdle }}" @if($item['active']) aria-current="page" @endif>
+                                <x-dashboard-icon :name="$item['icon']" class="dashboard-nav-icon" />
+                                <span>{{ $item['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </details>
+            </div>
+
+            <div class="border-t border-slate-200 pt-3">
                 <a href="{{ route('admin.logs.index') }}" data-dashboard-prefetch data-dashboard-nav-key="admin-admin-logs" class="{{ $navClass }} {{ request()->routeIs('admin.logs.*') ? $navActive : $navIdle }}">
                     <x-dashboard-icon name="shield-halved" class="dashboard-nav-icon" />
                     <span>Admin logs</span>

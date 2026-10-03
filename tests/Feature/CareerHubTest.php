@@ -14,7 +14,9 @@ use App\Notifications\CareerOpportunityPublished;
 use App\Notifications\LmsAnnouncementPublished;
 use App\Services\SemaphoreSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CareerHubTest extends TestCase
@@ -85,8 +87,8 @@ class CareerHubTest extends TestCase
             ->assertSee('Ambulatory')
             ->assertSee('MCARE-Coordinated Placement')
             ->assertSee('Open opportunity')
-            ->assertSee('Contact MCARE for details')
-            ->assertSee(route('trainee.career-hub.contact', $opportunity), false)
+            ->assertSee('Apply for this career')
+            ->assertSee(route('trainee.career-hub.apply-form', $opportunity), false)
             ->assertDontSee('private@example.test')
             ->assertDontSee('Must never be stored');
     }
@@ -321,7 +323,7 @@ class CareerHubTest extends TestCase
             ->assertSee(now()->addDays(10)->format('M d, Y'))
             ->assertSee('Open opportunity')
             ->assertSee('MCARE-Coordinated Placement')
-            ->assertDontSee(route('trainee.career-hub.contact', $opportunity), false);
+            ->assertDontSee(route('trainee.career-hub.apply-form', $opportunity), false);
 
         $this->actingAs($trainee)
             ->get(route('admin.learning.alumni-jobs.preview'))
@@ -380,7 +382,7 @@ class CareerHubTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_graduate_can_submit_a_career_inquiry_for_admin_review(): void
+    public function test_graduate_can_apply_for_a_career_and_admin_can_approve_or_reject(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $graduate = $this->graduatedUser();
@@ -399,15 +401,23 @@ class CareerHubTest extends TestCase
         $opportunity = CareerOpportunity::query()->firstOrFail();
 
         $this->actingAs($graduate)
+            ->get(route('trainee.career-hub.apply-form', $opportunity))
+            ->assertOk()
+            ->assertSee('Apply for this career')
+            ->assertSee('Live-in caregiver, Pili')
+            ->assertSee('Attach credentials')
+            ->assertSee('Submit application');
+
+        $this->actingAs($graduate)
             ->from(route('alumni.dashboard'))
-            ->post(route('trainee.career-hub.contact', $opportunity), [
+            ->post(route('trainee.career-hub.apply', $opportunity), [
                 'name' => $graduate->name,
                 'email' => $graduate->email,
                 'contact_number' => '09170000000',
                 'message' => 'I am available for live-in duty starting next week.',
             ])
-            ->assertRedirect(route('alumni.dashboard'))
-            ->assertSessionHas('saved', 'Your inquiry was sent to MCARE administration.');
+            ->assertRedirect(route('trainee.applications'))
+            ->assertSessionHas('saved', 'Your application was submitted. MCARE administration will review it.');
 
         $this->assertDatabaseHas('career_inquiries', [
             'user_id' => $graduate->id,
@@ -428,15 +438,29 @@ class CareerHubTest extends TestCase
         $adminPage = $this->actingAs($admin)->get(route('admin.learning.alumni-jobs'));
         $adminPage
             ->assertOk()
-            ->assertSee('Career inquiries')
+            ->assertSee('Career applications')
             ->assertSee($graduate->name)
             ->assertSee('I am available for live-in duty starting next week.')
+            ->assertSee('Pending')
+            ->assertSee('Approve')
+            ->assertSee('Reject');
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.achievements'))
+            ->assertOk()
+            ->assertSee('No career history yet');
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.applications'))
+            ->assertOk()
+            ->assertSee('My Applications')
+            ->assertSee('Live-in caregiver, Pili')
             ->assertSee('Pending');
 
         $this->actingAs($admin)
             ->from(route('admin.learning.alumni-jobs'))
             ->patch(route('admin.learning.alumni-jobs.inquiries.update', $inquiry), [
-                'status' => CareerInquiry::STATUS_REVIEWED,
+                'status' => CareerInquiry::STATUS_APPROVED,
                 'admin_notes' => 'Called the graduate to confirm availability.',
             ])
             ->assertRedirect(route('admin.learning.alumni-jobs'))
@@ -444,7 +468,8 @@ class CareerHubTest extends TestCase
 
         $this->assertDatabaseHas('career_inquiries', [
             'id' => $inquiry->id,
-            'status' => CareerInquiry::STATUS_REVIEWED,
+            'status' => CareerInquiry::STATUS_APPROVED,
+            'certificate_status' => CareerInquiry::CERT_AWAITING_UPLOAD,
             'admin_notes' => 'Called the graduate to confirm availability.',
             'reviewed_by_id' => $admin->id,
         ]);
@@ -452,26 +477,79 @@ class CareerHubTest extends TestCase
         $this->actingAs($graduate)
             ->get(route('trainee.achievements'))
             ->assertOk()
-            ->assertSee('Achievements history')
+            ->assertSee('Career history')
             ->assertSee('Live-in caregiver, Pili')
-            ->assertSee('₱18,000 / month');
+            ->assertSee('₱18,000 / month')
+            ->assertSee('Certificate required')
+            ->assertSee('Upload your placement certificate')
+            ->assertDontSee('Awarded');
+
+        Storage::fake('local');
+
+        $this->actingAs($graduate)
+            ->post(route('trainee.achievements.upload-certificate', $inquiry), [
+                'placement_certificate' => UploadedFile::fake()->create('placement-proof.pdf', 120, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved', 'Your placement certificate was submitted. MCARE administration will review it.');
+
+        $inquiry->refresh();
+        $this->assertSame(CareerInquiry::CERT_PENDING_REVIEW, $inquiry->certificate_status);
+        $this->assertNotNull($inquiry->placement_certificate);
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.achievements'))
+            ->assertOk()
+            ->assertSee('Certificate under review');
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.alumni-jobs'))
+            ->patch(route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry), [
+                'certificate_status' => CareerInquiry::CERT_APPROVED,
+            ])
+            ->assertRedirect(route('admin.learning.alumni-jobs'))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseHas('career_inquiries', [
+            'id' => $inquiry->id,
+            'certificate_status' => CareerInquiry::CERT_APPROVED,
+            'certificate_reviewed_by_id' => $admin->id,
+        ]);
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.achievements'))
+            ->assertOk()
+            ->assertSee('Awarded')
+            ->assertSee('View awarded certificate');
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.applications'))
+            ->assertOk()
+            ->assertSee('My Applications')
+            ->assertSee('Live-in caregiver, Pili')
+            ->assertSee('Approved');
 
         $this->actingAs($graduate)
             ->get(route('alumni.dashboard'))
             ->assertOk()
-            ->assertSee('Inquiry sent')
-            ->assertDontSee('data-dashboard-dialog-open="career-contact-'.$opportunity->id.'"', false);
+            ->assertSee('Approved')
+            ->assertDontSee(route('trainee.career-hub.apply-form', $opportunity), false);
+
+        $this->actingAs($graduate)
+            ->get(route('trainee.career-hub.apply-form', $opportunity))
+            ->assertOk()
+            ->assertSee('You already applied for this career');
 
         $this->actingAs($graduate)
             ->from(route('alumni.dashboard'))
-            ->post(route('trainee.career-hub.contact', $opportunity), [
+            ->post(route('trainee.career-hub.apply', $opportunity), [
                 'name' => $graduate->name,
                 'email' => $graduate->email,
                 'contact_number' => '09170000000',
                 'message' => 'Sending again.',
             ])
-            ->assertRedirect(route('alumni.dashboard'))
-            ->assertSessionHas('saved', 'MCARE administration already received your inquiry for this career.');
+            ->assertRedirect(route('trainee.applications'))
+            ->assertSessionHas('saved', 'You already applied for this career. MCARE administration will review your application.');
 
         $this->assertSame(1, CareerInquiry::query()->count());
 
@@ -483,7 +561,7 @@ class CareerHubTest extends TestCase
         $this->assertDatabaseMissing('career_inquiries', ['id' => $inquiry->id]);
 
         $this->actingAs($trainee)
-            ->post(route('trainee.career-hub.contact', $opportunity), [
+            ->post(route('trainee.career-hub.apply', $opportunity), [
                 'name' => 'Trainee',
                 'email' => $trainee->email,
                 'contact_number' => '09171111111',
@@ -577,6 +655,56 @@ class CareerHubTest extends TestCase
             'notifiable_id' => $otherTrainee->id,
             'type' => LmsAnnouncementPublished::class,
         ]);
+    }
+
+    public function test_admin_can_view_the_alumni_list(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $graduate = $this->graduatedUser();
+        $graduate->update(['name' => 'Listed Graduate']);
+
+        AlumniProfile::query()->create([
+            'user_id' => $graduate->id,
+            'rank' => AlumniProfile::RANK_JUNIOR,
+            'is_available_for_duty' => true,
+            'availability_updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.alumni.index'))
+            ->assertOk()
+            ->assertSee('Alumni list')
+            ->assertSee('Listed Graduate')
+            ->assertSee($graduate->email)
+            ->assertSee('Available for Duty')
+            ->assertSee(route('admin.alumni.show', $graduate), false);
+    }
+
+    public function test_admin_can_view_an_alumni_profile(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $graduate = $this->graduatedUser();
+        $graduate->update(['name' => 'Profile Graduate']);
+
+        AlumniProfile::query()->create([
+            'user_id' => $graduate->id,
+            'rank' => AlumniProfile::RANK_JUNIOR,
+            'is_available_for_duty' => true,
+            'availability_updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.alumni.show', $graduate))
+            ->assertOk()
+            ->assertSee('Alumni profile')
+            ->assertSee('Profile Graduate')
+            ->assertSee($graduate->email)
+            ->assertSee('Caregiving NC II')
+            ->assertSee('Available for Duty');
+
+        $this->actingAs($admin)
+            ->get(route('admin.alumni.show', User::factory()->create(['role' => 'trainee'])))
+            ->assertNotFound();
     }
 
     private function graduatedUser(array $overrides = []): User

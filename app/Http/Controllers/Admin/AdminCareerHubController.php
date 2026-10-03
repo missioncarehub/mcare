@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\CareerGraduateNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -58,7 +59,6 @@ class AdminCareerHubController extends Controller
         AdminActivityLog::record($request->user(), 'career.portal.previewed');
 
         return view('admin.learning.alumni-preview', [
-            // Administrators see the exact published feed without impersonating an alumni account.
             'isAdminPreview' => true,
             'jobs' => CareerOpportunity::query()
                 ->visibleToAlumni()
@@ -67,7 +67,7 @@ class AdminCareerHubController extends Controller
                 ->paginate(12),
             'unreadNotifications' => 0,
             'alumniProfile' => null,
-            'contactedJobIds' => [],
+            'applicationStatuses' => [],
         ]);
     }
 
@@ -157,6 +157,8 @@ class AdminCareerHubController extends Controller
             'admin_notes' => ['nullable', 'string', 'max:1000', 'not_regex:/[<>]/u'],
         ]);
 
+        $previousStatus = $careerInquiry->status;
+
         $careerInquiry->fill([
             'status' => $validated['status'],
             'admin_notes' => $validated['admin_notes'] ?? null,
@@ -165,9 +167,22 @@ class AdminCareerHubController extends Controller
         if ($validated['status'] === CareerInquiry::STATUS_PENDING) {
             $careerInquiry->reviewed_at = null;
             $careerInquiry->reviewed_by_id = null;
+            $careerInquiry->certificate_status = null;
+            $careerInquiry->placement_certificate = null;
+            $careerInquiry->certificate_admin_notes = null;
+            $careerInquiry->certificate_reviewed_at = null;
+            $careerInquiry->certificate_reviewed_by_id = null;
         } else {
             $careerInquiry->reviewed_at = $careerInquiry->reviewed_at ?: now();
             $careerInquiry->reviewed_by_id = $request->user()->id;
+
+            if ($validated['status'] === CareerInquiry::STATUS_APPROVED && $previousStatus !== CareerInquiry::STATUS_APPROVED) {
+                $careerInquiry->certificate_status = CareerInquiry::CERT_AWAITING_UPLOAD;
+                $careerInquiry->placement_certificate = null;
+                $careerInquiry->certificate_admin_notes = null;
+                $careerInquiry->certificate_reviewed_at = null;
+                $careerInquiry->certificate_reviewed_by_id = null;
+            }
         }
 
         $careerInquiry->save();
@@ -192,6 +207,65 @@ class AdminCareerHubController extends Controller
         $careerInquiry->delete();
 
         return back()->with('saved', 'Inquiry for '.$label.' was removed.');
+    }
+
+    public function credential(Request $request, CareerInquiry $careerInquiry, int $index)
+    {
+        $file = data_get($careerInquiry->credential_paths, $index);
+        $path = data_get($file, 'path');
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $name = data_get($file, 'name', 'credential');
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Disposition' => 'inline; filename="'.$name.'"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function placementCertificate(CareerInquiry $careerInquiry)
+    {
+        $path = data_get($careerInquiry->placement_certificate, 'path');
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $name = data_get($careerInquiry->placement_certificate, 'name', 'placement-certificate');
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Disposition' => 'inline; filename="'.$name.'"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function updateCertificateReview(Request $request, CareerInquiry $careerInquiry): RedirectResponse
+    {
+        abort_unless($careerInquiry->certificateIsPendingReview(), 404);
+
+        $validated = $request->validate([
+            'certificate_status' => ['required', Rule::in([
+                CareerInquiry::CERT_APPROVED,
+                CareerInquiry::CERT_REJECTED,
+            ])],
+            'certificate_admin_notes' => ['nullable', 'string', 'max:1000', 'not_regex:/[<>]/u'],
+        ]);
+
+        $careerInquiry->fill([
+            'certificate_status' => $validated['certificate_status'],
+            'certificate_admin_notes' => $validated['certificate_admin_notes'] ?? null,
+            'certificate_reviewed_at' => now(),
+            'certificate_reviewed_by_id' => $request->user()->id,
+        ])->save();
+
+        $careerInquiry->loadMissing('opportunity');
+
+        AdminActivityLog::record($request->user(), 'career.certificate.reviewed', $careerInquiry, [
+            'certificate_status' => $careerInquiry->certificate_status,
+        ]);
+
+        $message = $validated['certificate_status'] === CareerInquiry::CERT_APPROVED
+            ? 'Placement certificate approved. This career is now awarded in the alumni career history.'
+            : 'Placement certificate was returned to the alumni for resubmission.';
+
+        return back()->with('saved', $message);
     }
 
     /** @return array<string, mixed> */
