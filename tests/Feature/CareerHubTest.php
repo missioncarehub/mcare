@@ -502,6 +502,14 @@ class CareerHubTest extends TestCase
             ->assertOk()
             ->assertSee('Certificate under review');
 
+        $reviewPage = $this->actingAs($admin)->get(route('admin.learning.alumni-jobs'));
+        $reviewPage->assertOk()->assertSee('Award career');
+        $reviewDom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $reviewDom->loadHTML($reviewPage->getContent());
+        libxml_clear_errors();
+        $this->assertSame(0, (new \DOMXPath($reviewDom))->query('//form//form')->length);
+
         $this->actingAs($admin)
             ->from(route('admin.learning.alumni-jobs'))
             ->patch(route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry), [
