@@ -9,6 +9,7 @@ use App\Models\CareerInquiry;
 use App\Models\CareerOpportunity;
 use App\Models\EnrollmentApplication;
 use App\Models\User;
+use App\Notifications\CareerAwarded;
 use App\Services\CareerGraduateNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -255,13 +256,19 @@ class AdminCareerHubController extends Controller
             'certificate_reviewed_by_id' => $request->user()->id,
         ])->save();
 
-        $careerInquiry->loadMissing('opportunity');
+        $careerInquiry->loadMissing(['opportunity', 'graduate']);
 
         AdminActivityLog::record($request->user(), 'career.certificate.reviewed', $careerInquiry, [
             'certificate_status' => $careerInquiry->certificate_status,
         ]);
 
-        $message = $validated['certificate_status'] === CareerInquiry::CERT_APPROVED
+        $awarded = $validated['certificate_status'] === CareerInquiry::CERT_APPROVED;
+
+        if ($awarded && $careerInquiry->graduate) {
+            $careerInquiry->graduate->notify(new CareerAwarded($careerInquiry));
+        }
+
+        $message = $awarded
             ? 'Placement certificate approved. This career is now awarded in the alumni career history.'
             : 'Placement certificate was returned to the alumni for resubmission.';
 

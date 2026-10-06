@@ -10,6 +10,7 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\AdminOperationsNotification;
+use App\Notifications\CareerAwarded;
 use App\Notifications\CareerOpportunityPublished;
 use App\Notifications\LmsAnnouncementPublished;
 use App\Services\SemaphoreSmsService;
@@ -523,6 +524,18 @@ class CareerHubTest extends TestCase
             'certificate_status' => CareerInquiry::CERT_APPROVED,
             'certificate_reviewed_by_id' => $admin->id,
         ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $graduate->id,
+            'type' => CareerAwarded::class,
+        ]);
+
+        $this->actingAs($graduate)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('Career awarded')
+            ->assertSee('Live-in caregiver, Pili');
 
         $this->actingAs($graduate)
             ->get(route('trainee.achievements'))
