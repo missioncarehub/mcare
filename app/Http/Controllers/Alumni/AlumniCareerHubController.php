@@ -24,10 +24,17 @@ class AlumniCareerHubController extends Controller
             ->where('user_id', $request->user()->id)
             ->pluck('status', 'career_opportunity_id')
             ->all();
+        $appliedIds = array_map('intval', array_keys($applications));
 
         return view('trainee.career-hub', [
             'jobs' => CareerOpportunity::query()
-                ->visibleToAlumni()
+                ->where(function ($query) use ($appliedIds): void {
+                    $query->visibleToAlumni();
+
+                    if ($appliedIds !== []) {
+                        $query->orWhereIn('id', $appliedIds);
+                    }
+                })
                 ->orderBy('estimated_start_date')
                 ->latest('published_at')
                 ->paginate(12),
@@ -148,12 +155,12 @@ class AlumniCareerHubController extends Controller
 
     public function showApplyForm(Request $request, CareerOpportunity $careerOpportunity): View
     {
-        abort_unless($careerOpportunity->isVisibleToAlumni(), 404);
-
         $existing = CareerInquiry::query()
             ->where('user_id', $request->user()->id)
             ->where('career_opportunity_id', $careerOpportunity->id)
             ->first();
+
+        abort_unless($careerOpportunity->isVisibleToAlumni() || $existing, 404);
 
         $graduate = $request->user()->loadMissing('enrollmentApplication');
 
@@ -169,7 +176,12 @@ class AlumniCareerHubController extends Controller
         CareerOpportunity $careerOpportunity,
         AdminOperationsNotifier $adminNotifier,
     ): RedirectResponse {
-        abort_unless($careerOpportunity->isVisibleToAlumni(), 404);
+        $alreadyApplied = CareerInquiry::query()
+            ->where('user_id', $request->user()->id)
+            ->where('career_opportunity_id', $careerOpportunity->id)
+            ->exists();
+
+        abort_unless($careerOpportunity->isVisibleToAlumni() || $alreadyApplied, 404);
 
         $graduate = $request->user()->loadMissing('enrollmentApplication');
         $safeText = ['not_regex:/[<>]/u'];

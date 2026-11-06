@@ -9,8 +9,10 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Services\AnnouncementDeliveryService;
+use App\Services\SemaphoreSmsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -59,6 +61,7 @@ class AdminAnnouncementController extends Controller
             'target_user_id' => ['nullable', 'required_if:target_type,user', 'exists:users,id'],
             'due_date' => ['nullable', 'date'],
             'send_email' => ['nullable', 'boolean'],
+            'send_sms' => ['nullable', 'boolean'],
         ]);
 
         $announcement = AdminAnnouncement::create([
@@ -71,6 +74,7 @@ class AdminAnnouncementController extends Controller
             'target_user_id' => $validated['target_type'] === 'user' ? $validated['target_user_id'] : null,
             'due_date' => $validated['due_date'] ?? null,
             'send_email' => $request->boolean('send_email'),
+            'send_sms' => $request->boolean('send_sms'),
             'is_published' => true,
             'posted_at' => now(),
         ]);
@@ -93,19 +97,41 @@ class AdminAnnouncementController extends Controller
         };
 
         if ($recipients->isNotEmpty()) {
+            $recipients->load('enrollmentApplication');
             $this->announcementDelivery->deliverAdminAnnouncement($announcement, $recipients);
+        }
+
+        $smsDelivery = $announcement->send_sms
+            ? $this->sendAnnouncementSms($announcement, $recipients)
+            : ['sent' => 0, 'failed' => 0, 'skipped' => 0, 'recipients' => []];
+
+        if ($announcement->send_sms) {
+            $announcement->forceFill(['sms_delivery' => $smsDelivery])->save();
         }
 
         AdminActivityLog::record($request->user(), 'admin.announcement.published', $announcement, [
             'target_type' => $announcement->target_type,
             'recipients_count' => $recipients->count(),
             'send_email' => $announcement->send_email,
+            'send_sms' => $announcement->send_sms,
+            'sms_delivery' => $smsDelivery,
             'due_date' => $announcement->due_date?->toDateString(),
         ]);
 
-        $emailNotice = $announcement->send_email ? ' and emailed' : '';
+        $channels = ['in-app'];
+        if ($announcement->send_email) {
+            $channels[] = 'email';
+        }
+        if ($announcement->send_sms) {
+            $channels[] = 'SMS';
+        }
 
-        return back()->with('saved', "Announcement published{$emailNotice} to {$recipients->count()} recipient(s).");
+        $message = 'Announcement published by '.implode(', ', $channels).' to '.$recipients->count().' recipient(s).';
+        if ($announcement->send_sms) {
+            $message .= ' SMS sent '.$smsDelivery['sent'].', failed '.$smsDelivery['failed'].', skipped '.$smsDelivery['skipped'].'.';
+        }
+
+        return back()->with('saved', $message);
     }
 
     public function destroy(Request $request, AdminAnnouncement $announcement): RedirectResponse
@@ -117,5 +143,30 @@ class AdminAnnouncementController extends Controller
         $announcement->delete();
 
         return back()->with('saved', 'Announcement removed.');
+    }
+
+    /**
+     * @param  iterable<User>  $recipients
+     * @return array{sent: int, failed: int, skipped: int, recipients: list<array{user_id: int, status: string, error: ?string}>}
+     */
+    private function sendAnnouncementSms(AdminAnnouncement $announcement, iterable $recipients): array
+    {
+        $sms = app(SemaphoreSmsService::class);
+        $body = Str::limit(trim($announcement->title.': '.$announcement->message), 480, '');
+        $delivery = ['sent' => 0, 'failed' => 0, 'skipped' => 0, 'recipients' => []];
+
+        foreach ($recipients as $user) {
+            $number = $user->contact_number ?: $user->enrollmentApplication?->contact_number;
+            $result = $sms->sendOne($number, $body);
+            $status = $result['sent'] ? 'sent' : ($result['skipped'] ? 'skipped' : 'failed');
+            $delivery[$status]++;
+            $delivery['recipients'][] = [
+                'user_id' => $user->id,
+                'status' => $status,
+                'error' => $result['error'],
+            ];
+        }
+
+        return $delivery;
     }
 }

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\AdminAnnouncementNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -56,6 +57,42 @@ class AdminAnnouncementTest extends TestCase
                 return $notification->announcement->id === $announcement->id;
             }
         );
+    }
+
+    public function test_announcement_sms_records_sent_and_skipped_numbers(): void
+    {
+        Http::fake([
+            'api.semaphore.co/*' => Http::response([['message_id' => 41, 'status' => 'Pending']], 200),
+        ]);
+        Notification::fake();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $reachable = User::factory()->create(['role' => 'trainee']);
+        $unreachable = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $reachableApplication = $this->createApprovedApplication($reachable, $batch);
+        $skippedApplication = $this->createApprovedApplication($unreachable, $batch);
+        $reachable->forceFill(['contact_number' => '09171234567'])->save();
+        $reachableApplication->forceFill(['contact_number' => '09171234567'])->save();
+        $unreachable->forceFill(['contact_number' => 'not-a-mobile'])->save();
+        $skippedApplication->forceFill(['contact_number' => 'not-a-mobile'])->save();
+
+        $this->actingAs($admin)
+            ->post(route('admin.announcements.store'), [
+                'title' => 'Clinic reminder',
+                'message' => 'Bring your white uniform on Monday.',
+                'kind' => 'announcement',
+                'target_type' => 'all',
+                'send_sms' => 1,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $announcement = AdminAnnouncement::query()->firstOrFail();
+        $this->assertTrue($announcement->send_sms);
+        $this->assertSame(1, $announcement->sms_delivery['sent']);
+        $this->assertSame(1, $announcement->sms_delivery['skipped']);
+        $this->assertSame(0, $announcement->sms_delivery['failed']);
     }
 
     public function test_admin_can_send_monthly_payment_reminder_to_specific_batch(): void

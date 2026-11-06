@@ -145,6 +145,10 @@ class CareerInquiry extends Model
 
     public function statusLabel(): string
     {
+        if ($this->status === self::STATUS_REJECTED && str_contains((string) $this->admin_notes, 'Not selected. The opening was filled.')) {
+            return 'Not selected';
+        }
+
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();
     }
 }

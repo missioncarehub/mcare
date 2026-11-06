@@ -81,6 +81,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'applicant_status',
         'trainee_status',
         'password',
+        'verified_banner_dismissed_at',
     ];
 
     /**
@@ -102,6 +103,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     {
         return [
             'email_verified_at' => 'datetime',
+            'verified_banner_dismissed_at' => 'datetime',
             'birth_date' => 'date',
             'year_graduated' => 'integer',
             'password' => 'hashed',

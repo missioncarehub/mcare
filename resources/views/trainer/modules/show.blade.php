@@ -272,7 +272,7 @@
                     <div><p class="lms-eyebrow">{{ $module->title }}</p><h2 id="module-quiz-title">Create module quiz</h2><p>Create the draft, then add the answer key and questions.</p></div>
                     <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close quiz creator"><x-dashboard-icon name="xmark" /></button>
                 </div>
-                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
+                <form method="POST" action="{{ route('trainer.modules.quizzes.store', $module) }}" enctype="multipart/form-data" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
                     @csrf
                     <input type="hidden" name="_composer" value="module-quiz">
                     <div class="lms-field lms-field-span-2">
@@ -301,6 +301,7 @@
                         <label class="block text-xs font-bold text-purple-900 mb-1">Passing Score (%)</label>
                         <input type="number" name="passing_score_percent" value="75" min="50" max="100" class="form-field">
                     </div>
+                    @include('trainer.quizzes.partials.question-file', ['inputId' => 'module-quiz-question-file'])
                     <p class="lms-field-wide text-xs text-stone-600">The assessment starts as a draft. Add the answer key and questions before publishing it to trainees.</p>
                     <div class="lms-form-actions lms-field-wide">
                         <button type="button" data-dashboard-dialog-close class="secondary-action text-xs">Cancel</button>

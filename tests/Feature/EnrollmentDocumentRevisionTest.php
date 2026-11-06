@@ -121,10 +121,18 @@ class EnrollmentDocumentRevisionTest extends TestCase
         $this->assertSame('replace', $application->document_review['birth-certificate']['status']);
         $this->assertSame('Image is blurry.', $application->document_review['birth-certificate']['note']);
 
-        $this->actingAs($admin)
-            ->get(route('admin.enrollments.document-review', $application))
+        $reviewPage = $this->actingAs($admin)
+            ->get(route('admin.enrollments.document-review', $application));
+
+        $reviewPage
             ->assertOk()
-            ->assertSee('value="replace" selected', false);
+            ->assertSee('type="radio"', false)
+            ->assertDontSee('<select id="review-', false);
+
+        $this->assertMatchesRegularExpression(
+            '/name="documents\[birth-certificate\]\[status\]"\s+value="replace"[\s\S]*?checked/s',
+            $reviewPage->getContent(),
+        );
 
         Notification::assertSentTo($applicant, EnrollmentDocumentsReviseRequestedNotification::class);
     }
@@ -217,7 +225,8 @@ class EnrollmentDocumentRevisionTest extends TestCase
         $this->assertSame('enrollment-documents/test/education-document.pdf', $application->education_document_path);
         $this->assertNotSame('enrollment-documents/test/birth-certificate.pdf', $application->birth_certificate_path);
         Storage::disk('local')->assertExists($application->birth_certificate_path);
-        Storage::disk('local')->assertMissing('enrollment-documents/test/birth-certificate.pdf');
+        Storage::disk('local')->assertExists('enrollment-documents/test/birth-certificate.pdf');
+        $this->assertSame('enrollment-documents/test/birth-certificate.pdf', $application->document_review['birth-certificate']['history'][0]['path']);
         Storage::disk('local')->assertExists('enrollment-documents/test/education-document.pdf');
     }
 

@@ -2,9 +2,7 @@
 
 @section('content')
 @php
-    $submittedAttempts = collect($attempts->items());
-    $averageScore = $submittedAttempts->whereNotNull('score_percent')->avg('score_percent');
-    $passedCount = $submittedAttempts->where('passed', true)->count();
+    $classSummary = $classSummary ?? ['average' => null, 'highest' => null, 'lowest' => null, 'passed' => 0];
     $audienceLabel = $quiz->targetTrainee
         ? trim($quiz->targetTrainee->first_name.' '.$quiz->targetTrainee->last_name)
         : ($quiz->batch ? $quiz->batch->name.' '.$quiz->batch->year : 'Assigned class');
@@ -31,13 +29,18 @@
         </article>
         <article class="lms-metric-card">
             <span>Average score</span>
-            <strong>{{ $averageScore !== null ? number_format($averageScore, 1).'%' : '-' }}</strong>
-            <small>Current page</small>
+            <strong>{{ $classSummary['average'] !== null ? number_format((float) $classSummary['average'], 1).'%' : '-' }}</strong>
+            <small>Whole class</small>
+        </article>
+        <article class="lms-metric-card">
+            <span>Highest / lowest</span>
+            <strong>{{ $classSummary['highest'] !== null ? number_format((float) $classSummary['highest'], 1).'%' : '-' }} / {{ $classSummary['lowest'] !== null ? number_format((float) $classSummary['lowest'], 1).'%' : '-' }}</strong>
+            <small>Whole class</small>
         </article>
         <article class="lms-metric-card">
             <span>Passed</span>
-            <strong>{{ $passedCount }}</strong>
-            <small>Current page</small>
+            <strong>{{ $classSummary['passed'] }}</strong>
+            <small>Whole class</small>
         </article>
     </section>
 

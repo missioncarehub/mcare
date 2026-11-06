@@ -83,6 +83,32 @@ class SemaphoreSmsService
         return ['sent' => true, 'status' => $response->status(), 'error' => null];
     }
 
+    /**
+     * @return array{sent: bool, skipped: bool, status: ?int, error: ?string}
+     */
+    public function sendOne(?string $rawNumber, string $message, bool $priority = false): array
+    {
+        $number = $this->normalizePhilippineNumber($rawNumber);
+
+        if ($number === null) {
+            return [
+                'sent' => false,
+                'skipped' => true,
+                'status' => null,
+                'error' => 'Not a valid Philippine mobile number.',
+            ];
+        }
+
+        $result = $this->send([$number], $message, null, $priority);
+
+        return [
+            'sent' => (bool) $result['sent'],
+            'skipped' => false,
+            'status' => $result['status'],
+            'error' => $result['error'],
+        ];
+    }
+
     public function normalizePhilippineNumber(?string $raw): ?string
     {
         $digits = preg_replace('/\D+/', '', (string) $raw) ?? '';

@@ -2131,6 +2131,42 @@ form[data-auto-filter].is-filtering {
     font-size: 0.75rem;
 }
 
+.universal-dashboard .lms-question-import {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+    padding: 16px;
+    border: 1px dashed var(--lms-border);
+    background: #faf8ff;
+}
+
+.universal-dashboard .lms-question-import h3 {
+    font-size: 0.92rem;
+    font-weight: 900;
+}
+
+.universal-dashboard .lms-question-import p,
+.universal-dashboard .lms-import-status {
+    color: var(--lms-muted);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.universal-dashboard .lms-question-import a {
+    color: var(--lms-primary);
+    font-weight: 800;
+}
+
+.universal-dashboard .lms-question-import input[type="file"] {
+    max-width: 100%;
+    font-size: 0.85rem;
+}
+
+.universal-dashboard .lms-question-import code {
+    font-size: 0.85em;
+}
+
 .universal-dashboard .lms-summary-action {
     margin-left: auto;
     color: var(--lms-primary);

@@ -66,13 +66,22 @@ class EnrollmentDocumentRevisionController extends Controller
 
             $enrollmentApplication->forceFill($attributes);
 
+            $history = data_get($review, $key.'.history', []);
+            if (! is_array($history)) {
+                $history = [];
+            }
+
             if (filled($previousPath) && $previousPath !== $path) {
-                Storage::disk('local')->delete($previousPath);
+                $history[] = [
+                    'path' => $previousPath,
+                    'replaced_at' => now()->toIso8601String(),
+                ];
             }
 
             $review[$key] = [
                 'status' => 'unreviewed',
                 'note' => 'Replacement uploaded; awaiting admin review.',
+                'history' => $history,
             ];
 
             if ($key === 'id-photo' && $enrollmentApplication->user) {

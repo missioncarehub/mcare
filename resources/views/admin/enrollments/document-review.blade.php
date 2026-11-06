@@ -11,7 +11,7 @@
             Back to application
         </a>
         <span class="dashboard-pill {{ $documentsReadyForApproval ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">
-            {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
+            {{ $documentsReadyForApproval ? 'All verified' : count($pendingDocumentApprovals).' pending' }}
         </span>
     </div>
 
@@ -19,7 +19,7 @@
         <div>
             <p class="text-xs font-bold uppercase tracking-wider text-purple-700">{{ $application->last_name }}, {{ $application->first_name }}</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-950">Review documents</h1>
-            <p class="mt-2 text-sm leading-6 text-slate-600">Preview each file and mark every required document as Accepted. Document review stays incomplete while any file is still pending.</p>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Preview each file and choose one status. A remark is required when the document is not verified.</p>
         </div>
 
         @unless($releasedForReview)
@@ -41,11 +41,18 @@
                 @php
                     $storedReview = data_get($application->document_review, $key, []);
                     $defaultDocumentStatus = $document['path'] ? 'unreviewed' : 'missing';
+                    $currentDocumentStatus = old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus);
+                    $documentStatusOptions = [
+                        'unreviewed' => 'Pending',
+                        'accepted' => 'Verified',
+                        'replace' => 'Needs replacement',
+                        'missing' => 'Rejected',
+                    ];
                 @endphp
                 <div id="document-card-{{ $key }}" class="grid items-start gap-4 border-t border-slate-200 py-4 md:grid-cols-[minmax(14rem,0.8fr)_minmax(18rem,1.2fr)]">
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-3">
-                            <label for="review-{{ $key }}" class="text-sm font-bold text-slate-900">{{ $document['label'] }}</label>
+                            <p class="text-sm font-bold text-slate-900">{{ $document['label'] }}</p>
                             @if ($document['path'])
                                 <button type="button"
                                     class="document-preview-trigger secondary-action !px-3 !py-1.5 text-xs"
@@ -57,21 +64,35 @@
                                     Preview
                                 </button>
                             @else
-                                <span class="text-xs font-bold text-red-600">Missing</span>
+                                <span class="text-xs font-bold text-red-600">Not uploaded</span>
                             @endif
                         </div>
                         <p class="mt-2 text-xs leading-5 text-slate-500">{{ $document['path'] ? 'Private preview; access is logged.' : 'Applicant must upload this file.' }}</p>
                     </div>
                     <div>
-                        <label for="review-{{ $key }}" class="sr-only">Review status for {{ $document['label'] }}</label>
-                        <select id="review-{{ $key }}" name="documents[{{ $key }}][status]" class="w-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600">
-                            <option value="unreviewed" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'unreviewed')>Not reviewed</option>
-                            <option value="accepted" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'accepted')>Accepted</option>
-                            <option value="replace" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'replace')>Needs replacement</option>
-                            <option value="missing" @selected(old("documents.$key.status", $storedReview['status'] ?? $defaultDocumentStatus) === 'missing')>Missing</option>
-                        </select>
+                        <fieldset>
+                            <legend class="sr-only">Review status for {{ $document['label'] }}</legend>
+                            <div class="grid gap-2 sm:grid-cols-2">
+                                @foreach ($documentStatusOptions as $statusValue => $statusLabel)
+                                    <label class="flex items-center gap-2.5 border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50 has-[:checked]:text-purple-800">
+                                        <input
+                                            type="radio"
+                                            name="documents[{{ $key }}][status]"
+                                            value="{{ $statusValue }}"
+                                            class="h-4 w-4 border-slate-300 text-purple-700 focus:ring-purple-600"
+                                            @checked($currentDocumentStatus === $statusValue)
+                                            @required($loop->first)
+                                        >
+                                        <span>{{ $statusLabel }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </fieldset>
                         <label for="note-{{ $key }}" class="mt-3 block text-xs font-bold uppercase tracking-wider text-slate-500">Feedback or problem found</label>
-                        <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600" placeholder="Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
+                        <textarea id="note-{{ $key }}" name="documents[{{ $key }}][note]" rows="2" maxlength="500" class="mt-2 w-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-purple-600 focus:outline-none focus:ring-1 focus:ring-purple-600" placeholder="Required for Needs replacement or Rejected. Example: Image is blurry; upload a clear copy showing all corners.">{{ old("documents.$key.note", $storedReview['note'] ?? '') }}</textarea>
+                        @error('documents.'.$key.'.note')
+                            <p class="mt-1 text-xs font-semibold text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
             @endforeach
@@ -83,7 +104,7 @@
                 @if($documentsReadyForApproval && $application->documents_reviewed_at)
                     <p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>
                 @elseif(! $documentsReadyForApproval)
-                    <p class="text-xs text-amber-700">Accept every required document before this review can be completed.</p>
+                    <p class="text-xs text-amber-700">Verify every required document before this review can be completed.</p>
                 @endif
             </div>
 

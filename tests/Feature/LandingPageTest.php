@@ -50,6 +50,8 @@ class LandingPageTest extends TestCase
             ->assertSee('Advanced caregiving catalog offering.')
             ->assertSee(route('applications.create', ['training_program_id' => $extra->id]), false)
             ->assertSee('Admissions path')
+            ->assertSee(route('applications.status'), false)
+            ->assertSee('Check status')
             ->assertSee('data-landing-chat', false)
             ->assertDontSee('Basic Life Support')
             ->assertDontSee('Hidden Draft Program');

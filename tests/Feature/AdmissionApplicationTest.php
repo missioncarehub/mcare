@@ -10,8 +10,10 @@ use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Notifications\AdminOperationsNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdmissionApplicationTest extends TestCase
@@ -127,7 +129,122 @@ class AdmissionApplicationTest extends TestCase
         $this->get(route('applications.status', ['application_number' => $admission->application_number]))
             ->assertOk()
             ->assertSee('Pending review')
+            ->assertSee('Document review starts after you submit the enrollment form.')
             ->assertDontSee('Continue to enrollment');
+    }
+
+    public function test_status_lookup_includes_each_document_review_result(): void
+    {
+        $admission = $this->makeApprovedAdmission(['email' => 'documents.status@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+
+        EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => $admission->contact_number,
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'Upload a clearer complete copy.'],
+                'education-document' => ['status' => 'accepted', 'note' => null],
+                'id-photo' => ['status' => 'missing', 'note' => 'The ID photo was not attached.'],
+            ],
+        ]);
+
+        $this->get(route('applications.status', ['application_number' => $admission->application_number]))
+            ->assertOk()
+            ->assertSee('Document status')
+            ->assertSee('Birth Certificate')
+            ->assertSee('Needs replacement')
+            ->assertSee('Upload a clearer complete copy.')
+            ->assertSee('Form 137/138 or Diploma')
+            ->assertSee('Verified')
+            ->assertSee('ID Photo')
+            ->assertSee('Rejected')
+            ->assertSee('The ID photo was not attached.')
+            ->assertSee('Good Moral Certificate')
+            ->assertSee('Not uploaded')
+            ->assertSee('E-Signature')
+            ->assertSee('Upload replacement');
+    }
+
+    public function test_check_status_replacement_keeps_the_old_file_and_returns_the_document_to_pending(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admission = $this->makeApprovedAdmission(['email' => 'replace.status@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+        $enrollment = EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'Upload a clearer complete copy.'],
+            ],
+        ]);
+        Storage::disk('local')->put($enrollment->birth_certificate_path, '%PDF-1.4 old-birth');
+
+        $this->post(route('applications.documents.replace'), [
+            'application_number' => $admission->application_number,
+            'verifier' => 'wrong@example.test',
+            'document' => 'birth-certificate',
+            'replacement' => UploadedFile::fake()->create('birth.pdf', 40, 'application/pdf'),
+        ])->assertSessionHasErrors('verifier');
+
+        $this->post(route('applications.documents.replace'), [
+            'application_number' => $admission->application_number,
+            'verifier' => '09171234567',
+            'document' => 'birth-certificate',
+            'replacement' => UploadedFile::fake()->create('birth.pdf', 40, 'application/pdf'),
+        ])->assertRedirect(route('applications.status', [
+            'application_number' => $admission->application_number,
+        ]));
+
+        $enrollment->refresh();
+        $this->assertSame('unreviewed', $enrollment->document_review['birth-certificate']['status']);
+        $this->assertNotSame('enrollment-documents/test/birth-certificate.pdf', $enrollment->birth_certificate_path);
+        $this->assertSame('enrollment-documents/test/birth-certificate.pdf', $enrollment->document_review['birth-certificate']['history'][0]['path']);
+        Storage::disk('local')->assertExists('enrollment-documents/test/birth-certificate.pdf');
+        Storage::disk('local')->assertExists($enrollment->birth_certificate_path);
+        Notification::assertSentTo($admin, AdminOperationsNotification::class);
+
+        $this->get(route('applications.status', ['application_number' => $admission->application_number]))
+            ->assertOk()
+            ->assertSee('Pending')
+            ->assertDontSee('Upload replacement');
     }
 
     public function test_status_page_keeps_the_official_footer_on_the_layout(): void

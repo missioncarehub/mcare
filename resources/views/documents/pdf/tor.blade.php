@@ -55,6 +55,8 @@
     $address = collect([$application->street, $application->barangay, $application->city, $application->province, $application->zip_code])->filter()->implode(', ');
     $completionDate = $application->batch?->training_ends_at;
     $records = $application->competencyRecords->filter(fn($record) => $record->unit?->is_tor_included)->sortBy(fn($record) => $record->unit?->sort_order);
+    $certificateTemplate = $certificateTemplate ?? null;
+    $certificateValues = $certificateValues ?? [];
 @endphp
 <main class="page">
     <header class="header">
@@ -63,7 +65,7 @@
     </header>
     <div class="purple-rule"></div>
     <section class="title">
-        <h2>OFFICIAL TRANSCRIPT OF RECORD</h2>
+        <h2>{{ \App\Models\CertificateTemplate::headingFor(\App\Models\OfficialDocument::TYPE_TOR, $document) }}</h2>
         <p class="student-name">"{{ strtoupper($fullName) }}"</p>
         <p class="course">CAREGIVING NC II<em>Course<br>({{ $organization['course_hours'] }} Hours)</em></p>
     </section>
@@ -76,7 +78,7 @@
                 <tr><td class="school-block"><span class="field-label">Last School Attended:</span><span class="field-value">{{ $application->school_name ?: '-' }}</span><span class="field-label" style="margin-top: 3mm">Category:</span><span class="field-value">{{ $application->classification ?: '-' }}</span></td></tr>
                 <tr><td class="course-block"><span class="field-label">TITLE/COURSE:</span><span class="field-value">CAREGIVING NC II</span><span class="field-label" style="margin-top: 2mm; font-style: italic">Date Completed/Graduated:</span><span class="field-value">{{ $completionDate?->format('F j, Y') ?? '-' }}</span></td></tr>
                 <tr><td class="marks-block"><span class="field-label">Official Marks:</span><div class="official-marks">1.00 - 99%<br>1.10 - 98%<br>1.20 - 97%<br>1.25 - 96%<br>1.30 - 95%<br>1.40 - 94%<br>1.50 - 93%<br>1.60 - 92%<br>1.70 - 91%<br>1.75 - 90%<br>1.80 - 89%<br>1.90 - 88%<br>2.00 - 87%<br>2.10 - 86%<br>2.20 - 85%<br>2.25 - 84%<br>2.30 - 83%<br>2.40 - 82%<br>2.50 - 81%<br>2.60 - 80%<br>2.70 - 79%<br>2.75 - 78%<br>2.80 - 77%<br>2.90 - 76%<br>3.00 - 75%</div><span class="field-value" style="margin-top: 2mm">1.00-3.00 Competent<br>4.00-5.00 Not Yet Competent</span></td></tr>
-                <tr><td class="remarks-block"><span class="field-label">Remarks:</span><span class="field-value" style="margin-top: 5mm; font-style: italic; font-weight: 700">For Records and Reference Purposes</span></td></tr>
+                <tr><td class="remarks-block"><span class="field-label">Remarks:</span><span class="field-value" style="margin-top: 5mm; font-style: italic; font-weight: 700">For Records and Reference Purposes</span>@if(filled($certificateTemplate?->body))<span class="field-value">{{ \App\Models\CertificateTemplate::replacePlaceholders($certificateTemplate->body, $certificateValues ?? []) }}</span>@endif</td></tr>
             </tbody>
         </table>
 
@@ -92,8 +94,8 @@
     </section>
 
     <section class="approval-grid">
-        <div class="approval"><span class="label">Prepared by:</span><span class="name">{{ $organization['trainer_name'] }}</span><span class="role">Lead Trainer</span></div>
-        <div class="approval"><span class="label">Certified by:</span><span class="name">{{ $organization['registrar_name'] }}</span><span class="role">Registrar</span></div>
+        <div class="approval"><span class="label">Prepared by:</span><span class="name">{{ $certificateTemplate?->second_signatory_name ?: $organization['trainer_name'] }}</span><span class="role">{{ $certificateTemplate?->second_signatory_role ?: 'Lead Trainer' }}</span></div>
+        <div class="approval"><span class="label">Certified by:</span><span class="name">{{ $certificateTemplate?->signatory_name ?: $organization['registrar_name'] }}</span><span class="role">{{ $certificateTemplate?->signatory_role ?: 'Registrar' }}</span></div>
         <div class="approval"><span class="label">Seal</span><span class="role">Not valid without official seal</span></div>
     </section>
     <div class="document-number">Document no. {{ $document->document_number }} | Version {{ $document->version }}</div>

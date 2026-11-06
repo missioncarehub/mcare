@@ -188,13 +188,18 @@
                         <p class="mt-2 text-sm leading-6 text-slate-600">Open the document review page to preview files, record status and feedback, then return here to save the enrollment decision.</p>
                     </div>
                     <span class="dashboard-pill {{ $documentsReadyForApproval ? 'bg-emerald-50 text-emerald-700 ring-emerald-100' : 'bg-amber-50 text-amber-700 ring-amber-100' }}">
-                        {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
+                        {{ $documentsReadyForApproval ? 'All verified' : count($pendingDocumentApprovals).' pending' }}
                     </span>
                 </div>
                 <div class="mt-5">
-                    <a href="{{ route('admin.enrollments.document-review', $application) }}" class="primary-action">
-                        Review documents
-                    </a>
+                    <div class="flex flex-wrap gap-3">
+                        <a href="{{ route('admin.enrollments.document-review', $application) }}" class="primary-action">
+                            Review documents
+                        </a>
+                        <a href="{{ route('admin.enrollments.cor', $application) }}" class="secondary-action">
+                            Generate COR
+                        </a>
+                    </div>
                     @if($documentsReviewed)
                         <p class="mt-3 text-xs leading-5 text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}. Open the review page again if you need to change a file decision.</p>
                     @elseif(! $documentsReadyForApproval)
@@ -233,7 +238,7 @@
                     <div class="flex items-start justify-between gap-3">
                         <dt class="text-slate-600">Required documents</dt>
                         <dd class="text-right font-semibold {{ $documentsReadyForApproval ? 'text-emerald-700' : 'text-amber-700' }}">
-                            {{ $documentsReadyForApproval ? 'All accepted' : count($pendingDocumentApprovals).' pending' }}
+                            {{ $documentsReadyForApproval ? 'All verified' : count($pendingDocumentApprovals).' pending' }}
                         </dd>
                     </div>
                     <div class="flex items-start justify-between gap-3">

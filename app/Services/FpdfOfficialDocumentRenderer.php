@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Contracts\OfficialDocumentRenderer;
+use App\Models\CertificateTemplate;
 use App\Models\OfficialDocument;
+use App\Models\PublicSiteSetting;
 use FPDF;
 use RuntimeException;
 
@@ -38,15 +40,23 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
     {
         $application = $document->application;
         $organization = config('official_documents.organization', []);
+        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_COTC);
+        $values = CertificateTemplate::placeholderValues($document);
+        if ($template && ! $template->usesOfficialArtwork()) {
+            return $this->renderManagedCotc($document, $template, $values);
+        }
+
         $fullName = $this->latin(mb_strtoupper($this->fullName($application)));
         $completionDate = $application->batch?->training_ends_at ?? $document->generated_at ?? now();
-        $dateLine = $this->latin(sprintf(
-            'Given this %s of %s at %s',
-            $completionDate->format('jS'),
-            $completionDate->format('F, Y'),
-            (string) ($organization['name'] ?? 'Mission Care Training Center'),
-        ));
-        $documentLine = $this->latin($document->document_number.' | Version '.$document->version);
+        $dateLine = $template
+            ? $this->latin(CertificateTemplate::replacePlaceholders((string) $template->body, $values))
+            : $this->latin(sprintf(
+                'Given this %s of %s at %s',
+                $completionDate->format('jS'),
+                $completionDate->format('F, Y'),
+                (string) ($organization['name'] ?? 'Mission Care Training Center'),
+            ));
+        $documentLine = $this->verificationLine($document);
 
         $pdf = new LandscapeLetterPdf;
         $pdf->SetAutoPageBreak(false);
@@ -69,6 +79,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             $drawHeight,
             'JPG',
         );
+        $pdf->paintWatermark('MCARE OFFICIAL');
 
         $name = $this->cotcBox($originX, $originY, $scale, 14.0, 91.0, 178.5, 15.5);
         $pdf->SetFillColor(255, 252, 255);
@@ -116,6 +127,10 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         );
         $pdf->SetTextColor(0, 0, 0);
 
+        if ($template) {
+            $this->overlayCotcTemplate($pdf, $template, $values, $originX, $originY, $scale);
+        }
+
         return $pdf;
     }
 
@@ -136,7 +151,22 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             ->sortBy(fn ($record) => $record->unit?->sort_order)
             ->values();
 
-        $pdf = new FPDF('P', 'mm', 'A4');
+        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_TOR);
+        $values = CertificateTemplate::placeholderValues($document);
+        $title = $template
+            ? CertificateTemplate::replacePlaceholders((string) $template->title, $values)
+            : PublicSiteSetting::torTitle();
+        $body = $template ? trim(CertificateTemplate::replacePlaceholders((string) $template->body, $values)) : '';
+        $trainerName = $this->signatoryName($template?->second_signatory_name, (string) ($organization['trainer_name'] ?? ''));
+        $trainerRole = $this->signatoryName($template?->second_signatory_role, 'Lead Trainer');
+        $registrarName = $this->signatoryName(
+            $template?->signatory_name,
+            PublicSiteSetting::current()->registrarName() ?: (string) ($organization['registrar_name'] ?? ''),
+        );
+        $registrarRole = $this->signatoryName($template?->signatory_role, 'Registrar');
+        $logoPath = $template?->absoluteAsset($template->logo_path) ?? public_path('assets/official-logo.png');
+
+        $pdf = new OfficialPdf('P', 'mm', 'A4');
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();
@@ -148,8 +178,9 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
 
         $logoSize = 20.0;
         $logoX = (($pageWidth - 150) / 2);
+        $pdf->paintWatermark('MCARE OFFICIAL');
         $pdf->Image(
-            $this->preparedJpeg(public_path('assets/official-logo.png'), $logoSize, $logoSize),
+            $this->preparedJpeg($logoPath, $logoSize, $logoSize),
             $logoX,
             $y,
             $logoSize,
@@ -204,7 +235,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $pdf->Rect($marginX + 4, $y, $contentWidth - 8, 1.2, 'F');
 
         $y = 41.0;
-        $this->writeFitted($pdf, $marginX, $y, $contentWidth, 8, 'OFFICIAL TRANSCRIPT OF RECORD', 'Times', 'B', 13.5, 'C', 'M', 11);
+        $this->writeFitted($pdf, $marginX, $y, $contentWidth, 8, $this->latin($title), 'Times', 'B', 13.5, 'C', 'M', 11);
         $this->writeFitted($pdf, $marginX, $y + 9, $contentWidth, 9, '"'.$fullName.'"', 'Times', 'B', 16, 'C', 'M', 10);
         $this->writeFitted($pdf, $marginX, $y + 19, $contentWidth, 7, 'CAREGIVING NC II', 'Times', 'B', 12.5, 'C', 'M', 10);
         $hours = (int) ($organization['course_hours'] ?? 786);
@@ -257,7 +288,11 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $blockY += 19;
         $this->torField($pdf, $leftX, $blockY, $leftWidth, 65, 'Official Marks:', $this->officialMarksText(), 6.2);
         $blockY += 65;
-        $this->torField($pdf, $leftX, $blockY, $leftWidth, 18, 'Remarks:', "\nFor Records and Reference Purposes", 7);
+        $remarks = "\nFor Records and Reference Purposes";
+        if ($body !== '') {
+            $remarks .= "\n".$body;
+        }
+        $this->torField($pdf, $leftX, $blockY, $leftWidth, 18, 'Remarks:', $remarks, 7);
 
         $headerY = $gridY;
         $codeW = 22.0;
@@ -293,8 +328,8 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $pdf->Rect($rightX, $approvalY, $midWidth, $approvalHeight, 'DF');
         $pdf->Rect($rightX + $midWidth, $approvalY, $midWidth, $approvalHeight, 'DF');
 
-        $this->approvalBlock($pdf, $leftX, $approvalY, $leftWidth, $approvalHeight, 'Prepared by:', (string) ($organization['trainer_name'] ?? ''), 'Lead Trainer');
-        $this->approvalBlock($pdf, $rightX, $approvalY, $midWidth, $approvalHeight, 'Certified by:', (string) ($organization['registrar_name'] ?? ''), 'Registrar');
+        $this->approvalBlock($pdf, $leftX, $approvalY, $leftWidth, $approvalHeight, 'Prepared by:', $trainerName, $trainerRole, $template?->absoluteAsset($template->second_signature_path));
+        $this->approvalBlock($pdf, $rightX, $approvalY, $midWidth, $approvalHeight, 'Certified by:', $registrarName, $registrarRole, $template?->absoluteAsset($template->signature_path));
         $this->approvalBlock($pdf, $rightX + $midWidth, $approvalY, $midWidth, $approvalHeight, 'Seal', '', 'Not valid without official seal');
 
         $this->writeFitted(
@@ -303,7 +338,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             $approvalY + $approvalHeight + 2,
             $contentWidth,
             5,
-            $this->latin('Document no. '.$document->document_number.' | Version '.$document->version),
+            $this->verificationLine($document),
             'Helvetica',
             '',
             5.5,
@@ -312,7 +347,211 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             5,
         );
 
+        if ($template && ($template->paper_size !== 'a4' || $template->orientation !== 'portrait')) {
+            $pdf->presentOnPaper($template->orientation === 'landscape' ? 'L' : 'P', match ($template->paper_size) {
+                'letter' => 'Letter',
+                'legal' => 'Legal',
+                default => 'A4',
+            });
+        }
+
         return $pdf;
+    }
+
+    /**
+     * @param  array<string, string>  $values
+     */
+    private function renderManagedCotc(OfficialDocument $document, CertificateTemplate $template, array $values): FPDF
+    {
+        [$orientation, $size, $pageWidth, $pageHeight] = $this->paperSpec($template);
+        $pdf = new OfficialPdf($orientation, 'mm', $size);
+        $pdf->SetAutoPageBreak(false);
+        $pdf->SetMargins(0, 0, 0);
+        $pdf->AddPage();
+        $pdf->paintWatermark('MCARE OFFICIAL');
+
+        $margin = 14.0;
+        $contentWidth = $pageWidth - ($margin * 2);
+        $logoSize = 22.0;
+        $logoPath = $template->absoluteAsset($template->logo_path) ?? public_path('assets/official-logo.png');
+        $pdf->Image($this->preparedJpeg($logoPath, $logoSize, $logoSize), $margin, 12, $logoSize, $logoSize, 'JPG');
+        $this->writeFitted(
+            $pdf,
+            $margin + $logoSize + 4,
+            14,
+            $contentWidth - $logoSize - 4,
+            10,
+            $this->latin($values['organization']),
+            'Times',
+            'B',
+            16,
+            'L',
+            'M',
+            10,
+        );
+
+        $this->writeFitted($pdf, $margin, 42, $contentWidth, 16, $this->latin(CertificateTemplate::replacePlaceholders((string) $template->title, $values)), 'Times', 'B', 22, 'C', 'M', 12);
+        $this->writeFitted($pdf, $margin, 60, $contentWidth, 8, 'This certifies that', 'Times', 'I', 13, 'C', 'M', 10);
+        $this->writeFitted($pdf, $margin, 70, $contentWidth, 14, $this->latin(mb_strtoupper($values['trainee_name'])), 'Times', 'B', 20, 'C', 'M', 11);
+        $pdf->SetDrawColor(207, 98, 234);
+        $pdf->SetLineWidth(0.4);
+        $pdf->Line($margin + 18, 86, $pageWidth - $margin - 18, 86);
+        $this->writeFitted($pdf, $margin + 8, 92, $contentWidth - 16, 28, $this->latin(CertificateTemplate::replacePlaceholders((string) $template->body, $values)), 'Times', '', 12, 'C', 'T', 8);
+
+        $blockWidth = ($contentWidth - 12) / 2;
+        $blockY = $pageHeight - 48;
+        $this->signatoryBlock(
+            $pdf,
+            $margin,
+            $blockY,
+            $blockWidth,
+            $this->signatoryName($template->second_signatory_name, (string) config('official_documents.organization.trainer_name', '')),
+            $this->signatoryName($template->second_signatory_role, 'TVI Trainer'),
+            $template->absoluteAsset($template->second_signature_path),
+        );
+        $this->signatoryBlock(
+            $pdf,
+            $margin + $blockWidth + 12,
+            $blockY,
+            $blockWidth,
+            $this->signatoryName($template->signatory_name, (string) config('official_documents.organization.registrar_name', '')),
+            $this->signatoryName($template->signatory_role, 'TVI Registrar'),
+            $template->absoluteAsset($template->signature_path),
+        );
+        $this->writeFitted($pdf, $margin, $pageHeight - 12, $contentWidth, 5, $this->verificationLine($document), 'Helvetica', '', 8, 'R', 'M', 6);
+
+        return $pdf;
+    }
+
+    /**
+     * @param  array<string, string>  $values
+     */
+    private function overlayCotcTemplate(
+        OfficialPdf $pdf,
+        CertificateTemplate $template,
+        array $values,
+        float $originX,
+        float $originY,
+        float $scale,
+    ): void {
+        $title = trim(CertificateTemplate::replacePlaceholders((string) $template->title, $values));
+        if (strcasecmp($title, 'Certificate of Training Completion') !== 0 && $title !== '') {
+            $titleBox = $this->cotcBox($originX, $originY, $scale, 16, 18, 176, 58);
+            $pdf->SetFillColor(255, 252, 255);
+            $pdf->Rect($titleBox['x'], $titleBox['y'], $titleBox['w'], $titleBox['h'], 'F');
+            $this->writeFitted($pdf, $titleBox['x'] + (4 * $scale), $titleBox['y'], $titleBox['w'] - (8 * $scale), $titleBox['h'], $this->latin($title), 'Times', 'B', 22 * $scale, 'C', 'M', 11 * $scale);
+        }
+
+        $this->overlayCotcSignatory(
+            $pdf,
+            $originX,
+            $originY,
+            $scale,
+            28,
+            158,
+            $this->signatoryName($template->second_signatory_name, (string) config('official_documents.organization.trainer_name', '')),
+            $this->signatoryName($template->second_signatory_role, 'TVI Trainer'),
+            $template->absoluteAsset($template->second_signature_path),
+        );
+        $this->overlayCotcSignatory(
+            $pdf,
+            $originX,
+            $originY,
+            $scale,
+            112,
+            158,
+            $this->signatoryName($template->signatory_name, (string) config('official_documents.organization.registrar_name', '')),
+            $this->signatoryName($template->signatory_role, 'TVI Registrar'),
+            $template->absoluteAsset($template->signature_path),
+        );
+    }
+
+    private function overlayCotcSignatory(
+        OfficialPdf $pdf,
+        float $originX,
+        float $originY,
+        float $scale,
+        float $x,
+        float $y,
+        string $name,
+        string $role,
+        ?string $signaturePath,
+    ): void {
+        $box = $this->cotcBox($originX, $originY, $scale, $x, $y, 74, 32);
+        $pdf->SetFillColor(255, 252, 255);
+        $pdf->Rect($box['x'], $box['y'], $box['w'], $box['h'], 'F');
+        if ($signaturePath) {
+            $pdf->Image(
+                $this->preparedJpeg($signaturePath, 36 * $scale, 10 * $scale),
+                $box['x'] + (19 * $scale),
+                $box['y'] + (1 * $scale),
+                36 * $scale,
+                10 * $scale,
+                'JPG',
+            );
+        }
+        $this->writeFitted($pdf, $box['x'], $box['y'] + (12 * $scale), $box['w'], 8 * $scale, $this->latin($name), 'Times', 'B', 11 * $scale, 'C', 'M', 7 * $scale);
+        $this->writeFitted($pdf, $box['x'], $box['y'] + (21 * $scale), $box['w'], 7 * $scale, $this->latin($role), 'Times', '', 9 * $scale, 'C', 'M', 6 * $scale);
+    }
+
+    private function signatoryBlock(
+        OfficialPdf $pdf,
+        float $x,
+        float $y,
+        float $width,
+        string $name,
+        string $role,
+        ?string $signaturePath,
+    ): void {
+        if ($signaturePath) {
+            $pdf->Image($this->preparedJpeg($signaturePath, min(46, $width - 8), 14), $x + (($width - min(46, $width - 8)) / 2), $y, min(46, $width - 8), 14, 'JPG');
+        }
+        $pdf->SetDrawColor(15, 23, 42);
+        $pdf->Line($x + 8, $y + 16, $x + $width - 8, $y + 16);
+        $this->writeFitted($pdf, $x, $y + 17, $width, 6, $this->latin($name), 'Times', 'B', 11, 'C', 'M', 7);
+        $this->writeFitted($pdf, $x, $y + 23, $width, 5, $this->latin($role), 'Times', '', 9, 'C', 'M', 7);
+    }
+
+    /** @return array{0: string, 1: string, 2: float, 3: float} */
+    private function paperSpec(CertificateTemplate $template): array
+    {
+        $orientation = $template->orientation === 'landscape' ? 'L' : 'P';
+        $size = match ($template->paper_size) {
+            'letter' => 'Letter',
+            'legal' => 'Legal',
+            default => 'A4',
+        };
+        $dimensions = match ($size) {
+            'Letter' => [215.9, 279.4],
+            'Legal' => [215.9, 355.6],
+            default => [210.0, 297.0],
+        };
+        $width = $orientation === 'L' ? $dimensions[1] : $dimensions[0];
+        $height = $orientation === 'L' ? $dimensions[0] : $dimensions[1];
+
+        return [$orientation, $size, $width, $height];
+    }
+
+    private function signatoryName(?string $value, string $fallback): string
+    {
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : $fallback;
+    }
+
+    private function verificationLine(OfficialDocument $document): string
+    {
+        $enrollment = trim((string) ($document->application?->enrollment_number ?? ''));
+        if ($enrollment === '' && $document->application?->id) {
+            $enrollment = 'ENR-'.$document->application->id;
+        }
+
+        $line = $document->document_number.' | Version '.$document->version;
+        if ($enrollment !== '') {
+            $line = 'Enrollment ID: '.$enrollment.' | '.$line;
+        }
+
+        return $this->latin($line);
     }
 
     private function torField(
@@ -371,8 +610,20 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         string $label,
         string $name,
         string $role,
+        ?string $signaturePath = null,
     ): void {
         $this->writeFitted($pdf, $x + 2, $y + 2, $width - 4, 5, $this->latin($label), 'Helvetica', '', 6.5, 'C', 'T', 6);
+        if ($signaturePath) {
+            $imageWidth = min(36.0, $width - 8);
+            $pdf->Image(
+                $this->preparedJpeg($signaturePath, $imageWidth, 10),
+                $x + (($width - $imageWidth) / 2),
+                $y + 7,
+                $imageWidth,
+                10,
+                'JPG',
+            );
+        }
         if ($name !== '') {
             $this->writeFitted($pdf, $x + 2, $y + $height - 12, $width - 4, 6, $this->latin(mb_strtoupper($name)), 'Helvetica', 'B', 7.2, 'C', 'M', 6);
         }

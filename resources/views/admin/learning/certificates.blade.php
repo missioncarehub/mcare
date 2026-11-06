@@ -15,7 +15,8 @@
     ], fn ($value) => filled($value));
 @endphp
 <section class="space-y-6">
-    <header class="flex flex-wrap justify-end gap-2">
+    <header class="flex flex-wrap items-center justify-between gap-3">
+        <a href="{{ route('admin.learning.certificate-templates') }}" class="secondary-action">Certificate templates</a>
         <div class="flex flex-wrap gap-2">
             <button type="button" data-dashboard-dialog-open="competency-excel-dialog" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="file-excel" class="h-4 w-4" />Export competency Excel</button>
             <button type="button" data-dashboard-dialog-open="batch-tor-dialog" class="primary-action inline-flex items-center gap-2"><x-dashboard-icon name="folder-open" class="h-4 w-4" />Prepare batch TOR ZIP</button>
@@ -34,6 +35,8 @@
         <a href="{{ route('admin.learning.certificates', $tabQuery('active')) }}" class="{{ $isGraduatesTab ? '' : 'is-active' }}" @unless($isGraduatesTab) aria-current="page" @endunless>Active trainees ({{ $activeTrainees->count() }})</a>
         <a href="{{ route('admin.learning.certificates', $tabQuery('graduates')) }}" class="{{ $isGraduatesTab ? 'is-active' : '' }}" @if($isGraduatesTab) aria-current="page" @endif>Graduates ({{ $graduates->count() }})</a>
     </nav>
+
+    <p class="text-sm leading-6 text-slate-600">Generate COTC and Generate TOR use the active certificate template. Change the title, statement, logo, or signatory from <a href="{{ route('admin.learning.certificate-templates') }}" class="font-bold text-purple-700 hover:text-purple-900">Certificate templates</a>. Enrollment ID, document number, and the watermark stay on every file.</p>
 
     @include('admin.learning.partials.training-record-table', [
         'showHeading' => false,

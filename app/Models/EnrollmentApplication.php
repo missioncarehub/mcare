@@ -263,6 +263,61 @@ class EnrollmentApplication extends Model
         return self::statuses()[$this->status] ?? str($this->status)->headline()->toString();
     }
 
+    /** @return array<string, array{label: string, field: string}> */
+    public static function reviewDocuments(): array
+    {
+        return [
+            'birth-certificate' => ['label' => 'Birth Certificate', 'field' => 'birth_certificate_path'],
+            'education-document' => ['label' => 'Form 137/138 or Diploma', 'field' => 'education_document_path'],
+            'good-moral-certificate' => ['label' => 'Good Moral Certificate', 'field' => 'good_moral_certificate_path'],
+            'id-photo' => ['label' => 'ID Photo', 'field' => 'id_photo_path'],
+            'signature' => ['label' => 'E-Signature', 'field' => 'signature_path'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function documentReviewStatusLabels(): array
+    {
+        return [
+            'unreviewed' => 'Pending',
+            'accepted' => 'Verified',
+            'replace' => 'Needs replacement',
+            'missing' => 'Rejected',
+            'not_uploaded' => 'Not uploaded',
+        ];
+    }
+
+    /**
+     * Applicant-facing review result for each required document.
+     *
+     * @return list<array{key: string, label: string, status: string, status_label: string, note: ?string}>
+     */
+    public function documentStatuses(): array
+    {
+        $review = $this->document_review ?? [];
+        $labels = self::documentReviewStatusLabels();
+        $items = [];
+
+        foreach (self::reviewDocuments() as $key => $definition) {
+            $uploaded = filled($this->{$definition['field']});
+            $storedStatus = (string) data_get($review, $key.'.status', '');
+            $status = array_key_exists($storedStatus, $labels) && $storedStatus !== 'not_uploaded'
+                ? $storedStatus
+                : ($uploaded ? 'unreviewed' : 'not_uploaded');
+            $note = trim((string) data_get($review, $key.'.note', ''));
+
+            $items[] = [
+                'key' => $key,
+                'label' => $definition['label'],
+                'status' => $status,
+                'status_label' => $labels[$status],
+                'note' => in_array($status, ['replace', 'missing'], true) && $note !== '' ? $note : null,
+            ];
+        }
+
+        return $items;
+    }
+
     public static function learningStatuses(): array
     {
         return [

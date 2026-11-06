@@ -215,6 +215,7 @@
                 @else
                     <a href="{{ route('login') }}" class="hidden rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:inline-flex">Sign in</a>
                     <a href="{{ route('alumni.claim.create') }}" class="hidden rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100 xl:inline-flex">Alumni claim</a>
+                    <a href="{{ route('applications.status') }}" class="hidden rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:inline-flex">Check status</a>
                     <a href="{{ route('applications.create') }}" class="hidden rounded-lg bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800 lg:inline-flex">Apply now</a>
                 @endauth
 
@@ -265,6 +266,7 @@
                 <a href="#discover" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Discover</a>
                 <a href="#contact" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Contact</a>
                 <a href="{{ route('payments.show') }}" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Payments</a>
+                <a href="{{ route('applications.status') }}" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Check status</a>
                 @guest
                     <a href="{{ route('alumni.claim.create') }}" class="mobile-sidebar-link block rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-700">Alumni claim</a>
                 @endguest
@@ -281,6 +283,7 @@
                     </form>
                 @else
                     <a href="{{ route('login') }}" class="mobile-sidebar-link mb-2.5 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:border-purple-200 hover:text-purple-700">Sign in</a>
+                    <a href="{{ route('applications.status') }}" class="mobile-sidebar-link mb-2.5 inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:border-purple-200 hover:text-purple-700">Check status</a>
                     <a href="{{ route('applications.create') }}" class="mobile-sidebar-link inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-purple-100 hover:bg-purple-700">Apply now</a>
                 @endauth
             </div>
@@ -349,13 +352,14 @@
                         Mission Care Training and Assessment Center publishes official enrollment for TESDA-oriented caregiving programs, class schedules, training records, and graduate career follow-through.
                     </p>
 
-                    <div class="mt-6 grid grid-cols-1 gap-2.5 sm:mt-10 sm:flex sm:flex-row sm:gap-3">
+                    <div class="mt-6 grid grid-cols-1 gap-2.5 sm:mt-10 sm:flex sm:flex-row sm:flex-wrap sm:gap-3">
                         @auth
                             <a href="{{ $accountCtaUrl }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">{{ $accountCtaLabel }}</a>
                         @else
                             <a href="{{ route('login') }}" class="inline-flex h-11 items-center justify-center rounded-full border border-purple-200 bg-purple-50 px-6 text-sm font-bold text-purple-700 hover:bg-purple-100 sm:h-auto sm:px-7 sm:py-3.5">Sign In</a>
                             <a href="{{ route('applications.create') }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Apply now</a>
                         @endauth
+                        <a href="{{ route('applications.status') }}" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Check status</a>
                         <a href="#programs" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">View Programs</a>
                     </div>
 
@@ -578,14 +582,14 @@
                     <p class="text-sm font-bold uppercase tracking-[0.14em] text-purple-800">Admissions</p>
                     <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-4xl">Apply first. Enroll after your application number is approved.</h2>
                     <p class="mt-4 text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">Submit a short application, keep the issued number, and wait for MCARE review. Approved applicants then complete the TESDA enrollment form and payment.</p>
-                    <div class="mt-6 flex flex-col gap-3 sm:mt-10 sm:flex-row">
+                    <div class="mt-6 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap">
                         @auth
                             <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
                         @else
                             <a href="{{ route('applications.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">Apply now</a>
-                            <a href="{{ route('applications.status') }}" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:w-auto">Check status</a>
                             <a href="{{ route('payments.show') }}" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:w-auto">Pay with enrollment number</a>
                         @endauth
+                        <a href="{{ route('applications.status') }}" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:w-auto">Check status</a>
                     </div>
                 </div>
 
@@ -705,11 +709,14 @@
                     <h2 class="mt-3 text-2xl font-bold leading-tight text-slate-900 sm:mt-4 sm:text-3xl">Begin with an official training application.</h2>
                     <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:mt-4 sm:text-base sm:leading-7">Submit your application, keep the number, and enroll after MCARE approval. Payment verification then precedes enrollment review.</p>
                 </div>
-                @auth
-                    <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
-                @else
-                    <a href="{{ route('applications.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">Apply now</a>
-                @endauth
+                <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                    @auth
+                        <a href="{{ $accountCtaUrl }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">{{ $accountCtaLabel }}</a>
+                    @else
+                        <a href="{{ route('applications.create') }}" class="inline-flex w-full items-center justify-center rounded-full bg-purple-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:w-auto">Apply now</a>
+                    @endauth
+                    <a href="{{ route('applications.status') }}" class="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-8 py-4 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:w-auto">Check status</a>
+                </div>
             </div>
         </section>
     </main>

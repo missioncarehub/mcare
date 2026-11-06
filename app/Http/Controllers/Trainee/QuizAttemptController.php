@@ -168,6 +168,7 @@ class QuizAttemptController extends Controller
             'quiz' => $quiz,
             'attempt' => $attempt,
             'answerReviewAvailable' => $answerReviewAvailable,
+            'gradedAttemptCount' => $gradedAttemptCount,
         ]);
     }
 

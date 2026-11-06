@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Mail\AdmissionApplicationReceivedMail;
 use App\Models\AdminActivityLog;
 use App\Models\AdmissionApplication;
+use App\Models\EnrollmentApplication;
 use App\Models\TrainingProgram;
 use App\Services\AdminOperationsNotifier;
+use App\Services\ProfilePhotoStore;
+use App\Services\SemaphoreSmsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -157,7 +161,9 @@ class AdmissionApplicationController extends Controller
     public function status(Request $request): View
     {
         $number = AdmissionApplication::normalizeNumber($request->input('application_number', $request->query('application_number')));
-        $admission = $number !== '' ? AdmissionApplication::findByNumber($number) : null;
+        $admission = $number !== ''
+            ? AdmissionApplication::query()->with('enrollment')->where('application_number', $number)->first()
+            : null;
         $lookedUp = $request->isMethod('post') || $request->filled('application_number');
 
         return view('applications.status', [
@@ -176,5 +182,131 @@ class AdmissionApplicationController extends Controller
         return redirect()->route('applications.status', [
             'application_number' => AdmissionApplication::normalizeNumber($validated['application_number']),
         ]);
+    }
+
+    public function replaceDocument(Request $request, ProfilePhotoStore $profilePhotos, AdminOperationsNotifier $notifier): RedirectResponse
+    {
+        $catalog = EnrollmentApplication::reviewDocuments();
+        $validated = $request->validate([
+            'application_number' => ['required', 'string', 'max:40'],
+            'verifier' => ['required', 'string', 'max:180'],
+            'document' => ['required', Rule::in(array_keys($catalog))],
+            'replacement' => ['required', 'file', 'max:5120'],
+        ]);
+
+        $number = AdmissionApplication::normalizeNumber($validated['application_number']);
+        $admission = AdmissionApplication::query()->with('enrollment')->where('application_number', $number)->first();
+        $enrollment = $admission?->enrollment;
+        $key = $validated['document'];
+        $definition = $catalog[$key];
+
+        if (! $admission || ! $enrollment) {
+            throw ValidationException::withMessages([
+                'application_number' => 'Submit the enrollment form before uploading a replacement.',
+            ]);
+        }
+
+        if ($enrollment->status === EnrollmentApplication::STATUS_APPROVED) {
+            throw ValidationException::withMessages([
+                'replacement' => 'Documents can only be replaced before the enrollment is approved.',
+            ]);
+        }
+
+        if (! $this->verifierMatches($enrollment, $validated['verifier'])) {
+            throw ValidationException::withMessages([
+                'verifier' => 'Enter the email or mobile number used on the enrollment form.',
+            ]);
+        }
+
+        $review = $enrollment->document_review ?? [];
+        $status = (string) data_get($review, $key.'.status', '');
+        if (! in_array($status, ['replace', 'missing'], true)) {
+            throw ValidationException::withMessages([
+                'document' => 'That document is not waiting for a replacement.',
+            ]);
+        }
+
+        $imageOnly = in_array($key, ['id-photo', 'signature'], true);
+        $request->validate([
+            'replacement' => $imageOnly
+                ? ['required', 'file', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:5120']
+                : ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $directory = $enrollment->user_id
+            ? 'enrollment-documents/'.$enrollment->user_id
+            : 'enrollment-documents/application-'.$enrollment->id;
+        $previousPath = $enrollment->{$definition['field']};
+        $path = $request->file('replacement')->store($directory, 'local');
+        $history = data_get($review, $key.'.history', []);
+        if (! is_array($history)) {
+            $history = [];
+        }
+        if (filled($previousPath) && $previousPath !== $path) {
+            $history[] = [
+                'path' => $previousPath,
+                'replaced_at' => now()->toIso8601String(),
+            ];
+        }
+
+        $review[$key] = [
+            'status' => 'unreviewed',
+            'note' => 'Replacement uploaded from Check status; awaiting admin review.',
+            'history' => $history,
+        ];
+
+        $attributes = [
+            $definition['field'] => $path,
+            'document_review' => $review,
+            'documents_reviewed_at' => null,
+            'documents_reviewed_by_id' => null,
+        ];
+        if ($key === 'signature') {
+            $attributes['signature_type'] = 'upload';
+        }
+
+        $enrollment->forceFill($attributes)->save();
+
+        if ($key === 'id-photo' && $enrollment->user) {
+            $profilePhotos->syncFromPrivateDisk($enrollment->user, $path);
+        }
+
+        AdminActivityLog::record(null, 'enrollment.document.replaced', $enrollment, [
+            'document' => $key,
+            'application_number' => $admission->application_number,
+            'previous_path' => $previousPath,
+        ]);
+
+        $notifier->notify(
+            'Replacement document uploaded',
+            trim($enrollment->first_name.' '.$enrollment->last_name).' uploaded a replacement '.$definition['label'].'.',
+            route('admin.enrollments.document-review', $enrollment),
+            'file',
+            'enrollment.document.replaced',
+            ['enrollment_application_id' => $enrollment->id, 'document' => $key],
+        );
+
+        return redirect()
+            ->route('applications.status', ['application_number' => $admission->application_number])
+            ->with('saved', 'Replacement submitted. The document is pending review.');
+    }
+
+    private function verifierMatches(EnrollmentApplication $enrollment, string $verifier): bool
+    {
+        $given = trim($verifier);
+        $email = strtolower(trim((string) $enrollment->email));
+        $givenEmail = strtolower($given);
+
+        if ($email !== '' && strlen($email) === strlen($givenEmail) && hash_equals($email, $givenEmail)) {
+            return true;
+        }
+
+        $sms = app(SemaphoreSmsService::class);
+        $expected = $sms->normalizePhilippineNumber($enrollment->contact_number);
+        $givenNumber = $sms->normalizePhilippineNumber($given);
+
+        return $expected !== null
+            && $givenNumber !== null
+            && hash_equals($expected, $givenNumber);
     }
 }

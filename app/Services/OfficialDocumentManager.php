@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\OfficialDocumentRenderer;
 use App\Models\AdminActivityLog;
+use App\Models\CertificateTemplate;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
@@ -271,6 +272,7 @@ class OfficialDocumentManager
             ->max('version') ?? 0;
         $version = $lastVersion + 1;
         $year = $application->batch?->year ?? now()->year;
+        $activeTemplate = CertificateTemplate::activeFor($type);
         $prefix = strtoupper((string) config('official_documents.download_name_prefix', 'MCARE'));
         $documentNumber = sprintf(
             '%s-%s-%s-%05d-V%d',
@@ -289,11 +291,13 @@ class OfficialDocumentManager
             'document_number' => $documentNumber,
             'status' => OfficialDocument::STATUS_QUEUED,
             'storage_disk' => config('official_documents.disk', 'local'),
-            'template_version' => config('official_documents.template_version', '1.0'),
+            'template_version' => $activeTemplate ? 'v'.$activeTemplate->version : (string) config('official_documents.template_version', '1.0'),
             'generated_by_id' => $admin->id,
             'metadata' => [
                 'eligibility' => $this->eligibility->evaluate($application),
                 'trainee_name' => trim("{$application->first_name} {$application->middle_name} {$application->last_name}"),
+                'certificate_template_id' => $activeTemplate?->id,
+                'certificate_template_version' => $activeTemplate?->version,
             ],
         ]);
     }

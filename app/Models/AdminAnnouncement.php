@@ -33,6 +33,8 @@ class AdminAnnouncement extends Model
         'kind',
         'due_date',
         'send_email',
+        'send_sms',
+        'sms_delivery',
         'is_published',
         'posted_at',
         'expires_at',
@@ -43,6 +45,8 @@ class AdminAnnouncement extends Model
         return [
             'due_date' => 'date',
             'send_email' => 'boolean',
+            'send_sms' => 'boolean',
+            'sms_delivery' => 'array',
             'is_published' => 'boolean',
             'posted_at' => 'datetime',
             'expires_at' => 'datetime',

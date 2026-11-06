@@ -11,6 +11,15 @@
     @endphp
 
     <section id="dashboard" class="space-y-6">
+        @if (auth()->user()?->verified_banner_dismissed_at === null)
+            <div class="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="status">
+                <p class="text-sm font-semibold text-emerald-950">Your account has been verified. You can now access your modules and schedule.</p>
+                <form method="POST" action="{{ route('trainee.dashboard.dismiss-banner') }}">
+                    @csrf
+                    <button type="submit" class="secondary-action">Dismiss</button>
+                </form>
+            </div>
+        @endif
         <div class="dashboard-hero">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div class="min-w-0">

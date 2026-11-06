@@ -23,6 +23,8 @@ class PublicSiteSetting extends Model
         'registrar_name',
         'registrar_signature_type',
         'registrar_signature_path',
+        'tor_title',
+        'cor_statement',
         'unused_approved_expiry_mode',
         'unused_approved_expiry_amount',
         'unused_approved_expiry_date',
@@ -62,6 +64,8 @@ class PublicSiteSetting extends Model
             'registrar_name' => null,
             'registrar_signature_type' => null,
             'registrar_signature_path' => null,
+            'tor_title' => null,
+            'cor_statement' => null,
             'unused_approved_expiry_mode' => self::UNUSED_APPROVED_EXPIRY_OFF,
             'unused_approved_expiry_amount' => null,
             'unused_approved_expiry_date' => null,
@@ -124,6 +128,22 @@ class PublicSiteSetting extends Model
     {
         return $this->registrarName()
             ?: trim((string) config('official_documents.organization.registrar_name'));
+    }
+
+    public static function torTitle(): string
+    {
+        $title = trim((string) static::current()->tor_title);
+
+        return $title !== '' ? $title : 'OFFICIAL TRANSCRIPT OF RECORD';
+    }
+
+    public static function corStatement(): string
+    {
+        $statement = trim((string) static::current()->cor_statement);
+
+        return $statement !== ''
+            ? $statement
+            : 'This certifies that the trainee named below is registered for the training program, batch, and schedule on this record.';
     }
 
     public function hasRegistrarSignature(): bool

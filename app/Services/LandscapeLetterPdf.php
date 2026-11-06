@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use FPDF;
-
-final class LandscapeLetterPdf extends FPDF
+final class LandscapeLetterPdf extends OfficialPdf
 {
     public const WIDTH_MM = 279.4;
 

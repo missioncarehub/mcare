@@ -20,7 +20,8 @@ class CompletionEligibilityService
      *   eligible: bool,
      *   graduated: bool,
      *   checks: array<string, array{passed: bool, label: string, detail: string}>,
-     *   counts: array<string, int>
+     *   counts: array<string, int>,
+     *   quiz_summaries: list<array{title: string, score: string, percentage: string, attempts: int, result: string, taken_at: string}>
      * }
      */
     public function evaluate(EnrollmentApplication $application): array
@@ -129,7 +130,57 @@ class CompletionEligibilityService
                 'quizzes' => $quizCount,
                 'passed_quizzes' => $passedQuizzes,
             ],
+            'quiz_summaries' => $this->quizSummaries($application),
         ];
+    }
+
+    /**
+     * @return list<array{title: string, score: string, percentage: string, attempts: int, result: string, taken_at: string}>
+     */
+    private function quizSummaries(EnrollmentApplication $application): array
+    {
+        $quizzes = Quiz::query()
+            ->where('is_published', true)
+            ->where(function ($query) use ($application): void {
+                $query->where('target_enrollment_application_id', $application->id);
+
+                if ($application->training_batch_id) {
+                    $query->orWhere(function ($batch) use ($application): void {
+                        $batch->whereNull('target_enrollment_application_id')
+                            ->where('training_batch_id', $application->training_batch_id);
+                    });
+                }
+            })
+            ->orderBy('title')
+            ->get(['id', 'title']);
+
+        if ($quizzes->isEmpty()) {
+            return [];
+        }
+
+        $attemptGroups = QuizAttempt::query()
+            ->whereIn('quiz_id', $quizzes->pluck('id'))
+            ->where('enrollment_application_id', $application->id)
+            ->where('status', QuizAttempt::STATUS_GRADED)
+            ->orderByDesc('submitted_at')
+            ->get(['quiz_id', 'earned_points', 'total_points', 'score_percent', 'passed', 'submitted_at'])
+            ->groupBy('quiz_id');
+
+        return $quizzes->map(function (Quiz $quiz) use ($attemptGroups): array {
+            $attempts = $attemptGroups->get($quiz->id, collect());
+            $latest = $attempts->first();
+
+            return [
+                'title' => $quiz->title,
+                'score' => $latest
+                    ? number_format((float) $latest->earned_points, 2).' / '.number_format((float) $latest->total_points, 2)
+                    : 'No attempt',
+                'percentage' => $latest ? number_format((float) $latest->score_percent, 1).'%' : '—',
+                'attempts' => $attempts->count(),
+                'result' => $latest ? ($latest->passed ? 'Passed' : 'Failed') : 'Not taken',
+                'taken_at' => $latest?->submitted_at?->format('M d, Y') ?? '—',
+            ];
+        })->all();
     }
 
     public function requiredModulesCompleted(EnrollmentApplication $application): bool

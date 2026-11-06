@@ -1372,7 +1372,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const options = Array.from(question.querySelectorAll('[data-quiz-option]'));
                 const correctSelect = question.querySelector('[data-correct-option]');
-                const previousCorrect = Number(correctSelect?.value || 0);
+                const previousCorrect = correctSelect?.dataset.importedCorrect !== undefined
+                    ? Number(correctSelect.dataset.importedCorrect)
+                    : Number(correctSelect?.value || 0);
+                if (correctSelect?.dataset.importedCorrect !== undefined) {
+                    delete correctSelect.dataset.importedCorrect;
+                }
 
                 options.forEach((option, optionIndex) => {
                     const optionInput = option.querySelector('input');
@@ -1455,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         questionList.querySelectorAll('[data-quiz-question]').forEach(bindQuestion);
 
-        addQuestionButton?.addEventListener('click', () => {
+        const appendQuestionCard = () => {
             const questionIndex = questionList.querySelectorAll('[data-quiz-question]').length;
             const wrapper = document.createElement('div');
             wrapper.innerHTML = questionTemplate.innerHTML
@@ -1463,16 +1468,164 @@ document.addEventListener('DOMContentLoaded', () => {
                 .replaceAll('__NUMBER__', String(questionIndex + 1))
                 .trim();
             const question = wrapper.firstElementChild;
-            if (!question) return;
+            if (!question) return null;
 
             questionList.append(question);
             bindQuestion(question);
+
+            return question;
+        };
+
+        const fillImportedQuestion = (question, item) => {
+            const type = item.type || 'multiple_choice';
+            const typeSelect = question.querySelector('[data-question-type]');
+            if (typeSelect) typeSelect.value = type;
+
+            const points = question.querySelector('input[name$="[points]"]');
+            if (points) points.value = item.points ?? 1;
+
+            const prompt = question.querySelector('textarea');
+            if (prompt) prompt.value = item.prompt || '';
+
+            updateOptionControls(question);
+
+            if (type === 'multiple_choice') {
+                const optionList = question.querySelector('[data-quiz-option-list]');
+                const options = Array.isArray(item.options) ? item.options : [];
+                if (optionList) {
+                    optionList.replaceChildren();
+                    options.forEach((label) => {
+                        const row = document.createElement('div');
+                        row.className = 'lms-option-row';
+                        row.setAttribute('data-quiz-option', '');
+
+                        const letter = document.createElement('span');
+                        letter.className = 'lms-option-letter';
+                        letter.setAttribute('aria-hidden', 'true');
+
+                        const optionLabel = document.createElement('label');
+                        optionLabel.className = 'sr-only';
+
+                        const input = document.createElement('input');
+                        input.required = true;
+                        input.value = label ?? '';
+
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'lms-option-remove';
+                        remove.setAttribute('data-remove-option', '');
+                        remove.setAttribute('aria-label', 'Remove option');
+                        remove.textContent = 'x';
+
+                        row.append(letter, optionLabel, input, remove);
+                        optionList.append(row);
+                    });
+                }
+            }
+
+            const correct = question.querySelector('[data-correct-option]');
+            if (correct && item.correct_option !== null && item.correct_option !== undefined) {
+                correct.dataset.importedCorrect = String(item.correct_option);
+            }
+        };
+
+        addQuestionButton?.addEventListener('click', () => {
+            const question = appendQuestionCard();
+            if (!question) return;
+
             reindexBuilder();
             question.scrollIntoView({
                 behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
                 block: 'center',
             });
             question.querySelector('textarea')?.focus({ preventScroll: true });
+        });
+
+        const importInput = builder.querySelector('[data-quiz-import-file]');
+        const importStatus = builder.querySelector('[data-quiz-import-status]');
+        importInput?.addEventListener('change', async () => {
+            const file = importInput.files?.[0];
+            if (!file || !importStatus) return;
+
+            const setStatus = (message) => {
+                importStatus.textContent = message;
+            };
+
+            setStatus('Reading questions...');
+            const body = new FormData();
+            body.append('file', file);
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            try {
+                const response = await fetch(builder.dataset.importUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body,
+                });
+                const payload = await response.json().catch(() => ({}));
+                const rowErrors = Array.isArray(payload.errors)
+                    ? payload.errors.filter((error) => typeof error === 'string')
+                    : (payload?.errors && typeof payload.errors === 'object'
+                        ? Object.values(payload.errors).flat().filter((error) => typeof error === 'string')
+                        : []);
+                const imported = Array.isArray(payload.questions) ? payload.questions : [];
+                if (rowErrors.length > 0) {
+                    const readable = imported
+                        .map((item, index) => `${index + 1}. ${item?.prompt || 'Question'}`)
+                        .join('\n');
+                    setStatus([
+                        'Nothing was added. Fix these rows and import again:',
+                        ...rowErrors,
+                        readable ? 'Readable questions (not added):' : '',
+                        readable,
+                    ].filter(Boolean).join('\n'));
+                    return;
+                }
+                if (!response.ok) {
+                    setStatus(rowErrors[0] || payload?.message || 'The file could not be imported.');
+                    return;
+                }
+
+                if (imported.length === 0) {
+                    setStatus('No questions were found in that file.');
+                    return;
+                }
+
+                const current = Array.from(questionList.querySelectorAll('[data-quiz-question]'));
+                const isBlank = (question) => {
+                    const prompt = question.querySelector('textarea')?.value.trim() || '';
+                    const choices = Array.from(question.querySelectorAll('[data-quiz-option] input'))
+                        .map((input) => input.value.trim())
+                        .filter(Boolean);
+                    return prompt === '' && choices.length === 0;
+                };
+                const blanksOnly = current.length > 0 && current.every(isBlank);
+                const kept = blanksOnly ? 0 : current.length;
+                const room = 50 - kept;
+                if (imported.length > room) {
+                    setStatus(`A quiz can hold 50 questions. This file has ${imported.length}, and there is room for ${room} more.`);
+                    return;
+                }
+                if (blanksOnly) {
+                    current.forEach((question) => question.remove());
+                }
+
+                imported.forEach((item) => {
+                    const question = appendQuestionCard();
+                    if (!question) return;
+                    fillImportedQuestion(question, item);
+                });
+                reindexBuilder();
+                setStatus(`Added ${imported.length} question${imported.length === 1 ? '' : 's'}. Review them, then save.`);
+            } catch (error) {
+                setStatus('The file could not be imported.');
+            } finally {
+                importInput.value = '';
+            }
         });
 
         reindexBuilder();
@@ -1844,4 +1997,22 @@ document.addEventListener('DOMContentLoaded', () => {
             hideSuggest();
         }
     });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const counter = document.querySelector('[data-announcement-sms-count]');
+    const title = document.querySelector('#announcement-title');
+    const message = document.querySelector('#announcement-message');
+    if (!counter || !title || !message) return;
+
+    const refresh = () => {
+        const text = `${title.value.trim()}: ${message.value.trim()}`.trim();
+        const length = Math.min(text.length, 480);
+        const credits = length === 0 ? 0 : Math.ceil(length / 160);
+        counter.textContent = `${length} characters in the text that will be sent · ${credits} SMS credit${credits === 1 ? '' : 's'}`;
+    };
+
+    title.addEventListener('input', refresh);
+    message.addEventListener('input', refresh);
+    refresh();
 });

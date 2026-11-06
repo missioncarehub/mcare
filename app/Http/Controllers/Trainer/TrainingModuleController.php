@@ -14,6 +14,7 @@ use App\Models\TrainingSubmoduleProgress;
 use App\Rules\TrainingModuleFileType;
 use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
+use App\Services\QuizQuestionImporter;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
 use App\Services\TraineeClassworkSequence;
@@ -546,22 +547,35 @@ class TrainingModuleController extends Controller
             'time_limit_minutes' => ['nullable', 'integer', 'min:1', 'max:180'],
             'passing_score_percent' => ['nullable', 'numeric', 'min:50', 'max:100'],
             'is_published' => ['nullable', 'boolean'],
+            'question_file' => ['nullable', 'file', 'max:256', 'extensions:txt,text,csv,json'],
         ]);
 
-        $quiz = Quiz::create([
-            'trainer_id' => $request->user()->id,
-            'training_batch_id' => $module->training_batch_id,
-            'target_enrollment_application_id' => $module->target_enrollment_application_id,
-            'training_module_id' => $module->id,
-            'training_submodule_id' => $validated['training_submodule_id'],
-            'title' => $validated['title'],
-            'instructions' => $validated['instructions'] ?? null,
-            'time_limit_minutes' => $validated['time_limit_minutes'] ?? 20,
-            'passing_score_percent' => $validated['passing_score_percent'] ?? 75.00,
-            // A quiz cannot be released until the trainer adds at least one question.
-            'is_published' => false,
-            'published_at' => null,
-        ]);
+        $importedQuestions = $request->hasFile('question_file')
+            ? app(QuizQuestionImporter::class)->import($request->file('question_file'), 'question_file')
+            : null;
+
+        $quiz = DB::transaction(function () use ($request, $module, $validated, $importedQuestions): Quiz {
+            $created = Quiz::create([
+                'trainer_id' => $request->user()->id,
+                'training_batch_id' => $module->training_batch_id,
+                'target_enrollment_application_id' => $module->target_enrollment_application_id,
+                'training_module_id' => $module->id,
+                'training_submodule_id' => $validated['training_submodule_id'],
+                'title' => $validated['title'],
+                'instructions' => $validated['instructions'] ?? null,
+                'time_limit_minutes' => $validated['time_limit_minutes'] ?? 20,
+                'passing_score_percent' => $validated['passing_score_percent'] ?? 75.00,
+                // A quiz cannot be released until the trainer adds at least one question.
+                'is_published' => false,
+                'published_at' => null,
+            ]);
+
+            if ($importedQuestions !== null) {
+                $created->questions()->createMany($importedQuestions);
+            }
+
+            return $created;
+        });
 
         AdminActivityLog::record($request->user(), 'trainer.quiz.created', $quiz, [
             'title' => $quiz->title,
@@ -570,7 +584,9 @@ class TrainingModuleController extends Controller
 
         return redirect()
             ->route('trainer.quizzes.edit', $quiz)
-            ->with('saved', 'Module assessment created. Add your questions and choices below.');
+            ->with('saved', $importedQuestions === null
+                ? 'Module assessment created. Add your questions and choices below.'
+                : 'Imported '.count($importedQuestions).' '.str('question')->plural(count($importedQuestions)).'. Review them, then save.');
     }
 
     /**

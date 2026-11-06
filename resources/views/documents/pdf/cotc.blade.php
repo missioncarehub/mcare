@@ -18,11 +18,26 @@
 @php
     $fullName = trim(collect([$application->first_name, $application->middle_name, $application->last_name, $application->extension_name])->filter()->implode(' '));
     $completionDate = $application->batch?->training_ends_at ?? $document->generated_at ?? now();
+    $useArtwork = $useOfficialArtwork ?? true;
+    $dateSentence = isset($certificateTemplate)
+        ? \App\Models\CertificateTemplate::replacePlaceholders((string) $certificateTemplate->body, $certificateValues ?? [])
+        : 'Given this '.$completionDate->format('jS').' of '.$completionDate->format('F, Y').' at '.$organization['name'];
+    $enrollment = trim((string) ($application->enrollment_number ?? ''));
+    if ($enrollment === '' && $application->id) {
+        $enrollment = 'ENR-'.$application->id;
+    }
 @endphp
-<main class="page" style="background-image: url('{{ $cotcTemplateDataUri }}')">
+<main class="page" @if($useArtwork) style="background-image: url('{{ $cotcTemplateDataUri }}')" @endif>
     <div class="dynamic-name {{ mb_strlen($fullName) > 30 ? 'is-long' : '' }}">{{ $fullName }}</div>
-    <div class="dynamic-date">Given this {{ $completionDate->format('jS') }} of {{ $completionDate->format('F, Y') }} at {{ $organization['name'] }}</div>
-    <div class="document-number">{{ $document->document_number }} | Version {{ $document->version }}</div>
+    <div class="dynamic-date">{{ $dateSentence }}</div>
+    @if(isset($certificateTemplate) && strcasecmp(trim(\App\Models\CertificateTemplate::replacePlaceholders((string) $certificateTemplate->title, $certificateValues ?? [])), 'Certificate of Training Completion') !== 0)
+        <div class="dynamic-date" style="top: 28mm; height: 16mm; font-size: 18pt; font-weight: 700;">{{ \App\Models\CertificateTemplate::replacePlaceholders((string) $certificateTemplate->title, $certificateValues ?? []) }}</div>
+    @endif
+    @if(isset($certificateTemplate))
+        <div class="document-number" style="left: 28mm; right: auto;">{{ $certificateTemplate->second_signatory_name }} · {{ $certificateTemplate->second_signatory_role }}</div>
+        <div class="document-number" style="right: 78mm;">{{ $certificateTemplate->signatory_name }} · {{ $certificateTemplate->signatory_role }}</div>
+    @endif
+    <div class="document-number">{{ $enrollment !== '' ? 'Enrollment ID: '.$enrollment.' | ' : '' }}{{ $document->document_number }} | Version {{ $document->version }}</div>
 </main>
 </body>
 </html>

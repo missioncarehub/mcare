@@ -315,10 +315,10 @@
                         </div>
                     </div>
                     <p class="text-xs leading-5 text-slate-600">Show this ticket number at the MCARE cashier. Once verified, the admin will attach the official receipt number to your payment history.</p>
-                    <button type="button" onclick="window.print()" class="secondary-action w-full justify-center">
+                    <a href="{{ route('payment.receipt') }}" target="_blank" rel="noopener noreferrer" class="secondary-action w-full justify-center">
                         <x-dashboard-icon name="print" class="h-4 w-4" />
-                        <span>Print Ticket</span>
-                    </button>
+                        <span>Print ticket</span>
+                    </a>
                 @elseif ($application->payment_reference || $application->payment_receipt_number)
                     <div class="rounded-xl border border-purple-100 bg-white p-3.5 space-y-2 text-xs">
                         <div class="flex items-start justify-between gap-3">

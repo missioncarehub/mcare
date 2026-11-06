@@ -370,6 +370,10 @@
                         </td>
                         <td>
                             <div class="flex flex-wrap gap-2" aria-label="Module actions">
+                                <a href="{{ route('admin.learning.modules.quizzes', $module) }}" class="admin-module-action" aria-label="Module quizzes" title="Quizzes">
+                                    <x-dashboard-icon name="clipboard-list" class="h-4 w-4" />
+                                    <span class="admin-module-action-tooltip" aria-hidden="true">Quizzes</span>
+                                </a>
                                 <a href="{{ route('admin.learning.modules.preview', $module) }}" class="admin-module-action" aria-label="Preview module" title="Preview module">
                                     <x-dashboard-icon name="eye" class="h-4 w-4" />
                                     <span class="admin-module-action-tooltip" aria-hidden="true">Preview</span>

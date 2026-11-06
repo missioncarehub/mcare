@@ -23,7 +23,7 @@
         <div class="lms-result-score">
             <span>Your score</span>
             <strong>{{ number_format((float) $attempt->score_percent, 1) }}%</strong>
-            <small>{{ number_format((float) $attempt->earned_points, 1) }} of {{ number_format((float) $attempt->total_points, 1) }} points</small>
+            <small>{{ number_format((float) $attempt->earned_points, 1) }} of {{ number_format((float) $attempt->total_points, 1) }} points · Attempt {{ $attempt->attempt_number }} of {{ $gradedAttemptCount ?? $attempt->attempt_number }}</small>
         </div>
         <div>
             <p class="lms-eyebrow">{{ $attempt->passed ? 'Passed' : 'Keep learning' }}</p>

@@ -9,8 +9,10 @@ use App\Models\CareerInquiry;
 use App\Models\CareerOpportunity;
 use App\Models\EnrollmentApplication;
 use App\Models\User;
+use App\Notifications\CareerApplicationDecided;
 use App\Notifications\CareerAwarded;
 use App\Services\CareerGraduateNotifier;
+use App\Services\SemaphoreSmsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -186,6 +188,9 @@ class AdminCareerHubController extends Controller
             }
         }
 
+        $filledOpening = $validated['status'] === CareerInquiry::STATUS_APPROVED
+            && $previousStatus !== CareerInquiry::STATUS_APPROVED;
+
         $careerInquiry->save();
         $careerInquiry->loadMissing('opportunity');
 
@@ -193,7 +198,76 @@ class AdminCareerHubController extends Controller
             'status' => $careerInquiry->status,
         ]);
 
-        return back()->with('saved', 'Inquiry for '.$careerInquiry->opportunity?->listingTitle().' was updated.');
+        if ($filledOpening) {
+            $this->fillCareerOpening($careerInquiry, $request->user());
+        }
+
+        return back()->with('saved', $filledOpening
+            ? 'Inquiry approved. The posting is closed and other pending applicants were marked not selected.'
+            : 'Inquiry for '.$careerInquiry->opportunity?->listingTitle().' was updated.');
+    }
+
+    private function fillCareerOpening(CareerInquiry $approved, User $admin): void
+    {
+        $opportunity = $approved->opportunity;
+        if (! $opportunity) {
+            return;
+        }
+
+        $others = CareerInquiry::query()
+            ->where('career_opportunity_id', $opportunity->id)
+            ->whereKeyNot($approved->id)
+            ->where('status', CareerInquiry::STATUS_PENDING)
+            ->with('graduate.enrollmentApplication')
+            ->get();
+
+        foreach ($others as $other) {
+            $note = trim((string) $other->admin_notes);
+            $other->forceFill([
+                'status' => CareerInquiry::STATUS_REJECTED,
+                'admin_notes' => trim($note."\nNot selected. The opening was filled."),
+                'reviewed_by_id' => $admin->id,
+                'reviewed_at' => now(),
+            ])->save();
+            $this->notifyCareerDecision($other, 'not_selected', $admin);
+        }
+
+        if ($opportunity->is_published) {
+            $opportunity->forceFill(['is_published' => false])->save();
+        }
+
+        $approved->loadMissing('graduate.enrollmentApplication');
+        $this->notifyCareerDecision($approved, 'approved', $admin);
+
+        AdminActivityLog::record($admin, 'admin.career_opening.filled', $opportunity, [
+            'approved_inquiry_id' => $approved->id,
+            'not_selected' => $others->pluck('id')->all(),
+        ]);
+    }
+
+    private function notifyCareerDecision(CareerInquiry $inquiry, string $decision, User $admin): void
+    {
+        $graduate = $inquiry->graduate;
+        $career = $inquiry->opportunity?->listingTitle() ?? 'the career';
+        $message = $decision === 'approved'
+            ? 'MCARE approved your application for '.$career.'. Upload your placement certificate in the Career Hub.'
+            : 'The opening for '.$career.' was filled. Your application was not selected.';
+
+        if ($graduate) {
+            $graduate->notify(new CareerApplicationDecided($inquiry, $decision));
+        }
+
+        $number = $inquiry->contact_number
+            ?: $graduate?->contact_number
+            ?: $graduate?->enrollmentApplication?->contact_number;
+        $sms = app(SemaphoreSmsService::class)->sendOne($number, $message, true);
+
+        AdminActivityLog::record($admin, 'career.inquiry.notified', $inquiry, [
+            'decision' => $decision,
+            'email' => filled($graduate?->email),
+            'sms' => $sms['sent'] ? 'sent' : ($sms['skipped'] ? 'skipped' : 'failed'),
+            'sms_error' => $sms['error'],
+        ]);
     }
 
     public function destroyInquiry(Request $request, CareerInquiry $careerInquiry): RedirectResponse

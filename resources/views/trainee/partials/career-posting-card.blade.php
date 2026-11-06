@@ -3,7 +3,7 @@
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
             <x-dashboard-icon name="briefcase" class="h-5 w-5" />
         </span>
-        <span class="bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Open opportunity</span>
+        <span class="{{ $job->is_published ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }} px-3 py-1 text-xs font-bold">{{ $job->is_published ? 'Open opportunity' : 'Opening filled' }}</span>
     </div>
 
     <h3 class="mt-5 text-xl font-black text-slate-950">{{ $job->listingTitle() }}</h3>
@@ -47,7 +47,7 @@
             @if ($applicationStatus === 'approved')
                 <span class="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-200"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approved</span>
             @elseif ($applicationStatus === 'rejected')
-                <span class="inline-flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200"><x-dashboard-icon name="xmark" class="h-4 w-4" />Not approved</span>
+                <span class="inline-flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-bold text-red-700 ring-1 ring-red-200"><x-dashboard-icon name="xmark" class="h-4 w-4" />{{ $job->is_published ? 'Not approved' : 'Not selected' }}</span>
             @elseif ($applicationStatus === 'pending')
                 <span class="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 ring-1 ring-amber-200"><x-dashboard-icon name="clock" class="h-4 w-4" />Application pending</span>
             @else

@@ -116,7 +116,8 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertSee('PAY-ON-SITE RECEIPT', false)
             ->assertSee('PHP 22,000.00')
             ->assertSee('PHP 2,000.00')
-            ->assertSee('Print / Save PDF');
+            ->assertSee('Print / Save PDF')
+            ->assertSee('size: A5 portrait', false);
 
         // Once the cashier has verified the active ticket, the dashboard
         // presents the official receipt action instead of the pending ticket.
@@ -153,6 +154,8 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertOk()
             ->assertSee($firstReference)
             ->assertSee('OFFICIAL PAYMENT RECEIPT', false)
+            ->assertSee('Received by')
+            ->assertSee('Signature')
             ->assertSee('Ana Reyes')
             ->assertDontSee('TESDA-accredited Caregiving NC II training and assessment.', false)
             ->assertDontSee('Log in to MCARE', false);

@@ -9,9 +9,11 @@ use App\Http\Controllers\Admin\AdminCareerHubController;
 use App\Http\Controllers\Admin\AdminContactMessageController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminLearningSystemController;
+use App\Http\Controllers\Admin\AdminQuizController;
 use App\Http\Controllers\Admin\AdminSessionController;
 use App\Http\Controllers\Admin\AdmissionApplicationReviewController;
 use App\Http\Controllers\Admin\BatchScheduleController;
+use App\Http\Controllers\Admin\CertificateTemplateController;
 use App\Http\Controllers\Admin\CertificationController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\HistoricalAlumniClaimController as AdminHistoricalAlumniClaimController;
@@ -192,6 +194,9 @@ Route::middleware('throttle:global-web')->group(function () {
         Route::post('/applications/status', [AdmissionApplicationController::class, 'lookup'])
             ->middleware('throttle:search')
             ->name('applications.lookup');
+        Route::post('/applications/status/documents', [AdmissionApplicationController::class, 'replaceDocument'])
+            ->middleware('throttle:6,1')
+            ->name('applications.documents.replace');
 
         Route::get('/enrollment', [EnrollmentController::class, 'create'])
             ->name('enrollment.create');
@@ -304,6 +309,10 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'show'])
                     ->middleware('permission:enrollments.review')
                     ->name('enrollments.show');
+
+                Route::get('/enrollments/{enrollmentApplication}/cor', [EnrollmentReviewController::class, 'downloadCor'])
+                    ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
+                    ->name('enrollments.cor');
 
                 Route::patch('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'update'])
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
@@ -522,9 +531,44 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/modules/{module}', [AdminLearningSystemController::class, 'destroyModule'])
                     ->middleware(['permission:modules.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.modules.destroy');
+                Route::get('/learning/modules/{module}/quizzes', [AdminQuizController::class, 'index'])
+                    ->middleware(['permission:modules.manage', 'permission:quizzes.manage'])
+                    ->name('learning.modules.quizzes');
+                Route::post('/learning/modules/{module}/quizzes', [AdminQuizController::class, 'store'])
+                    ->middleware(['permission:modules.manage', 'permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.modules.quizzes.store');
+                Route::post('/learning/quizzes/import', [TrainerQuizController::class, 'importQuestions'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.quizzes.import');
+                Route::get('/learning/quizzes/import-template', [TrainerQuizController::class, 'importTemplate'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:document-downloads'])
+                    ->name('learning.quizzes.import-template');
+                Route::get('/learning/quizzes/{quiz}/edit', [TrainerQuizController::class, 'edit'])
+                    ->middleware('permission:quizzes.manage')
+                    ->name('learning.quizzes.edit');
+                Route::patch('/learning/quizzes/{quiz}', [TrainerQuizController::class, 'update'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.quizzes.update');
                 Route::get('/learning/certificates', [CertificationController::class, 'index'])
                     ->middleware('permission:official-documents.manage')
                     ->name('learning.certificates');
+                Route::get('/learning/certificate-templates', [CertificateTemplateController::class, 'index'])
+                    ->middleware('permission:official-documents.manage')
+                    ->name('learning.certificate-templates');
+                Route::post('/learning/certificate-templates', [CertificateTemplateController::class, 'store'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.certificate-templates.store');
+                Route::get('/learning/certificate-templates/{type}/preview', [CertificateTemplateController::class, 'preview'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
+                    ->whereIn('type', OfficialDocument::supportedTypes())
+                    ->name('learning.certificate-templates.preview');
+                Route::get('/learning/certificate-templates/{certificateTemplate}/assets/{slot}', [CertificateTemplateController::class, 'asset'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
+                    ->whereIn('slot', ['logo', 'signature', 'second-signature'])
+                    ->name('learning.certificate-templates.asset');
+                Route::patch('/learning/certificate-templates/{certificateTemplate}/activate', [CertificateTemplateController::class, 'activate'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.certificate-templates.activate');
                 Route::get('/learning/competency-records/excel', [CompetencyWorkbookController::class, 'downloadForAdmin'])
                     ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.competency-workbooks.download');
@@ -724,6 +768,12 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::post('/quizzes', [TrainerQuizController::class, 'store'])
                     ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
                     ->name('quizzes.store');
+                Route::post('/quizzes/import', [TrainerQuizController::class, 'importQuestions'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
+                    ->name('quizzes.import');
+                Route::get('/quizzes/import-template', [TrainerQuizController::class, 'importTemplate'])
+                    ->middleware(['permission:quizzes.manage', 'throttle:document-downloads'])
+                    ->name('quizzes.import-template');
                 Route::get('/quizzes/{quiz}/edit', [TrainerQuizController::class, 'edit'])
                     ->middleware('permission:quizzes.manage')
                     ->name('quizzes.edit');
@@ -799,11 +849,17 @@ Route::middleware('throttle:global-web')->group(function () {
             Route::middleware(['auth', 'trainee', 'permission:trainee.access'])->group(function () {
                 Route::get('/', [TraineeDashboardController::class, 'index'])
                     ->name('dashboard');
+                Route::post('/welcome/dismiss', [TraineeDashboardController::class, 'dismissVerifiedBanner'])
+                    ->middleware('throttle:sensitive-mutation')
+                    ->name('dashboard.dismiss-banner');
                 Route::get('/schedule', [TraineeDashboardController::class, 'schedule'])
                     ->name('schedule');
                 Route::get('/documents', [TraineeDashboardController::class, 'documents'])
                     ->middleware('permission:documents.view')
                     ->name('documents');
+                Route::get('/documents/cor', [TraineeDashboardController::class, 'downloadCor'])
+                    ->middleware(['permission:documents.view', 'throttle:document-downloads'])
+                    ->name('documents.cor');
                 Route::get('/documents/cotc/{officialDocument}/download', [TraineeCertificateController::class, 'download'])
                     ->middleware(['permission:cotc.download', 'throttle:document-downloads'])
                     ->name('cotc.download');

@@ -9,7 +9,9 @@ use App\Models\QuizAttempt;
 use App\Models\QuizQuestion;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingModule;
+use App\Services\QuizQuestionImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\Concerns\CreatesLmsTestData;
 use Tests\TestCase;
 
@@ -358,6 +360,136 @@ class QuizAuthoringTest extends TestCase
         $this->assertNull($record->tor_grade);
         $this->assertCount(3, $record->outcomeResults);
         $this->assertTrue($record->outcomeResults->every(fn ($res) => $res->status === 'competent'));
+    }
+
+    public function test_trainer_can_import_questions_from_a_file_while_building_a_quiz(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $module = $this->lmsModule($trainer, $batch);
+        $quiz = $this->quiz($trainer->id, $batch->id, ['training_module_id' => $module->id]);
+        $file = UploadedFile::fake()->createWithContent('questions.txt', QuizQuestionImporter::sampleText());
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.quizzes.edit', $quiz))
+            ->assertOk()
+            ->assertSee('data-quiz-import', false)
+            ->assertSee('Import questions', false)
+            ->assertSee(route('trainer.quizzes.import'), false);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.quizzes.import'), ['file' => $file], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('questions.0.prompt', 'What should happen before patient contact?')
+            ->assertJsonCount(4, 'questions');
+
+        $payload = $this->quizPayload($batch->id, [
+            'training_module_id' => $module->id,
+            'title' => 'Imported class quiz',
+            'question_file' => UploadedFile::fake()->createWithContent('questions.txt', QuizQuestionImporter::sampleText()),
+        ]);
+
+        $this->actingAs($trainer)
+            ->post(route('trainer.quizzes.store'), $payload)
+            ->assertRedirect();
+
+        $imported = Quiz::query()->where('title', 'Imported class quiz')->firstOrFail();
+        $this->assertCount(4, $imported->questions);
+        $this->assertSame('enumeration', $imported->questions[2]->type);
+        $this->assertSame([], $imported->questions[2]->options);
+
+        $submodule = $this->lmsSubmodule($module);
+        $this->actingAs($trainer)
+            ->post(route('trainer.modules.quizzes.store', $module), [
+                'training_submodule_id' => $submodule->id,
+                'title' => 'Module file quiz',
+                'question_file' => UploadedFile::fake()->createWithContent('questions.csv', <<<'CSV'
+type,prompt,points,answer,option_a,option_b
+multiple_choice,Which action comes first?,1,A,Hand hygiene,Leave the room
+CSV),
+            ])
+            ->assertRedirect();
+
+        $moduleQuiz = Quiz::query()->where('title', 'Module file quiz')->firstOrFail();
+        $this->assertSame('Hand hygiene', $moduleQuiz->questions()->first()->options[0]);
+    }
+
+    public function test_admin_can_import_questions_when_creating_and_editing_a_quiz(): void
+    {
+        $admin = $this->lmsUser('admin');
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch();
+        $module = $this->lmsModule($trainer, $batch);
+        $submodule = $this->lmsSubmodule($module);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules'))
+            ->assertOk()
+            ->assertSee('Module quizzes', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.modules.quizzes', $module))
+            ->assertOk()
+            ->assertSee('Import questions from a file', false)
+            ->assertSee(route('admin.learning.quizzes.import-template'), false);
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.modules.quizzes.store', $module), [
+                'title' => 'Admin imported quiz',
+                'training_submodule_id' => $submodule->id,
+                'question_file' => UploadedFile::fake()->createWithContent('questions.txt', QuizQuestionImporter::sampleText()),
+            ])
+            ->assertRedirect();
+
+        $quiz = Quiz::query()->where('title', 'Admin imported quiz')->firstOrFail();
+        $this->assertSame($trainer->id, $quiz->trainer_id);
+        $this->assertCount(4, $quiz->questions);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.quizzes.edit', $quiz))
+            ->assertOk()
+            ->assertSee('data-import-url="'.route('admin.learning.quizzes.import').'"', false)
+            ->assertSee('What should happen before patient contact?');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.quizzes.import'), [
+                'file' => UploadedFile::fake()->createWithContent('questions.json', json_encode([[
+                    'prompt' => 'Reviewed from a file',
+                    'options' => ['Yes', 'No'],
+                    'answer' => 'A',
+                ]], JSON_THROW_ON_ERROR)),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('questions.0.correct_option', 0);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.quizzes.update', $quiz), $this->quizPayload($batch->id, [
+                'training_module_id' => $module->id,
+                'training_submodule_id' => $submodule->id,
+                'title' => 'Admin imported quiz',
+                'questions' => [[
+                    'type' => 'multiple_choice',
+                    'prompt' => 'Reviewed question',
+                    'options' => ['Yes', 'No'],
+                    'correct_option' => 1,
+                    'points' => 1,
+                ]],
+            ]))
+            ->assertRedirect(route('admin.learning.modules.quizzes', $module));
+
+        $this->assertSame('Reviewed question', $quiz->fresh()->questions()->first()->prompt);
+        $this->assertSame(1, $quiz->fresh()->questions()->first()->correct_option);
+    }
+
+    public function test_a_trainee_cannot_import_quiz_questions(): void
+    {
+        $trainee = $this->lmsUser('trainee');
+
+        $this->actingAs($trainee)
+            ->post(route('trainer.quizzes.import'), [
+                'file' => UploadedFile::fake()->createWithContent('questions.txt', QuizQuestionImporter::sampleText()),
+            ])
+            ->assertForbidden();
     }
 
     private function quiz(int $trainerId, int $batchId, array $overrides = []): Quiz

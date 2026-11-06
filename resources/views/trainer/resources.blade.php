@@ -235,7 +235,7 @@
             <button type="button" data-dashboard-dialog-close class="lms-dialog-close" aria-label="Close quiz creator"><x-dashboard-icon name="xmark" /></button>
         </div>
 
-        <form method="POST" action="{{ route('trainer.quizzes.store') }}" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
+        <form method="POST" action="{{ route('trainer.quizzes.store') }}" enctype="multipart/form-data" class="lms-form-grid lms-composer-form" data-dashboard-dialog-form data-submit-label="Creating quiz...">
             @csrf
             <input type="hidden" name="_composer" value="quiz">
 
@@ -323,6 +323,8 @@
                 <label for="quick-quiz-due">Due Date (Optional)</label>
                 <input id="quick-quiz-due" type="datetime-local" name="due_at" class="form-field">
             </div>
+
+            @include('trainer.quizzes.partials.question-file', ['inputId' => 'quick-quiz-question-file'])
 
             <!-- Initial starter question to satisfy validation and allow adding questions right away -->
             <input type="hidden" name="questions[0][type]" value="multiple_choice">

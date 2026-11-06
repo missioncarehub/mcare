@@ -17,7 +17,7 @@
         <aside class="dashboard-panel space-y-5">
             <header class="border-b border-slate-100 pb-3">
                 <h2 class="text-base font-bold text-slate-950">Publish Notice or Reminder</h2>
-                <p class="mt-1 text-xs text-slate-500">Dispatches in-app notifications and optional email notices.</p>
+                <p class="mt-1 text-xs text-slate-500">Sends an in-app notice, and can also send email and SMS.</p>
             </header>
 
             <form method="POST" action="{{ route('admin.announcements.store') }}" class="space-y-4" id="admin-announcement-form">
@@ -81,14 +81,29 @@
                     <textarea id="announcement-message" name="message" rows="4" required maxlength="5000" class="form-field" placeholder="Provide instructions, installment details, or announcement notes...">{{ old('message') }}</textarea>
                 </div>
 
-                <div class="rounded-xl border border-sky-100 bg-sky-50/50 p-3.5">
+                <div class="space-y-3 rounded-xl border border-sky-100 bg-sky-50/50 p-3.5">
+                    <label class="flex items-start gap-2.5">
+                        <input type="checkbox" checked disabled class="mt-0.5 rounded border-slate-300 text-purple-600">
+                        <span class="text-xs text-slate-700">
+                            <strong class="font-bold text-slate-950">In-app</strong><br>
+                            Always saved in the trainee notification bell.
+                        </span>
+                    </label>
                     <label class="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" name="send_email" value="1" @checked(old('send_email', true)) class="mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
                         <span class="text-xs text-slate-700">
-                            <strong class="font-bold text-slate-950">Send Email Notification</strong><br>
-                            Dispatches a branded email notice to the selected audience with due dates and payment links.
+                            <strong class="font-bold text-slate-950">Email</strong><br>
+                            Sends a branded email through the configured mail service.
                         </span>
                     </label>
+                    <label class="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" name="send_sms" value="1" @checked(old('send_sms')) class="mt-0.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+                        <span class="text-xs text-slate-700">
+                            <strong class="font-bold text-slate-950">SMS</strong><br>
+                            Sends through Semaphore to a valid 09XX or +63 mobile number. 160 characters is 1 credit. Numbers that are not Philippine mobiles are skipped.
+                        </span>
+                    </label>
+                    <p class="text-xs font-semibold text-slate-600" data-announcement-sms-count>0 characters in the text that will be sent · 0 SMS credits</p>
                 </div>
 
                 <button type="submit" class="primary-action w-full justify-center">
@@ -155,16 +170,13 @@
                                     @endif
                                 </td>
                                 <td>
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">In-app</span>
                                     @if ($item->send_email)
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                            <x-dashboard-icon name="envelope" class="h-3 w-3" />
-                                            <span>Email + App</span>
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                                            <x-dashboard-icon name="bell" class="h-3 w-3" />
-                                            <span>In-App Only</span>
-                                        </span>
+                                        <span class="mt-1 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Email</span>
+                                    @endif
+                                    @if ($item->send_sms)
+                                        @php $smsDelivery = $item->sms_delivery ?? []; @endphp
+                                        <span class="mt-1 inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700">SMS {{ $smsDelivery['sent'] ?? 0 }} sent, {{ $smsDelivery['failed'] ?? 0 }} failed, {{ $smsDelivery['skipped'] ?? 0 }} skipped</span>
                                     @endif
                                 </td>
                                 <td>

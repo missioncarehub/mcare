@@ -22,9 +22,20 @@
         ]];
     }
     $isPrivate = filled(old('target_enrollment_application_id', $quiz?->target_enrollment_application_id));
-    $moduleReturnUrl = $quiz?->training_module_id
-        ? route('trainer.modules.show', $quiz->training_module_id).'#assessments'
-        : route('trainer.resources');
+    $isAdminQuiz = request()->routeIs('admin.learning.quizzes.*');
+    $questionImportUrl = $isAdminQuiz
+        ? route('admin.learning.quizzes.import')
+        : route('trainer.quizzes.import');
+    $questionTemplateUrl = $isAdminQuiz
+        ? route('admin.learning.quizzes.import-template')
+        : route('trainer.quizzes.import-template');
+    $moduleReturnUrl = $isAdminQuiz
+        ? ($quiz?->training_module_id
+            ? route('admin.learning.modules.quizzes', $quiz->training_module_id)
+            : route('admin.learning.modules'))
+        : ($quiz?->training_module_id
+            ? route('trainer.modules.show', $quiz->training_module_id).'#assessments'
+            : route('trainer.resources'));
     $selectedModuleId = old('training_module_id', $quiz?->training_module_id);
     $selectedSubmoduleId = old('training_submodule_id', $quiz?->training_submodule_id);
     $selectedBatchId = old('training_batch_id', $quiz?->training_batch_id);
@@ -61,7 +72,7 @@
         : trim(($selectedBatch?->name ?? 'Class').' '.($selectedBatch?->year ?? '')).' — entire class';
 @endphp
 
-<div class="lms-page" data-quiz-builder>
+<div class="lms-page" data-quiz-builder data-import-url="{{ $questionImportUrl }}">
     <header class="lms-class-header">
         <div class="min-w-0">
             <p class="lms-eyebrow">Quiz builder</p>
@@ -225,7 +236,18 @@
         <section class="lms-builder-section" aria-labelledby="quiz-questions-heading">
             <div class="lms-builder-section-heading">
                 <span>2</span>
-                <div><h2 id="quiz-questions-heading">Questions</h2><p>Add multiple-choice or true-or-false questions and choose the correct answer for each one.</p></div>
+                <div><h2 id="quiz-questions-heading">Questions</h2><p>Add questions one at a time, or import them from a text, CSV, or JSON file.</p></div>
+            </div>
+
+            <div class="lms-question-import" data-quiz-import>
+                <div>
+                    <h3>Import questions</h3>
+                    <p>Choose a <strong>.txt</strong>, <strong>.csv</strong>, or <strong>.json</strong> file. A clean file is added here so you can review it before saving. If any row is missing an answer or repeats a question, the file is listed and nothing is added until it is fixed. In a text file, leave a blank line between questions and mark the correct choice with <strong>*</strong> or <code>Answer: B</code>.</p>
+                </div>
+                <label class="sr-only" for="quiz-question-import">Question file</label>
+                <input id="quiz-question-import" type="file" data-quiz-import-file accept=".txt,.text,.csv,.json,text/plain,text/csv,application/json">
+                <p>CSV needs a header row: <code>type, prompt, points, answer, option_a, option_b</code>. <a href="{{ $questionTemplateUrl }}">Download a sample text file</a>.</p>
+                <p class="lms-import-status" data-quiz-import-status role="status"></p>
             </div>
 
             <div class="lms-question-list" data-quiz-question-list>
@@ -258,7 +280,7 @@
                             </div>
                             <div class="lms-field lms-field-wide">
                                 <label for="question-{{ $questionIndex }}-prompt">Question / Activity Instructions</label>
-                                <textarea id="question-{{ $questionIndex }}-prompt" name="questions[{{ $questionIndex }}][prompt]" rows="3" maxlength="1200" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background.">{{ data_get($question, 'prompt') }}</textarea>
+                                <textarea id="question-{{ $questionIndex }}-prompt" name="questions[{{ $questionIndex }}][prompt]" rows="3" maxlength="2000" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background.">{{ data_get($question, 'prompt') }}</textarea>
                             </div>
                         </div>
                         <fieldset class="lms-option-fieldset" @if(in_array($questionType, ['file_upload', 'enumeration'], true)) hidden @endif>
@@ -306,7 +328,7 @@
             <div class="lms-form-grid">
                 <div class="lms-field"><label for="question-__INDEX__-type">Question type</label><select id="question-__INDEX__-type" name="questions[__INDEX__][type]" data-question-type><option value="multiple_choice">Multiple choice</option><option value="true_false">True or false</option><option value="file_upload">Activity Document (PDF or image)</option><option value="enumeration">Enumeration / Written Activity</option></select></div>
                 <div class="lms-field"><label for="question-__INDEX__-points">Points</label><input id="question-__INDEX__-points" type="number" name="questions[__INDEX__][points]" value="1" min="1" max="100" required></div>
-                <div class="lms-field lms-field-wide"><label for="question-__INDEX__-prompt">Question / Activity Instructions</label><textarea id="question-__INDEX__-prompt" name="questions[__INDEX__][prompt]" rows="3" maxlength="1200" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background."></textarea></div>
+                <div class="lms-field lms-field-wide"><label for="question-__INDEX__-prompt">Question / Activity Instructions</label><textarea id="question-__INDEX__-prompt" name="questions[__INDEX__][prompt]" rows="3" maxlength="2000" required placeholder="Example: Create a DOCX or PDF file answering: Tell me about yourself and your caregiving background."></textarea></div>
             </div>
             <fieldset class="lms-option-fieldset">
                 <legend>Answer options</legend>

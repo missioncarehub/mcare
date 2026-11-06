@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\OfficialDocumentRenderer;
+use App\Models\CertificateTemplate;
 use App\Models\OfficialDocument;
 use RuntimeException;
 use Spatie\Browsershot\Browsershot;
@@ -17,15 +18,19 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
             'application.competencyRecords.unit',
         ]);
 
+        $template = CertificateTemplate::activeFor($document->type);
         $view = OfficialDocument::templateViewForType($document->type);
         $html = view($view, [
             'document' => $document,
             'application' => $document->application,
             'organization' => config('official_documents.organization'),
-            'logoDataUri' => $this->logoDataUri(),
+            'logoDataUri' => $this->logoDataUri($template),
             'cotcTemplateDataUri' => $document->type === OfficialDocument::TYPE_COTC
                 ? $this->publicPngDataUri('assets/cotc-official-template.png')
                 : null,
+            'certificateTemplate' => $template,
+            'certificateValues' => CertificateTemplate::placeholderValues($document),
+            'useOfficialArtwork' => $template ? $template->usesOfficialArtwork() : $document->type === OfficialDocument::TYPE_COTC,
         ])->render();
 
         $browsershot = Browsershot::html($html)
@@ -33,15 +38,22 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
             ->allowFileAccess()
             ->emulateMedia('print');
 
-        match ($document->type) {
-            OfficialDocument::TYPE_TOR => $browsershot->format('A4')->margins(0, 0, 0, 0),
-            OfficialDocument::TYPE_COTC => $browsershot
-                ->windowSize(1056, 816)
-                ->format('Letter')
-                ->landscape()
-                ->margins(0, 0, 0, 0)
-                ->setOption('preferCSSPageSize', true),
+        $paper = match ($template?->paper_size) {
+            'letter' => 'Letter',
+            'legal' => 'Legal',
+            'a4' => 'A4',
+            default => $document->type === OfficialDocument::TYPE_COTC ? 'Letter' : 'A4',
         };
+        $landscape = $template
+            ? $template->orientation === 'landscape'
+            : $document->type === OfficialDocument::TYPE_COTC;
+        $browsershot->format($paper)->margins(0, 0, 0, 0);
+        if ($landscape) {
+            $browsershot->landscape();
+        }
+        if ($document->type === OfficialDocument::TYPE_COTC && ($template === null || $template->usesOfficialArtwork())) {
+            $browsershot->windowSize(1056, 816)->setOption('preferCSSPageSize', true);
+        }
 
         $this->applyConfiguredBinaries($browsershot);
 
@@ -176,8 +188,13 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
         ];
     }
 
-    private function logoDataUri(): string
+    private function logoDataUri(?CertificateTemplate $template = null): string
     {
+        $customLogo = $template?->absoluteAsset($template->logo_path);
+        if ($customLogo !== null) {
+            return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($customLogo));
+        }
+
         return $this->publicPngDataUri('assets/official-logo.png');
     }
 

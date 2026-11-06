@@ -537,7 +537,7 @@ class AdminEnrollmentReviewTest extends TestCase
             ->get(route('admin.enrollments.show', $application))
             ->assertOk()
             ->assertSee('Completed')
-            ->assertSee('All accepted');
+            ->assertSee('All verified');
     }
 
     public function test_show_page_does_not_mark_document_review_completed_when_documents_are_pending(): void
@@ -581,7 +581,7 @@ class AdminEnrollmentReviewTest extends TestCase
             ->assertSee('Incomplete')
             ->assertSee('4 pending')
             ->assertSee('Document review stays incomplete while required documents are pending')
-            ->assertDontSee('All accepted');
+            ->assertDontSee('All verified');
     }
 
     public function test_saving_an_approved_decision_emails_a_verification_link_and_login_waits_for_it(): void
@@ -812,6 +812,30 @@ class AdminEnrollmentReviewTest extends TestCase
             ->assertRedirect(route('admin.enrollments.show', $application));
 
         Notification::assertSentTo($applicant, QueuedVerifyEmail::class);
+    }
+
+    public function test_a_document_that_is_not_verified_requires_a_remark(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->approvalReadyApplication($applicant);
+
+        $this->actingAs($admin)
+            ->from(route('admin.enrollments.document-review', $application))
+            ->patch(route('admin.enrollments.documents.review', $application), [
+                'documents' => [
+                    'birth-certificate' => ['status' => 'replace', 'note' => ''],
+                    'education-document' => ['status' => 'accepted', 'note' => null],
+                    'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                    'id-photo' => ['status' => 'accepted', 'note' => null],
+                    'signature' => ['status' => 'accepted', 'note' => null],
+                ],
+                'review_action' => 'save',
+            ])
+            ->assertRedirect(route('admin.enrollments.document-review', $application))
+            ->assertSessionHasErrors('documents.birth-certificate.note');
+
+        $this->assertSame('accepted', $application->fresh()->document_review['birth-certificate']['status']);
     }
 
     private function approvalReadyApplication(User $user): EnrollmentApplication

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\EnrollmentDocumentsReviseRequestedNotification;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
 use App\Services\AccountDeletionService;
+use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\RollingModuleReleaseService;
 use App\Services\StaffVisiblePhoto;
 use App\Services\TesdaRegistrationPdfService;
@@ -562,6 +563,21 @@ class EnrollmentReviewController extends Controller
         ]);
     }
 
+    public function downloadCor(EnrollmentApplication $enrollmentApplication): Response
+    {
+        $pdf = app(CertificateOfRegistrationRenderer::class)->render($enrollmentApplication);
+        $filename = CertificateOfRegistrationRenderer::filename($enrollmentApplication);
+
+        AdminActivityLog::record(request()->user(), 'enrollment.cor.downloaded', $enrollmentApplication, [
+            'certificate_no' => CertificateOfRegistrationRenderer::number($enrollmentApplication),
+        ]);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     /**
      * @return array<string, array{status: string, note: ?string}>
      */
@@ -586,10 +602,24 @@ class EnrollmentReviewController extends Controller
 
         foreach ($this->documentFields() as $key => $definition) {
             $submitted = $documents[$key] ?? [];
+            $status = $submitted['status'] ?? ($enrollmentApplication->{$definition['field']} ? 'unreviewed' : 'missing');
+            $note = trim((string) ($submitted['note'] ?? '')) ?: null;
+
+            if (in_array($status, ['replace', 'missing'], true) && $note === null) {
+                throw ValidationException::withMessages([
+                    "documents.{$key}.note" => 'Add a remark when the document is not verified.',
+                ]);
+            }
+
             $review[$key] = [
-                'status' => $submitted['status'] ?? ($enrollmentApplication->{$definition['field']} ? 'unreviewed' : 'missing'),
-                'note' => trim((string) ($submitted['note'] ?? '')) ?: null,
+                'status' => $status,
+                'note' => $note,
             ];
+
+            $history = data_get($enrollmentApplication->document_review, $key.'.history');
+            if (is_array($history) && $history !== []) {
+                $review[$key]['history'] = array_values($history);
+            }
         }
 
         return $review;

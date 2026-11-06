@@ -59,6 +59,9 @@
                             @empty
                                 <p class="mt-1 text-xs text-emerald-700">All completion checks passed</p>
                             @endforelse
+                            @foreach(($eligibility['quiz_summaries'] ?? []) as $summary)
+                                <p class="mt-1 text-xs text-slate-600">{{ $summary['title'] }}: {{ $summary['score'] }} ({{ $summary['percentage'] }}) · {{ $summary['attempts'] }} attempts · {{ $summary['result'] }} · {{ $summary['taken_at'] }}</p>
+                            @endforeach
                         </td>
                         <td>
                             @include('admin.learning.partials.training-record-document-actions', [

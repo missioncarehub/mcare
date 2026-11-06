@@ -35,6 +35,10 @@
                     <button type="submit" class="primary-action">Look up status</button>
                 </form>
 
+                @if (session('saved'))
+                    <p class="enrollment-notice enrollment-notice-ok" role="status">{{ session('saved') }}</p>
+                @endif
+
                 @if ($lookedUp && ! $admission)
                     <p class="enrollment-notice enrollment-notice-error" role="alert">That application number was not found. Check the number from your confirmation email and try again.</p>
                 @endif
@@ -55,6 +59,15 @@
                             'in_progress' => 'In progress',
                             'pending' => 'Pending',
                             'blocked' => 'Blocked',
+                        ];
+                        $documentStatuses = $enrollment?->documentStatuses() ?? [];
+                        $canReplaceDocuments = $enrollment && $enrollment->status !== \App\Models\EnrollmentApplication::STATUS_APPROVED;
+                        $documentStatusTones = [
+                            'accepted' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                            'replace' => 'bg-amber-50 text-amber-800 ring-amber-100',
+                            'missing' => 'bg-red-50 text-red-700 ring-red-100',
+                            'unreviewed' => 'bg-slate-50 text-slate-600 ring-slate-100',
+                            'not_uploaded' => 'bg-slate-50 text-slate-500 ring-slate-100',
                         ];
                     @endphp
 
@@ -101,6 +114,42 @@
                                     </li>
                                 @endforeach
                             </ol>
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Document status</p>
+                            @if ($documentStatuses === [])
+                                <p class="mt-2 text-sm leading-6 text-slate-600">Document review starts after you submit the enrollment form.</p>
+                            @else
+                                @if ($errors->has('verifier') || $errors->has('replacement') || $errors->has('document'))
+                                    <p class="mt-2 text-sm font-semibold text-red-700" role="alert">{{ $errors->first('verifier') ?: $errors->first('replacement') ?: $errors->first('document') }}</p>
+                                @endif
+                                <ul class="mt-3 space-y-2">
+                                    @foreach ($documentStatuses as $document)
+                                        <li class="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <p class="text-sm font-bold text-slate-900">{{ $document['label'] }}</p>
+                                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 {{ $documentStatusTones[$document['status']] ?? 'bg-slate-50 text-slate-600 ring-slate-100' }}">{{ $document['status_label'] }}</span>
+                                            </div>
+                                            @if ($document['note'])
+                                                <p class="mt-1 text-xs leading-5 text-slate-600">{{ $document['note'] }}</p>
+                                            @endif
+                                            @if ($canReplaceDocuments && in_array($document['status'], ['replace', 'missing'], true))
+                                                <form method="POST" action="{{ route('applications.documents.replace') }}" enctype="multipart/form-data" class="mt-3 space-y-2">
+                                                    @csrf
+                                                    <input type="hidden" name="application_number" value="{{ $admission->application_number }}">
+                                                    <input type="hidden" name="document" value="{{ $document['key'] }}">
+                                                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500" for="verifier-{{ $document['key'] }}">Email or mobile on the enrollment form</label>
+                                                    <input class="form-field" id="verifier-{{ $document['key'] }}" name="verifier" value="{{ old('document') === $document['key'] ? old('verifier') : '' }}" required autocomplete="username">
+                                                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500" for="replacement-{{ $document['key'] }}">Upload replacement</label>
+                                                    <input id="replacement-{{ $document['key'] }}" name="replacement" type="file" accept="{{ in_array($document['key'], ['id-photo', 'signature'], true) ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png' }}" required>
+                                                    <button type="submit" class="secondary-action">Submit replacement</button>
+                                                </form>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </div>
 
                         @if ($admission->isPending())

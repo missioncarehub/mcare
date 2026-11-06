@@ -249,6 +249,11 @@
             .button { width: auto; }
         }
 
+        @page {
+            size: A5 portrait;
+            margin: 10mm;
+        }
+
         @media print {
             body {
                 background: #fff;
@@ -258,7 +263,11 @@
             .actions,
             .status-banner { display: none !important; }
 
-            .page { width: 100%; max-width: 28rem; }
+            .page {
+                width: 128mm;
+                max-width: 128mm;
+                margin: 0;
+            }
         }
     </style>
 </head>
@@ -289,6 +298,7 @@
             ?: $displayPayment?->ticket_number
             ?: $application->latestPaymentReference();
         $paymongoPaymentNumber = $application->paymongoPaymentId();
+        $receivedBy = $verifiedPayment?->recordedByAdmin?->name ?: 'MCARE Cashier';
         $receiptReturnUrl = $receiptReturnUrl ?? route('payment.show');
         $receiptReturnLabel = $receiptReturnLabel ?? 'Back to payment';
         $logoPath = public_path('assets/images/logoicon.png');
@@ -445,6 +455,8 @@
                         <div class="cashier-line"><span>PayMongo payment number</span><b>{{ $paymongoPaymentNumber }}</b></div>
                     @endif
                     <div class="cashier-line"><span>Date</span><b>{{ $verifiedPayment?->paid_at?->format('M d, Y g:i A') ?? $application->payment_verified_at?->format('M d, Y g:i A') ?? now()->format('M d, Y g:i A') }}</b></div>
+                    <div class="cashier-line"><span>Received by</span><b>{{ $receivedBy }}</b></div>
+                    <div class="cashier-line"><span>Signature</span><b></b></div>
                 </div>
 
                 <p class="footer">

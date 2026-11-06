@@ -175,6 +175,20 @@
                     @error('registrar_name', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
                 </div>
 
+                <div>
+                    <label for="tor_title" class="block text-sm font-bold text-slate-700">Transcript title</label>
+                    <input id="tor_title" name="tor_title" type="text" value="{{ old('tor_title', \App\Models\PublicSiteSetting::current()->tor_title) }}" maxlength="180" placeholder="OFFICIAL TRANSCRIPT OF RECORD" class="form-field mt-2 max-w-xl text-base">
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Leave this blank to keep OFFICIAL TRANSCRIPT OF RECORD. The next transcript uses this title.</p>
+                    @error('tor_title', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </div>
+
+                <div>
+                    <label for="cor_statement" class="block text-sm font-bold text-slate-700">Certificate of registration statement</label>
+                    <textarea id="cor_statement" name="cor_statement" rows="3" maxlength="1000" class="form-field mt-2 max-w-xl text-base" placeholder="This certifies that the trainee named below is registered for the training program, batch, and schedule on this record.">{{ old('cor_statement', \App\Models\PublicSiteSetting::current()->cor_statement) }}</textarea>
+                    <p class="mt-2 text-xs leading-5 text-slate-500">This sentence is printed on the next Certificate of Registration. The trainee name, program, batch, schedule, and payment status stay filled from the live enrollment.</p>
+                    @error('cor_statement', 'registrar') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
+                </div>
+
                 <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>

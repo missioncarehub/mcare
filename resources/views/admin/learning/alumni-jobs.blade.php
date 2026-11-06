@@ -234,7 +234,7 @@
                                         <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Return this certificate to the alumni for resubmission?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return cert</button></form>
                                     @endif
                                     @if ($inquiry->isPending())
-                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Approve this application? The career will appear in the alumni career history so they can submit a placement certificate.">@csrf @method('PATCH')<input type="hidden" name="status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approve</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Approve this application? This fills the opening, closes the posting, and marks every other pending applicant as not selected.">@csrf @method('PATCH')<input type="hidden" name="status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approve</button></form>
                                         <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Reject this application?">@csrf @method('PATCH')<input type="hidden" name="status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Reject</button></form>
                                     @endif
                                     <button type="button" data-dashboard-dialog-open="career-inquiry-{{ $inquiry->id }}" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="pencil" class="h-4 w-4" />Review</button>
@@ -309,6 +309,7 @@
                             @endforeach
                         </select>
                         @error('status')<p class="form-error">{{ $message }}</p>@enderror
+                        <p class="mt-2 text-xs leading-5 text-slate-500">Approving fills this opening, closes the posting, and marks other pending applicants as not selected.</p>
                     </div>
                     <div>
                         <label for="inquiry-notes-{{ $inquiry->id }}" class="form-label">Admin notes <span class="font-normal text-slate-400">(optional)</span></label>

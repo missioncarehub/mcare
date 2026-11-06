@@ -52,6 +52,23 @@
         </div>
     </article>
 
+    <section aria-labelledby="quiz-score-summary-title">
+        <div class="mb-4">
+            <p class="dashboard-section-kicker">Assessments</p>
+            <h2 id="quiz-score-summary-title" class="mt-1 text-2xl font-black text-slate-950">Quiz scores</h2>
+        </div>
+        <div class="dashboard-panel overflow-hidden">
+            @forelse(($quizSummaries ?? []) as $summary)
+                <div class="border-b border-slate-100 px-4 py-3 last:border-b-0">
+                    <p class="text-sm font-bold text-slate-950">{{ $summary['title'] }}</p>
+                    <p class="mt-1 text-xs text-slate-600">{{ $summary['score'] }} · {{ $summary['percentage'] }} · {{ $summary['attempts'] }} {{ \Illuminate\Support\Str::plural('attempt', $summary['attempts']) }} · {{ $summary['result'] }} · {{ $summary['taken_at'] }}</p>
+                </div>
+            @empty
+                <p class="px-4 py-5 text-sm text-slate-500">No published quiz scores are on this record yet.</p>
+            @endforelse
+        </div>
+    </section>
+
     <section aria-labelledby="validated-grades-title">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>

@@ -13,9 +13,12 @@ use App\Models\User;
 use App\Notifications\LmsQuizPublished;
 use App\Services\ClassroomComments;
 use App\Services\ModuleAssessmentService;
+use App\Services\QuizQuestionImporter;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -47,7 +50,8 @@ class QuizController extends Controller
         $this->assertTrainerBatch($request, $batchId, $targetTrainee);
         $parentModule = $this->resolveParentModule($request, $validated, $batchId, $targetTrainee);
         $submodule = $this->resolveSubmodule($parentModule, $validated);
-        $questions = $this->normalizedQuestions($validated['questions']);
+        $importedQuestions = $this->questionsFromUpload($request);
+        $questions = $importedQuestions ?? $this->normalizedQuestions($validated['questions']);
         $published = $request->boolean('is_published');
 
         $quiz = DB::transaction(function () use (
@@ -94,8 +98,40 @@ class QuizController extends Controller
             $this->notifyTrainees($quiz);
         }
 
+        if ($importedQuestions !== null) {
+            return redirect()
+                ->route('trainer.quizzes.edit', $quiz)
+                ->with('saved', 'Imported '.count($questions).' '.str('question')->plural(count($questions)).'. Review them, then save.');
+        }
+
         return $this->moduleRedirect($quiz)
             ->with('saved', $quiz->is_published ? 'Quiz published.' : 'Quiz saved as a draft.');
+    }
+
+    public function importQuestions(Request $request, QuizQuestionImporter $importer): JsonResponse
+    {
+        $this->authorize('create', Quiz::class);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:256', 'extensions:txt,text,csv,json'],
+        ]);
+
+        $preview = $importer->preview($validated['file']);
+
+        return response()->json([
+            'questions' => $preview['questions'],
+            'errors' => $preview['errors'],
+        ], $preview['errors'] === [] ? 200 : 422);
+    }
+
+    public function importTemplate(): Response
+    {
+        $this->authorize('create', Quiz::class);
+
+        return response(QuizQuestionImporter::sampleText(), 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="quiz-questions.txt"',
+        ]);
     }
 
     public function edit(
@@ -105,7 +141,7 @@ class QuizController extends Controller
     ): View {
         $this->authorize('update', $quiz);
 
-        return view('trainer.quizzes.edit', [
+        return view($request->routeIs('admin.learning.quizzes.edit') ? 'admin.learning.quiz-edit' : 'trainer.quizzes.edit', [
             'quiz' => $quiz->load(['questions', 'batch', 'targetTrainee', 'trainingModule', 'trainingSubmodule']),
             'classroomComments' => $comments->visibleFor($request->user(), $quiz),
             'privateCommentRecipients' => $comments->privateRecipients($request->user(), $quiz),
@@ -237,6 +273,8 @@ class QuizController extends Controller
     {
         $this->authorize('viewResults', $quiz);
 
+        $gradedAttempts = $quiz->attempts()->where('status', QuizAttempt::STATUS_GRADED);
+
         return view('trainer.quizzes.results', [
             'quiz' => $quiz->load(['batch', 'targetTrainee', 'questions']),
             'attempts' => $quiz->attempts()
@@ -244,6 +282,12 @@ class QuizController extends Controller
                 ->where('status', QuizAttempt::STATUS_GRADED)
                 ->latest('submitted_at')
                 ->paginate(20),
+            'classSummary' => [
+                'average' => (clone $gradedAttempts)->avg('score_percent'),
+                'highest' => (clone $gradedAttempts)->max('score_percent'),
+                'lowest' => (clone $gradedAttempts)->min('score_percent'),
+                'passed' => (clone $gradedAttempts)->where('passed', true)->count(),
+            ],
         ]);
     }
 
@@ -290,9 +334,11 @@ class QuizController extends Controller
             'training_module_id' => [
                 'required',
                 'integer',
-                Rule::exists('training_modules', 'id')->where(
-                    fn ($query) => $query->where('trainer_id', $request->user()->id)
-                ),
+                $this->managesAnyQuiz($request)
+                    ? Rule::exists('training_modules', 'id')
+                    : Rule::exists('training_modules', 'id')->where(
+                        fn ($query) => $query->where('trainer_id', $request->user()->id)
+                    ),
             ],
             'training_submodule_id' => ['nullable', 'integer', 'exists:training_submodules,id'],
             'audience_type' => ['required', Rule::in(['batch', 'trainee'])],
@@ -452,7 +498,7 @@ class QuizController extends Controller
         $moduleId = $validated['training_module_id'];
         $module = TrainingModule::query()
             ->whereKey($moduleId)
-            ->where('trainer_id', $request->user()->id)
+            ->when(! $this->managesAnyQuiz($request), fn ($query) => $query->where('trainer_id', $request->user()->id))
             ->first();
 
         if (! $module) {
@@ -515,6 +561,14 @@ class QuizController extends Controller
     {
         $moduleId ??= $quiz->training_module_id;
 
+        if (request()->routeIs('admin.learning.quizzes.*')) {
+            if (! $moduleId) {
+                return redirect()->route('admin.learning.modules');
+            }
+
+            return redirect()->route('admin.learning.modules.quizzes', $moduleId);
+        }
+
         if (! $moduleId) {
             return redirect()->route('trainer.resources');
         }
@@ -527,6 +581,16 @@ class QuizController extends Controller
         int $batchId,
         ?EnrollmentApplication $targetTrainee,
     ): void {
+        if ($this->managesAnyQuiz($request)) {
+            if ($targetTrainee && (int) $targetTrainee->training_batch_id !== $batchId) {
+                throw ValidationException::withMessages([
+                    'target_enrollment_application_id' => 'The selected trainee is outside the quiz class.',
+                ]);
+            }
+
+            return;
+        }
+
         $assignedBatch = TrainingBatch::assignedTo($request->user());
 
         if (! $assignedBatch || $batchId !== (int) $assignedBatch->id) {
@@ -540,6 +604,28 @@ class QuizController extends Controller
                 'target_enrollment_application_id' => 'The selected trainee is outside the trainer\'s assigned batch.',
             ]);
         }
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function questionsFromUpload(Request $request): ?array
+    {
+        if (! $request->hasFile('question_file')) {
+            return null;
+        }
+
+        $validated = $request->validate([
+            'question_file' => ['required', 'file', 'max:256', 'extensions:txt,text,csv,json'],
+        ]);
+
+        return app(QuizQuestionImporter::class)->import($validated['question_file'], 'question_file');
+    }
+
+    private function managesAnyQuiz(Request $request): bool
+    {
+        return $request->routeIs('admin.learning.quizzes.*')
+            && $request->user()?->hasRole('admin') === true;
     }
 
     /**

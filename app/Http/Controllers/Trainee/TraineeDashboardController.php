@@ -17,6 +17,7 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
 use App\Models\TrainingSubmodule;
 use App\Models\TrainingSubmoduleProgress;
+use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\ClassroomComments;
 use App\Services\CompletionEligibilityService;
 use App\Services\LearningPdfWatermark;
@@ -45,6 +46,29 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.dashboard');
     }
 
+    public function dismissVerifiedBanner(Request $request): RedirectResponse
+    {
+        $request->user()?->forceFill([
+            'verified_banner_dismissed_at' => now(),
+        ])->save();
+
+        return back();
+    }
+
+    public function downloadCor(Request $request): Response
+    {
+        $application = $this->approvedApplicationFor($request);
+        abort_unless($application, 404);
+
+        $pdf = app(CertificateOfRegistrationRenderer::class)->render($application);
+        $filename = CertificateOfRegistrationRenderer::filename($application);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
     public function modules(Request $request): View|RedirectResponse
     {
         return $this->portalView($request, 'trainee.modules.index');
@@ -63,6 +87,7 @@ class TraineeDashboardController extends Controller
         return $this->portalView($request, 'trainee.grades', [
             'gradeRecords' => $this->evaluatedGradesFor($application)->get(),
             'competencyRecords' => $application->competencyRecords()->with('unit')->get(),
+            'quizSummaries' => app(CompletionEligibilityService::class)->evaluate($application)['quiz_summaries'] ?? [],
         ], $application);
     }
 

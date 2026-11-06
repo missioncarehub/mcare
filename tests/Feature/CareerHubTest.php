@@ -10,6 +10,7 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Notifications\AdminOperationsNotification;
+use App\Notifications\CareerApplicationDecided;
 use App\Notifications\CareerAwarded;
 use App\Notifications\CareerOpportunityPublished;
 use App\Notifications\LmsAnnouncementPublished;
@@ -385,6 +386,10 @@ class CareerHubTest extends TestCase
 
     public function test_graduate_can_apply_for_a_career_and_admin_can_approve_or_reject(): void
     {
+        Http::fake([
+            'api.semaphore.co/*' => Http::response([['message_id' => 91, 'status' => 'Pending']], 200),
+        ]);
+
         $admin = User::factory()->create(['role' => 'admin']);
         $graduate = $this->graduatedUser();
         $trainee = User::factory()->create(['role' => 'trainee']);
@@ -589,6 +594,76 @@ class CareerHubTest extends TestCase
                 'message' => 'Should be blocked.',
             ])
             ->assertForbidden();
+    }
+
+    public function test_approving_one_applicant_closes_the_posting_and_marks_the_others_not_selected(): void
+    {
+        Http::fake([
+            'api.semaphore.co/*' => Http::response([['message_id' => 77, 'status' => 'Pending']], 200),
+        ]);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $chosen = $this->graduatedUser(['contact_number' => '09170000001']);
+        $waiting = $this->graduatedUser(['contact_number' => '09170000002']);
+        $opportunity = CareerOpportunity::create([
+            'created_by_id' => $admin->id,
+            'estimated_start_date' => now()->addWeek()->toDateString(),
+            'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+            'title' => 'Weekend caregiver, Naga',
+            'estimated_salary' => '₱15,000 / month',
+            'employer' => 'MCARE-Coordinated Placement',
+            'description' => 'Privacy-minimal career posting managed through the MCARE Alumni Hub.',
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $approved = CareerInquiry::create([
+            'career_opportunity_id' => $opportunity->id,
+            'user_id' => $chosen->id,
+            'name' => $chosen->name,
+            'email' => $chosen->email,
+            'contact_number' => '09170000001',
+            'message' => 'I can start this weekend.',
+            'status' => CareerInquiry::STATUS_PENDING,
+        ]);
+        $other = CareerInquiry::create([
+            'career_opportunity_id' => $opportunity->id,
+            'user_id' => $waiting->id,
+            'name' => $waiting->name,
+            'email' => $waiting->email,
+            'contact_number' => '09170000002',
+            'message' => 'I am also available.',
+            'status' => CareerInquiry::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.alumni-jobs.inquiries.update', $approved), [
+                'status' => CareerInquiry::STATUS_APPROVED,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('saved');
+
+        $this->assertFalse($opportunity->refresh()->is_published);
+        $this->assertSame(CareerInquiry::STATUS_APPROVED, $approved->refresh()->status);
+        $this->assertSame(CareerInquiry::STATUS_REJECTED, $other->refresh()->status);
+        $this->assertSame('Not selected', $other->statusLabel());
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $waiting->id,
+            'type' => CareerApplicationDecided::class,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $chosen->id,
+            'type' => CareerApplicationDecided::class,
+        ]);
+
+        $this->actingAs($this->graduatedUser())
+            ->post(route('trainee.career-hub.apply', $opportunity), [
+                'name' => 'New Graduate',
+                'email' => 'new.graduate@example.test',
+                'contact_number' => '09170000003',
+                'message' => 'Is this still open?',
+            ])
+            ->assertNotFound();
     }
 
     public function test_unpublished_career_cannot_receive_an_inquiry(): void

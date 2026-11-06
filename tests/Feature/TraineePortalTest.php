@@ -6,6 +6,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\User;
+use App\Services\CompletionEligibilityService;
 use App\Services\RollingModuleReleaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -128,8 +129,65 @@ class TraineePortalTest extends TestCase
             ->assertSee('href="'.route('trainee.modules.index').'"', false)
             ->assertSee('href="'.route('trainee.documents').'"', false)
             ->assertSee('Continue in classwork')
+            ->assertSee('Your account has been verified. You can now access your modules and schedule.')
             ->assertSee('dashboard-stat-meter', false)
             ->assertDontSee('href="'.route('payment.show').'"', false);
+    }
+
+    public function test_verified_banner_stays_hidden_after_it_is_dismissed(): void
+    {
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertSee('Your account has been verified. You can now access your modules and schedule.');
+
+        $this->actingAs($trainee)
+            ->post(route('trainee.dashboard.dismiss-banner'))
+            ->assertRedirect();
+
+        $this->assertNotNull($trainee->refresh()->verified_banner_dismissed_at);
+
+        $this->actingAs($trainee)
+            ->get(route('trainee.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Your account has been verified. You can now access your modules and schedule.');
+    }
+
+    public function test_trainee_can_download_a_registration_certificate_from_current_enrollment_data(): void
+    {
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $application = $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
+
+        $response = $this->actingAs($trainee)->get(route('trainee.documents.cor'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+        $this->assertStringContainsString('COR-', $response->headers->get('content-disposition'));
+        $this->assertNotNull($application->id);
+    }
+
+    public function test_quiz_score_summary_uses_the_stored_attempt(): void
+    {
+        $trainer = User::factory()->create(['role' => 'trainer']);
+        $trainee = User::factory()->create(['role' => 'trainee']);
+        $batch = $this->batch();
+        $application = $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
+        $module = $this->lmsModule($trainer, $batch, ['title' => 'Hand Hygiene']);
+        $this->lmsPassedAssessment($trainer, $module, $application, 90);
+
+        $summary = app(CompletionEligibilityService::class)->evaluate($application)['quiz_summaries'][0];
+
+        $this->assertSame('Hand Hygiene Required Assessment', $summary['title']);
+        $this->assertSame('9.00 / 10.00', $summary['score']);
+        $this->assertSame('90.0%', $summary['percentage']);
+        $this->assertSame(1, $summary['attempts']);
+        $this->assertSame('Passed', $summary['result']);
     }
 
     public function test_trainee_sidebar_destinations_are_separate_pages(): void

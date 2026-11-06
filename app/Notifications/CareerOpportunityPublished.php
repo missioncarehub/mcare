@@ -15,7 +15,13 @@ class CareerOpportunityPublished extends Notification
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        $channels = ['database'];
+
+        if (filled($notifiable->email ?? null)) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
     }
 
     /** @return array<string, mixed> */
@@ -30,10 +36,6 @@ class CareerOpportunityPublished extends Notification
         ];
     }
 
-    /**
-     * This notification is currently in-app only. The mail channel can be
-     * enabled later after the client's alumni contact policy is confirmed.
-     */
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
