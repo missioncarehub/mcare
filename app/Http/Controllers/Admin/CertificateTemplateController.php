@@ -10,6 +10,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
+use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class CertificateTemplateController extends Controller
 {
     public function index(): View
     {
-        $sections = collect(OfficialDocument::supportedTypes())
+        $sections = collect(CertificateTemplate::managedTypes())
             ->mapWithKeys(function (string $type) {
                 $history = CertificateTemplate::query()
                     ->with('createdBy')
@@ -42,28 +43,63 @@ class CertificateTemplateController extends Controller
         ]);
     }
 
+    public function edit(string $type): View
+    {
+        abort_unless(in_array($type, CertificateTemplate::managedTypes(), true), 404);
+
+        $history = CertificateTemplate::query()
+            ->with('createdBy')
+            ->where('type', $type)
+            ->orderByDesc('version')
+            ->get();
+        $label = CertificateTemplate::label($type);
+
+        return view('admin.learning.certificate-template-edit', [
+            'type' => $type,
+            'heading' => match ($label) {
+                'COTC' => 'Certificate of Training Completion',
+                'COR' => 'Certificate of Registration',
+                default => 'Transcript of Records',
+            },
+            'section' => [
+                'active' => $history->firstWhere('is_active', true),
+                'history' => $history,
+                'defaults' => CertificateTemplate::formDefaults($type),
+            ],
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $type = $request->validate([
-            'type' => ['required', Rule::in(OfficialDocument::supportedTypes())],
+            'type' => ['required', Rule::in(CertificateTemplate::managedTypes())],
         ])['type'];
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:180'],
-            'body' => [$type === OfficialDocument::TYPE_COTC ? 'required' : 'nullable', 'string', 'max:2000'],
+            'body' => [in_array($type, [OfficialDocument::TYPE_COTC, CertificateTemplate::TYPE_COR], true) ? 'required' : 'nullable', 'string', 'max:2000'],
             'paper_size' => ['required', Rule::in(['letter', 'a4', 'legal'])],
             'orientation' => ['required', Rule::in(['portrait', 'landscape'])],
             'signatory_name' => ['nullable', 'string', 'max:180'],
             'signatory_role' => ['nullable', 'string', 'max:120'],
             'second_signatory_name' => ['nullable', 'string', 'max:180'],
             'second_signatory_role' => ['nullable', 'string', 'max:120'],
+            'background' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:2048'],
+            'field_layout' => ['nullable', 'string', 'max:8000'],
             'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'signature' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'second_signature' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         $previous = CertificateTemplate::activeFor($type);
-        $useArtwork = $type === OfficialDocument::TYPE_COTC && $request->boolean('use_official_artwork');
+        $importedBackground = $request->hasFile('background');
+        $useArtwork = $type === OfficialDocument::TYPE_COTC && $request->boolean('use_official_artwork') && ! $importedBackground;
+        $backgroundPath = null;
+        if ($importedBackground) {
+            $backgroundPath = $request->file('background')->store('certificate-templates', 'local');
+        } elseif (! $useArtwork && ! $request->boolean('clear_background')) {
+            $backgroundPath = $previous?->background_path;
+        }
         $template = new CertificateTemplate([
             'type' => $type,
             'version' => ((int) CertificateTemplate::query()->where('type', $type)->max('version')) + 1,
@@ -73,6 +109,10 @@ class CertificateTemplateController extends Controller
             'paper_size' => $useArtwork ? 'letter' : $validated['paper_size'],
             'orientation' => $useArtwork ? 'landscape' : $validated['orientation'],
             'use_official_artwork' => $useArtwork,
+            'background_path' => $backgroundPath,
+            'field_layout' => $backgroundPath
+                ? ($this->fieldLayout($validated['field_layout'] ?? null, $type) ?? $previous?->field_layout)
+                : null,
             'logo_path' => $previous?->logo_path,
             'signatory_name' => $this->blankToNull($validated['signatory_name'] ?? null),
             'signatory_role' => $this->blankToNull($validated['signatory_role'] ?? null),
@@ -89,9 +129,11 @@ class CertificateTemplateController extends Controller
             }
         }
 
-        DB::transaction(function () use ($template, $type): void {
-            CertificateTemplate::query()->where('type', $type)->where('is_active', true)->update(['is_active' => false]);
-            $template->is_active = true;
+        DB::transaction(function () use ($template, $type, $importedBackground): void {
+            if (! $importedBackground) {
+                CertificateTemplate::query()->where('type', $type)->where('is_active', true)->update(['is_active' => false]);
+                $template->is_active = true;
+            }
             $template->save();
         });
 
@@ -100,11 +142,19 @@ class CertificateTemplateController extends Controller
             'version' => $template->version,
         ]);
 
-        $label = $type === OfficialDocument::TYPE_COTC ? 'COTC' : 'TOR';
+        $label = CertificateTemplate::label($type);
+
+        if ($importedBackground && ! $template->is_active) {
+            return redirect()
+                ->route('admin.learning.certificate-templates.edit', $type)
+                ->with('saved', $label.' template version '.$template->version.' was saved. Choose Make active template when new documents should use this design.');
+        }
+
+        $saved = $label.' template version '.$template->version.' is active. The next generated '.$label.' uses this text and signatory.';
 
         return redirect()
             ->route('admin.learning.certificate-templates')
-            ->with('saved', $label.' template version '.$template->version.' is active. The next generated '.$label.' uses this text and signatory.');
+            ->with('saved', $saved);
     }
 
     public function activate(Request $request, CertificateTemplate $certificateTemplate): RedirectResponse
@@ -122,18 +172,54 @@ class CertificateTemplateController extends Controller
             'version' => $certificateTemplate->version,
         ]);
 
-        $label = $certificateTemplate->type === OfficialDocument::TYPE_COTC ? 'COTC' : 'TOR';
+        $label = CertificateTemplate::label($certificateTemplate->type);
 
-        return redirect()
-            ->route('admin.learning.certificate-templates')
-            ->with('saved', $label.' template version '.$certificateTemplate->version.' is now the active template.');
+        return back()->with('saved', $label.' template version '.$certificateTemplate->version.' is now the active template.');
+    }
+
+    public function destroy(Request $request, CertificateTemplate $certificateTemplate): RedirectResponse
+    {
+        $type = $certificateTemplate->type;
+        $version = $certificateTemplate->version;
+        $wasActive = (bool) $certificateTemplate->is_active;
+        $label = CertificateTemplate::label($type);
+
+        AdminActivityLog::record($request->user(), 'admin.certificate-template.deleted', $certificateTemplate, [
+            'type' => $type,
+            'version' => $version,
+        ]);
+
+        DB::transaction(function () use ($certificateTemplate, $wasActive, $type): void {
+            $certificateTemplate->delete();
+
+            if (! $wasActive) {
+                return;
+            }
+
+            CertificateTemplate::query()
+                ->where('type', $type)
+                ->orderByDesc('version')
+                ->first()
+                ?->update(['is_active' => true]);
+        });
+
+        $restoredDefault = $wasActive && CertificateTemplate::activeFor($type) === null;
+
+        return back()->with(
+            'saved',
+            $restoredDefault
+                ? $label.' saved template was deleted. The official layout is used again.'
+                : $label.' template version '.$version.' was deleted.',
+        );
     }
 
     public function preview(string $type, FpdfOfficialDocumentRenderer $renderer): Response
     {
-        abort_unless(in_array($type, OfficialDocument::supportedTypes(), true), 404);
+        abort_unless(in_array($type, CertificateTemplate::managedTypes(), true), 404);
 
-        $pdf = $renderer->render($this->sampleDocument($type));
+        $pdf = $type === CertificateTemplate::TYPE_COR
+            ? app(CertificateOfRegistrationRenderer::class)->render($this->sampleEnrollment())
+            : $renderer->render($this->sampleDocument($type));
         $name = strtoupper($type).'-template-preview.pdf';
 
         return response($pdf, 200, [
@@ -148,6 +234,7 @@ class CertificateTemplateController extends Controller
             'logo' => $certificateTemplate->logo_path,
             'signature' => $certificateTemplate->signature_path,
             'second-signature' => $certificateTemplate->second_signature_path,
+            'background' => $certificateTemplate->background_path,
             default => null,
         };
         $absolute = $certificateTemplate->absoluteAsset($path);
@@ -156,7 +243,7 @@ class CertificateTemplateController extends Controller
         return response()->file($absolute);
     }
 
-    private function sampleDocument(string $type): OfficialDocument
+    private function sampleEnrollment(): EnrollmentApplication
     {
         $batch = new TrainingBatch([
             'name' => 'Batch 1',
@@ -170,6 +257,8 @@ class CertificateTemplateController extends Controller
             'first_name' => 'Maria',
             'middle_name' => 'Reyes',
             'last_name' => 'Santos',
+            'schedule_preference' => 'AM',
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
             'street' => '1 Training Street',
             'barangay' => 'Central',
             'city' => 'Pili',
@@ -178,6 +267,15 @@ class CertificateTemplateController extends Controller
             'school_name' => 'MCARE School',
             'classification' => 'Student',
         ]);
+        $application->setRelation('batch', $batch);
+
+        return $application;
+    }
+
+    private function sampleDocument(string $type): OfficialDocument
+    {
+        $application = $this->sampleEnrollment();
+        $batch = $application->batch;
         $unit = new CompetencyUnit([
             'code' => 'HCS323301',
             'title' => 'Provide Care and Support to Infants and Toddlers',
@@ -201,6 +299,36 @@ class CertificateTemplateController extends Controller
         $document->setRelation('application', $application);
 
         return $document;
+    }
+
+    /** @return array<string, array{x: float, y: float, w: float, h: float, size: float, align: string}>|null */
+    private function fieldLayout(?string $json, string $type): ?array
+    {
+        $decoded = json_decode((string) $json, true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $layout = [];
+        foreach (array_keys(CertificateTemplate::importFields($type)) as $key) {
+            $box = $decoded[$key] ?? null;
+            if (! is_array($box)) {
+                continue;
+            }
+
+            $x = max(0, min(92, (float) ($box['x'] ?? 0)));
+            $y = max(0, min(92, (float) ($box['y'] ?? 0)));
+            $layout[$key] = [
+                'x' => $x,
+                'y' => $y,
+                'w' => max(8, min(100 - $x, (float) ($box['w'] ?? 20))),
+                'h' => max(4, min(40, (float) ($box['h'] ?? 6))),
+                'size' => max(7, min(28, (float) ($box['size'] ?? 11))),
+                'align' => in_array($box['align'] ?? 'C', ['L', 'C', 'R'], true) ? (string) $box['align'] : 'C',
+            ];
+        }
+
+        return $layout === [] ? null : $layout;
     }
 
     private function blankToNull(?string $value): ?string

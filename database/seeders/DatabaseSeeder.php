@@ -176,5 +176,7 @@ class DatabaseSeeder extends Seeder
                 ]
             );
         }
+
+        $this->call(SampleGraduateSeeder::class);
     }
 }

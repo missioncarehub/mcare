@@ -47,6 +47,7 @@ use App\Http\Controllers\Trainer\TrainerPortalController;
 use App\Http\Controllers\Trainer\TrainerSearchController;
 use App\Http\Controllers\Trainer\TrainingModuleController as TrainerTrainingModuleController;
 use App\Models\EnrollmentApplication;
+use App\Models\CertificateTemplate;
 use App\Models\OfficialDocument;
 use App\Models\PublicSiteSetting;
 use App\Models\PublicUpdate;
@@ -555,20 +556,27 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/learning/certificate-templates', [CertificateTemplateController::class, 'index'])
                     ->middleware('permission:official-documents.manage')
                     ->name('learning.certificate-templates');
+                Route::get('/learning/certificate-templates/{type}', [CertificateTemplateController::class, 'edit'])
+                    ->middleware('permission:official-documents.manage')
+                    ->whereIn('type', CertificateTemplate::managedTypes())
+                    ->name('learning.certificate-templates.edit');
                 Route::post('/learning/certificate-templates', [CertificateTemplateController::class, 'store'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.certificate-templates.store');
                 Route::get('/learning/certificate-templates/{type}/preview', [CertificateTemplateController::class, 'preview'])
                     ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
-                    ->whereIn('type', OfficialDocument::supportedTypes())
+                    ->whereIn('type', CertificateTemplate::managedTypes())
                     ->name('learning.certificate-templates.preview');
                 Route::get('/learning/certificate-templates/{certificateTemplate}/assets/{slot}', [CertificateTemplateController::class, 'asset'])
                     ->middleware(['permission:official-documents.manage', 'throttle:document-downloads'])
-                    ->whereIn('slot', ['logo', 'signature', 'second-signature'])
+                    ->whereIn('slot', ['logo', 'signature', 'second-signature', 'background'])
                     ->name('learning.certificate-templates.asset');
                 Route::patch('/learning/certificate-templates/{certificateTemplate}/activate', [CertificateTemplateController::class, 'activate'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.certificate-templates.activate');
+                Route::delete('/learning/certificate-templates/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])
+                    ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.certificate-templates.destroy');
                 Route::get('/learning/competency-records/excel', [CompetencyWorkbookController::class, 'downloadForAdmin'])
                     ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.competency-workbooks.download');

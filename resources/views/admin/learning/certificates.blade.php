@@ -36,7 +36,7 @@
         <a href="{{ route('admin.learning.certificates', $tabQuery('graduates')) }}" class="{{ $isGraduatesTab ? 'is-active' : '' }}" @if($isGraduatesTab) aria-current="page" @endif>Graduates ({{ $graduates->count() }})</a>
     </nav>
 
-    <p class="text-sm leading-6 text-slate-600">Generate COTC and Generate TOR use the active certificate template. Change the title, statement, logo, or signatory from <a href="{{ route('admin.learning.certificate-templates') }}" class="font-bold text-purple-700 hover:text-purple-900">Certificate templates</a>. Enrollment ID, document number, and the watermark stay on every file.</p>
+    <p class="text-sm leading-6 text-slate-600">Generate COTC and Generate TOR use the active certificate template. Change the title, statement, logo, or signatory from <a href="{{ route('admin.learning.certificate-templates') }}" class="font-bold text-purple-700 hover:text-purple-900">Certificate templates</a>. Enrollment ID and document number stay on every file.</p>
 
     @include('admin.learning.partials.training-record-table', [
         'showHeading' => false,

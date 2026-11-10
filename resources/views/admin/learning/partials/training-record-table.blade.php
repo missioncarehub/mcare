@@ -12,13 +12,14 @@
     @endif
 
     <div class="dashboard-table-wrap overflow-x-auto">
-        <table class="dashboard-table w-full min-w-[68rem]">
+        <table class="dashboard-table w-full min-w-[78rem]">
             <thead>
                 <tr>
                     <th>Trainee</th>
                     <th>Batch / class</th>
                     <th>Status</th>
                     <th>Completion checks</th>
+                    <th>Quiz scores</th>
                     <th>COTC</th>
                     <th>TOR</th>
                 </tr>
@@ -32,6 +33,8 @@
                         $checks = collect($eligibility['checks'] ?? []);
                         $passedCount = $checks->where('passed', true)->count();
                         $pendingChecks = $checks->where('passed', false);
+                        $quizSummaries = collect($eligibility['quiz_summaries'] ?? []);
+                        $quizPassed = $quizSummaries->where('result', 'Passed')->count();
                     @endphp
                     <tr>
                         <td>
@@ -59,9 +62,29 @@
                             @empty
                                 <p class="mt-1 text-xs text-emerald-700">All completion checks passed</p>
                             @endforelse
-                            @foreach(($eligibility['quiz_summaries'] ?? []) as $summary)
-                                <p class="mt-1 text-xs text-slate-600">{{ $summary['title'] }}: {{ $summary['score'] }} ({{ $summary['percentage'] }}) · {{ $summary['attempts'] }} attempts · {{ $summary['result'] }} · {{ $summary['taken_at'] }}</p>
-                            @endforeach
+                        </td>
+                        <td>
+                            @if($quizSummaries->isEmpty())
+                                <p class="text-xs text-slate-500">No published quizzes</p>
+                            @else
+                                <p class="text-xs font-semibold text-slate-700">{{ $quizPassed }} of {{ $quizSummaries->count() }} passed</p>
+                                <div class="mt-2 flex flex-col items-start gap-1.5">
+                                    @foreach($quizSummaries as $summary)
+                                        <button
+                                            type="button"
+                                            class="text-left text-sm font-bold text-purple-700 underline decoration-purple-200 underline-offset-2 hover:text-purple-900"
+                                            data-dashboard-dialog-open="quiz-score-summary-dialog"
+                                            data-quiz-trainee="{{ trim($record->last_name.', '.$record->first_name.' '.$record->middle_name) }}"
+                                            data-quiz-title="{{ $summary['title'] }}"
+                                            data-quiz-score="{{ $summary['score'] }}"
+                                            data-quiz-percentage="{{ $summary['percentage'] }}"
+                                            data-quiz-attempts="{{ $summary['attempts'] }} {{ \Illuminate\Support\Str::plural('attempt', $summary['attempts']) }}"
+                                            data-quiz-result="{{ $summary['result'] }}"
+                                            data-quiz-taken="{{ $summary['taken_at'] }}"
+                                        >{{ $summary['title'] }}</button>
+                                    @endforeach
+                                </div>
+                            @endif
                         </td>
                         <td>
                             @include('admin.learning.partials.training-record-document-actions', [
@@ -82,10 +105,61 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="py-14 text-center text-slate-500">{{ $empty }}</td>
+                        <td colspan="7" class="py-14 text-center text-slate-500">{{ $empty }}</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
+
+    <dialog id="quiz-score-summary-dialog" data-dashboard-dialog class="m-auto w-[min(94vw,32rem)] rounded-xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="quiz-score-summary-title">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-purple-700" data-quiz-modal-trainee>Trainee</p>
+                <h2 id="quiz-score-summary-title" class="mt-1 text-xl font-bold text-slate-950" data-quiz-modal-title>Quiz score</h2>
+            </div>
+            <button type="button" data-dashboard-dialog-close class="secondary-action" aria-label="Close">Close</button>
+        </div>
+        <dl class="grid grid-cols-2 gap-4 p-6">
+            <div>
+                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Score</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950" data-quiz-modal-score>—</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Percentage</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950" data-quiz-modal-percentage>—</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Attempts</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950" data-quiz-modal-attempts>—</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Result</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950" data-quiz-modal-result>—</dd>
+            </div>
+            <div class="col-span-2">
+                <dt class="text-xs font-bold uppercase tracking-wider text-slate-500">Date</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950" data-quiz-modal-taken>—</dd>
+            </div>
+        </dl>
+    </dialog>
 </section>
+<script>
+document.querySelectorAll('[data-quiz-title]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const dialog = document.getElementById('quiz-score-summary-dialog');
+        if (!dialog) return;
+        dialog.querySelector('[data-quiz-modal-trainee]').textContent = button.dataset.quizTrainee || 'Trainee';
+        dialog.querySelector('[data-quiz-modal-title]').textContent = button.dataset.quizTitle || 'Quiz score';
+        dialog.querySelector('[data-quiz-modal-score]').textContent = button.dataset.quizScore || '—';
+        dialog.querySelector('[data-quiz-modal-percentage]').textContent = button.dataset.quizPercentage || '—';
+        dialog.querySelector('[data-quiz-modal-attempts]').textContent = button.dataset.quizAttempts || '—';
+        const result = dialog.querySelector('[data-quiz-modal-result]');
+        result.textContent = button.dataset.quizResult || '—';
+        result.className = 'mt-1 text-sm font-semibold ' + (button.dataset.quizResult === 'Passed'
+            ? 'text-emerald-700'
+            : (button.dataset.quizResult === 'Failed' ? 'text-red-700' : 'text-slate-950'));
+        dialog.querySelector('[data-quiz-modal-taken]').textContent = button.dataset.quizTaken || '—';
+    });
+});
+</script>

@@ -24,6 +24,11 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $this->temporaryImages = [];
 
         try {
+            $imported = $this->renderImported($document);
+            if ($imported !== null) {
+                return $imported;
+            }
+
             $pdf = match ($document->type) {
                 OfficialDocument::TYPE_COTC => $this->renderCotc($document),
                 OfficialDocument::TYPE_TOR => $this->renderTor($document),
@@ -34,6 +39,39 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         } finally {
             $this->forgetTemporaryImages();
         }
+    }
+
+    private function renderImported(OfficialDocument $document): ?string
+    {
+        $template = CertificateTemplate::activeFor($document->type);
+        if (! $template?->usesImportedBackground()) {
+            return null;
+        }
+
+        $records = collect($document->application?->competencyRecords)
+            ->filter(fn ($record) => $record->unit?->is_tor_included)
+            ->sortBy(fn ($record) => $record->unit?->sort_order)
+            ->map(function ($record): string {
+                $remark = $record->status === 'competent' ? 'COMPETENT' : 'NOT YET COMPETENT';
+
+                return trim(((string) $record->unit?->code).' '.((string) $record->unit?->title).' '.$remark);
+            })
+            ->implode("\n");
+        $organization = config('official_documents.organization', []);
+
+        return app(ImportedCertificateRenderer::class)->render(
+            $template,
+            CertificateTemplate::placeholderValues($document),
+            [
+                'signatory_name' => $this->signatoryName($template->signatory_name, PublicSiteSetting::current()->registrarName() ?: (string) ($organization['registrar_name'] ?? '')),
+                'signatory_role' => $this->signatoryName($template->signatory_role, 'Registrar'),
+                'signatory_signature' => $template->absoluteAsset($template->signature_path),
+                'second_signatory_name' => $this->signatoryName($template->second_signatory_name, (string) ($organization['trainer_name'] ?? '')),
+                'second_signatory_role' => $this->signatoryName($template->second_signatory_role, 'Trainer'),
+                'second_signatory_signature' => $template->absoluteAsset($template->second_signature_path),
+                'records' => $records,
+            ],
+        );
     }
 
     private function renderCotc(OfficialDocument $document): FPDF
@@ -79,7 +117,6 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             $drawHeight,
             'JPG',
         );
-        $pdf->paintWatermark('MCARE OFFICIAL');
 
         $name = $this->cotcBox($originX, $originY, $scale, 14.0, 91.0, 178.5, 15.5);
         $pdf->SetFillColor(255, 252, 255);
@@ -139,13 +176,13 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $application = $document->application;
         $organization = config('official_documents.organization', []);
         $fullName = $this->latin(mb_strtoupper($this->fullName($application)));
-        $address = $this->latin(collect([
+        $address = $this->wrapPlain($this->latin(collect([
             $application->street,
             $application->barangay,
             $application->city,
             $application->province,
             $application->zip_code,
-        ])->filter()->implode(', ') ?: '-');
+        ])->filter()->implode(', ') ?: '-'), 42);
         $records = $application->competencyRecords
             ->filter(fn ($record) => $record->unit?->is_tor_included)
             ->sortBy(fn ($record) => $record->unit?->sort_order)
@@ -178,7 +215,6 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
 
         $logoSize = 20.0;
         $logoX = (($pageWidth - 150) / 2);
-        $pdf->paintWatermark('MCARE OFFICIAL');
         $pdf->Image(
             $this->preparedJpeg($logoPath, $logoSize, $logoSize),
             $logoX,
@@ -288,11 +324,11 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $blockY += 19;
         $this->torField($pdf, $leftX, $blockY, $leftWidth, 65, 'Official Marks:', $this->officialMarksText(), 6.2);
         $blockY += 65;
-        $remarks = "\nFor Records and Reference Purposes";
+        $remarks = 'For Records and Reference Purposes';
         if ($body !== '') {
             $remarks .= "\n".$body;
         }
-        $this->torField($pdf, $leftX, $blockY, $leftWidth, 18, 'Remarks:', $remarks, 7);
+        $this->torField($pdf, $leftX, $blockY, $leftWidth, 18, 'Remarks:', $remarks, 7, 'I');
 
         $headerY = $gridY;
         $codeW = 22.0;
@@ -338,7 +374,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             $approvalY + $approvalHeight + 2,
             $contentWidth,
             5,
-            $this->verificationLine($document),
+            $this->latin('Document no. '.$document->document_number.' | Version '.$document->version),
             'Helvetica',
             '',
             5.5,
@@ -368,7 +404,6 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();
-        $pdf->paintWatermark('MCARE OFFICIAL');
 
         $margin = 14.0;
         $contentWidth = $pageWidth - ($margin * 2);
@@ -563,11 +598,37 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         string $label,
         string $value,
         float $size = 7,
+        string $valueStyle = '',
     ): void {
         $pdf->SetDrawColor(17, 17, 17);
         $pdf->Line($x, $y + $height, $x + $width, $y + $height);
         $this->writeFitted($pdf, $x + 1.2, $y + 1, $width - 2.4, 4, $this->latin($label), 'Helvetica', 'B', 7.2, 'L', 'T', 6);
-        $this->writeFitted($pdf, $x + 1.2, $y + 5, $width - 2.4, $height - 6, $this->latin($value), 'Helvetica', '', $size, 'L', 'T', 5.5);
+        $this->writeFitted($pdf, $x + 1.2, $y + 5, $width - 2.4, $height - 6, $this->latin($value), 'Helvetica', $valueStyle, $size, 'L', 'T', 5.5);
+    }
+
+    private function wrapPlain(string $text, int $width): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+        if ($text === '') {
+            return '-';
+        }
+
+        $lines = [];
+        $line = '';
+        foreach (explode(' ', $text) as $word) {
+            $next = $line === '' ? $word : $line.' '.$word;
+            if (strlen($next) > $width && $line !== '') {
+                $lines[] = $line;
+                $line = $word;
+            } else {
+                $line = $next;
+            }
+        }
+        if ($line !== '') {
+            $lines[] = $line;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function torCell(

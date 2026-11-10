@@ -48,6 +48,7 @@ class FpdfOfficialDocumentRendererTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $pdf);
         $this->assertTrue($this->pdfContains($pdf, 'MARIA REYES SANTOS'));
         $this->assertTrue($this->pdfContains($pdf, 'MCARE-COTC-2026-00002-V1'));
+        $this->assertFalse($this->pdfContains($pdf, 'MCARE OFFICIAL'));
         $this->assertGreaterThan(0, preg_match_all('/\/Subtype\s*\/Image/', $pdf) ?: 0);
     }
 
@@ -70,9 +71,12 @@ class FpdfOfficialDocumentRendererTest extends TestCase
 
         $this->assertStringStartsWith('%PDF-', $pdf);
         $this->assertTrue($this->pdfContains($pdf, 'OFFICIAL TRANSCRIPT OF RECORD'));
+        $this->assertTrue($this->pdfContains($pdf, 'REGISTRAR'));
+        $this->assertTrue($this->pdfContains($pdf, '786 Hours'));
         $this->assertTrue($this->pdfContains($pdf, 'HCS323301'));
         $this->assertTrue($this->pdfContains($pdf, 'COMPETENT'));
-        $this->assertTrue($this->pdfContains($pdf, 'MCARE-TOR-2026-00002-V1'));
+        $this->assertTrue($this->pdfContains($pdf, 'Document no. MCARE-TOR-2026-00002-V1 | Version 1'));
+        $this->assertFalse($this->pdfContains($pdf, 'MCARE OFFICIAL'));
     }
 
     public function test_manager_can_generate_a_cotc_without_node(): void

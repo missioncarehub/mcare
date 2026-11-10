@@ -9,8 +9,11 @@ use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CertificateTemplateTest extends TestCase
@@ -30,8 +33,24 @@ class CertificateTemplateTest extends TestCase
             ->get(route('admin.learning.certificate-templates'))
             ->assertOk()
             ->assertSee('Certificate templates')
-            ->assertSee('Live preview')
-            ->assertSee('{{trainee_name}}', false);
+            ->assertSee('Default official template')
+            ->assertSee('Manage template')
+            ->assertSee(route('admin.learning.certificate-templates.edit', 'cotc'), false)
+            ->assertSee('REGISTRAR')
+            ->assertSee('NOTHING FOLLOWS')
+            ->assertSee('style="aspect-ratio: 210 / 297"', false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates.edit', 'cotc'))
+            ->assertOk()
+            ->assertSee('Manage Certificate of Training Completion')
+            ->assertSee('Import a pre-made template')
+            ->assertSee('Imported template')
+            ->assertSee('Import a finished design to preview it here.')
+            ->assertDontSee('Live preview')
+            ->assertDontSee('Drag a label')
+            ->assertSee('style="aspect-ratio: 11 / 8.5"', false)
+            ->assertDontSee('Use the official certificate artwork');
 
         $this->actingAs($admin)
             ->post(route('admin.learning.certificate-templates.store'), [
@@ -118,15 +137,15 @@ class CertificateTemplateTest extends TestCase
         $this->assertTrue($this->pdfContains($cotc, 'Amina Dela Cruz'));
         $this->assertTrue($this->pdfContains($cotc, 'MARIA REYES SANTOS'));
         $this->assertTrue($this->pdfContains($cotc, 'Enrollment ID: MCE-2026-SAMPLE'));
-        $this->assertTrue($this->pdfContains($cotc, 'MCARE OFFICIAL'));
+        $this->assertFalse($this->pdfContains($cotc, 'MCARE OFFICIAL'));
 
         $this->assertTrue($this->pdfContains($tor, 'Registrar copy of the transcript'));
         $this->assertTrue($this->pdfContains($tor, 'Issued for Maria Reyes Santos'));
         $this->assertTrue($this->pdfContains($tor, 'AMINA DELA CRUZ'));
         $this->assertTrue($this->pdfContains($tor, 'HCS323301'));
         $this->assertTrue($this->pdfContains($tor, 'COMPETENT'));
-        $this->assertTrue($this->pdfContains($tor, 'Enrollment ID: MCE-2026-SAMPLE'));
-        $this->assertTrue($this->pdfContains($tor, 'MCARE OFFICIAL'));
+        $this->assertTrue($this->pdfContains($tor, 'Document no. MCARE-TOR-2026-00002-V1 | Version 1'));
+        $this->assertTrue($this->pdfContains($tor, 'For Records and Reference Purposes'));
     }
 
     public function test_a_managed_cotc_can_change_paper_size_without_removing_the_verification_line(): void
@@ -178,6 +197,160 @@ class CertificateTemplateTest extends TestCase
         $this->assertTrue($this->pdfContains($response->getContent(), 'PREVIEW REGISTRAR'));
     }
 
+    public function test_generate_cor_uses_the_current_enrollment_and_the_saved_template(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch 1',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+            'am_days' => 'MWF',
+            'am_start_time' => '08:00',
+            'am_end_time' => '12:00',
+            'am_room' => 'Skills Lab A',
+        ]);
+        $application = EnrollmentApplication::create([
+            'user_id' => $applicant->id,
+            'training_batch_id' => $batch->id,
+            'enrollment_number' => 'MCE-2026-11011',
+            'email' => $applicant->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => 'Maria',
+            'last_name' => 'Santos',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09170000000',
+            'schedule_preference' => 'AM',
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'street' => '123 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'High School Graduate',
+            'school_name' => 'MCARE High School',
+            'year_graduated' => 2020,
+            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
+            'review_released_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.index'))
+            ->assertOk()
+            ->assertSee('Generate COR')
+            ->assertSee(route('admin.enrollments.cor', $application), false);
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.certificate-templates.store'), [
+                'type' => CertificateTemplate::TYPE_COR,
+                'title' => 'Registrar copy of registration',
+                'body' => 'Issued for {{trainee_name}}. Payment is {{payment_status}}.',
+                'paper_size' => 'a4',
+                'orientation' => 'portrait',
+                'signatory_name' => 'Amina Dela Cruz',
+                'signatory_role' => 'Registrar',
+            ])
+            ->assertRedirect(route('admin.learning.certificate-templates'))
+            ->assertSessionHas('saved');
+
+        $first = $this->actingAs($admin)->get(route('admin.enrollments.cor', $application));
+        $first->assertOk();
+        $first->assertHeader('content-type', 'application/pdf');
+        $pdf = $first->getContent();
+        $this->assertStringStartsWith('%PDF', $pdf);
+        foreach ([
+            'Registrar copy of registration',
+            'Issued for Maria Santos',
+            'Payment is Fully paid',
+            'COR-MCE-2026-11011',
+            'Maria Santos',
+            'Caregiving NC II',
+            'Batch 1 2026',
+            'MWF',
+            'Fully paid',
+            'Amina Dela Cruz',
+            now()->format('F j, Y'),
+            'MCARE OFFICIAL',
+        ] as $needle) {
+            $this->assertTrue($this->pdfContains($pdf, $needle), $needle);
+        }
+
+        $application->update([
+            'first_name' => 'Lucia',
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+        ]);
+
+        $second = app(CertificateOfRegistrationRenderer::class)->render($application->fresh('batch'));
+        $this->assertTrue($this->pdfContains($second, 'Lucia Santos'), 'Lucia Santos');
+        $this->assertTrue($this->pdfContains($second, 'Partially paid'), 'Partially paid');
+        $this->assertFalse($this->pdfContains($second, 'Maria Santos'));
+    }
+
+    public function test_an_imported_template_is_filled_from_the_current_record(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $png = tempnam(sys_get_temp_dir(), 'mcare-template');
+        $image = imagecreatetruecolor(120, 70);
+        imagefilledrectangle($image, 0, 0, 120, 70, imagecolorallocate($image, 244, 214, 255));
+        imagepng($image, $png);
+        imagedestroy($image);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates.edit', OfficialDocument::TYPE_COTC))
+            ->assertOk()
+            ->assertSee('Import a pre-made template')
+            ->assertSee('Imported template')
+            ->assertSee('Import a finished design to preview it here.')
+            ->assertDontSee('Live preview')
+            ->assertDontSee('Drag a label');
+
+        $this->actingAs($admin)
+            ->post(route('admin.learning.certificate-templates.store'), [
+                'type' => OfficialDocument::TYPE_COTC,
+                'title' => 'Imported board certificate',
+                'body' => 'Awarded to {{trainee_name}} for {{program}}.',
+                'paper_size' => 'letter',
+                'orientation' => 'landscape',
+                'use_official_artwork' => '1',
+                'signatory_name' => 'Amina Dela Cruz',
+                'signatory_role' => 'Registrar',
+                'second_signatory_name' => 'Paolo Reyes',
+                'second_signatory_role' => 'Trainer',
+                'background' => new UploadedFile($png, 'premades-certificate.png', 'image/png', null, true),
+                'field_layout' => json_encode(CertificateTemplate::defaultFieldLayout(OfficialDocument::TYPE_COTC, 'landscape')),
+            ])
+            ->assertRedirect(route('admin.learning.certificate-templates.edit', OfficialDocument::TYPE_COTC))
+            ->assertSessionHas('saved');
+
+        $saved = CertificateTemplate::query()->where('type', OfficialDocument::TYPE_COTC)->sole();
+        $this->assertFalse($saved->is_active);
+        $this->assertFalse($saved->use_official_artwork);
+        $this->assertNotNull($saved->background_path);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates.edit', OfficialDocument::TYPE_COTC))
+            ->assertOk()
+            ->assertSee('Make active template');
+
+        $this->actingAs($admin)
+            ->patch(route('admin.learning.certificate-templates.activate', $saved))
+            ->assertRedirect();
+
+        $saved = CertificateTemplate::activeFor(OfficialDocument::TYPE_COTC);
+
+        $pdf = app(FpdfOfficialDocumentRenderer::class)->render($this->document(OfficialDocument::TYPE_COTC));
+        $this->assertTrue($this->pdfContains($pdf, 'MARIA REYES SANTOS'));
+        $this->assertTrue($this->pdfContains($pdf, 'Awarded to Maria Reyes Santos for Caregiving NC II'));
+        $this->assertTrue($this->pdfContains($pdf, 'Enrollment ID: MCE-2026-SAMPLE'));
+        $this->assertFalse($this->pdfContains($pdf, 'MCARE OFFICIAL'));
+        $this->assertFalse($this->pdfContains($pdf, 'This certifies that'));
+
+        @unlink($png);
+    }
+
     public function test_a_trainer_cannot_open_the_template_manager(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);
@@ -185,6 +358,61 @@ class CertificateTemplateTest extends TestCase
         $this->actingAs($trainer)
             ->get(route('admin.learning.certificate-templates'))
             ->assertForbidden();
+
+        $this->actingAs($trainer)
+            ->get(route('admin.learning.certificate-templates.edit', 'cotc'))
+            ->assertForbidden();
+    }
+
+    public function test_deleting_a_saved_template_restores_the_previous_or_official_layout(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $older = CertificateTemplate::create([
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'is_active' => false,
+            'title' => 'Earlier transcript title',
+            'body' => '',
+            'paper_size' => 'a4',
+            'orientation' => 'portrait',
+            'use_official_artwork' => false,
+        ]);
+        $current = CertificateTemplate::create([
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 2,
+            'is_active' => true,
+            'title' => 'OFFICIAL TRANSCRIPT OF RECORD',
+            'body' => '',
+            'paper_size' => 'a4',
+            'orientation' => 'portrait',
+            'use_official_artwork' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates'))
+            ->assertOk()
+            ->assertSee('Delete saved template')
+            ->assertSee('REGISTRAR')
+            ->assertSee('NOTHING FOLLOWS');
+
+        $this->actingAs($admin)
+            ->delete(route('admin.learning.certificate-templates.destroy', $current))
+            ->assertRedirect();
+
+        $this->assertNull(CertificateTemplate::query()->find($current->id));
+        $this->assertTrue((bool) $older->fresh()->is_active);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.learning.certificate-templates.destroy', $older))
+            ->assertRedirect();
+
+        $this->assertNull(CertificateTemplate::activeFor(OfficialDocument::TYPE_TOR));
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates'))
+            ->assertOk()
+            ->assertSee('Default official template')
+            ->assertSee('REGISTRAR')
+            ->assertDontSee('Delete saved template');
     }
 
     private function document(string $type): OfficialDocument

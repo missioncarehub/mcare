@@ -188,6 +188,18 @@ class TraineePortalTest extends TestCase
         $this->assertSame('90.0%', $summary['percentage']);
         $this->assertSame(1, $summary['attempts']);
         $this->assertSame('Passed', $summary['result']);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin)
+            ->get(route('admin.learning.certificates'))
+            ->assertOk()
+            ->assertSee('Quiz scores')
+            ->assertSee('Hand Hygiene Required Assessment')
+            ->assertSee('data-dashboard-dialog-open="quiz-score-summary-dialog"', false)
+            ->assertSee('data-quiz-score="9.00 / 10.00"', false)
+            ->assertSee('data-quiz-percentage="90.0%"', false)
+            ->assertSee('data-quiz-result="Passed"', false)
+            ->assertSee('id="quiz-score-summary-dialog"', false);
     }
 
     public function test_trainee_sidebar_destinations_are_separate_pages(): void
