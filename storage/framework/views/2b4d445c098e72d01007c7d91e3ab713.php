@@ -1,0 +1,1 @@
+<?php /**PATH C:\Users\John Lloyd\Desktop\mcare_hub\resources\views\auth\password-layout.blade.php ENDPATH**/ ?>
