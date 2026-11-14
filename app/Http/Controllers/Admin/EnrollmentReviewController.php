@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Notifications\EnrollmentDocumentsReviseRequestedNotification;
 use App\Notifications\EnrollmentStatusUpdatedNotification;
 use App\Services\AccountDeletionService;
-use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\RollingModuleReleaseService;
 use App\Services\StaffVisiblePhoto;
 use App\Services\TesdaRegistrationPdfService;
@@ -560,21 +559,6 @@ class EnrollmentReviewController extends Controller
         return response()->file($this->localDisk()->path($path), [
             'Content-Type' => $this->documentMimeType($path) ?: 'application/octet-stream',
             'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $filename, $fallbackFilename),
-        ]);
-    }
-
-    public function downloadCor(EnrollmentApplication $enrollmentApplication): Response
-    {
-        $pdf = app(CertificateOfRegistrationRenderer::class)->render($enrollmentApplication);
-        $filename = CertificateOfRegistrationRenderer::filename($enrollmentApplication);
-
-        AdminActivityLog::record(request()->user(), 'enrollment.cor.downloaded', $enrollmentApplication, [
-            'certificate_no' => CertificateOfRegistrationRenderer::number($enrollmentApplication),
-        ]);
-
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 

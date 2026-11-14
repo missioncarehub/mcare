@@ -8,8 +8,6 @@ use Illuminate\Support\Facades\Storage;
 
 class CertificateTemplate extends Model
 {
-    public const TYPE_COR = 'cor';
-
     public const PLACEHOLDERS = [
         'trainee_name',
         'program',
@@ -62,14 +60,13 @@ class CertificateTemplate extends Model
     /** @return list<string> */
     public static function managedTypes(): array
     {
-        return [OfficialDocument::TYPE_COTC, OfficialDocument::TYPE_TOR, self::TYPE_COR];
+        return [OfficialDocument::TYPE_COTC, OfficialDocument::TYPE_TOR];
     }
 
     public static function label(string $type): string
     {
         return match ($type) {
             OfficialDocument::TYPE_COTC => 'COTC',
-            self::TYPE_COR => 'COR',
             default => 'TOR',
         };
     }
@@ -103,20 +100,6 @@ class CertificateTemplate extends Model
                 'signatory_role' => 'TVI Registrar',
                 'second_signatory_name' => (string) ($organization['trainer_name'] ?? ''),
                 'second_signatory_role' => 'TVI Trainer',
-            ];
-        }
-
-        if ($type === self::TYPE_COR) {
-            return [
-                'title' => 'CERTIFICATE OF REGISTRATION',
-                'body' => PublicSiteSetting::corStatement(),
-                'paper_size' => 'a4',
-                'orientation' => 'portrait',
-                'use_official_artwork' => false,
-                'signatory_name' => PublicSiteSetting::current()->registrarNameForForm(),
-                'signatory_role' => 'Registrar',
-                'second_signatory_name' => '',
-                'second_signatory_role' => '',
             ];
         }
 
@@ -160,14 +143,8 @@ class CertificateTemplate extends Model
             'signatory' => 'Registrar',
         ];
 
-        if ($type === self::TYPE_COR) {
-            $fields['schedule'] = 'Schedule';
-            $fields['payment_status'] = 'Payment';
-            $fields['generation_date'] = 'Date';
-        } else {
-            $fields['completion_date'] = 'Completion date';
-            $fields['second_signatory'] = $type === OfficialDocument::TYPE_TOR ? 'Prepared by' : 'Trainer';
-        }
+        $fields['completion_date'] = 'Completion date';
+        $fields['second_signatory'] = $type === OfficialDocument::TYPE_TOR ? 'Prepared by' : 'Trainer';
 
         if ($type === OfficialDocument::TYPE_TOR) {
             $fields['records'] = 'Competency records';
@@ -186,7 +163,7 @@ class CertificateTemplate extends Model
     {
         $landscape = $orientation === 'landscape';
         $boxes = match ($type) {
-            OfficialDocument::TYPE_COTC, self::TYPE_COR => $landscape
+            OfficialDocument::TYPE_COTC => $landscape
                 ? [
                     'trainee_name' => [5, 42, 64, 8, 22, 'C'],
                     'body' => [10, 63, 58, 6, 11, 'C'],
@@ -228,7 +205,6 @@ class CertificateTemplate extends Model
 
         $keys = match ($type) {
             OfficialDocument::TYPE_COTC => ['trainee_name', 'body', 'certificate_no', 'enrollment_id'],
-            self::TYPE_COR => ['trainee_name', 'program', 'batch', 'schedule', 'payment_status', 'generation_date', 'certificate_no'],
             default => ['trainee_name', 'completion_date', 'certificate_no', 'enrollment_id'],
         };
 
@@ -263,13 +239,7 @@ class CertificateTemplate extends Model
             'enrollment_id' => 'Enrollment ID',
         ];
 
-        if ($type === self::TYPE_COR) {
-            $fields['schedule'] = 'Schedule';
-            $fields['payment_status'] = 'Payment';
-            $fields['generation_date'] = 'Date';
-        } else {
-            $fields['completion_date'] = 'Completion date';
-        }
+        $fields['completion_date'] = 'Completion date';
 
         if ($type === OfficialDocument::TYPE_TOR) {
             $fields['records'] = 'Competency records';
@@ -433,7 +403,6 @@ class CertificateTemplate extends Model
         if ($title === '') {
             return match ($type) {
                 OfficialDocument::TYPE_TOR => PublicSiteSetting::torTitle(),
-                self::TYPE_COR => 'CERTIFICATE OF REGISTRATION',
                 default => 'Certificate of Training Completion',
             };
         }

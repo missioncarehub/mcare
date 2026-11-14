@@ -202,6 +202,11 @@ class AdminCareerHubController extends Controller
             $this->fillCareerOpening($careerInquiry, $request->user());
         }
 
+        if ($validated['status'] === CareerInquiry::STATUS_REJECTED
+            && $previousStatus !== CareerInquiry::STATUS_REJECTED) {
+            $this->notifyCareerDecision($careerInquiry, 'rejected', $request->user());
+        }
+
         return back()->with('saved', $filledOpening
             ? 'Inquiry approved. The posting is closed and other pending applicants were marked not selected.'
             : 'Inquiry for '.$careerInquiry->opportunity?->listingTitle().' was updated.');

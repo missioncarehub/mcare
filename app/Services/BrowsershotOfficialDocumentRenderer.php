@@ -33,11 +33,6 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
             'useOfficialArtwork' => $template ? $template->usesOfficialArtwork() : $document->type === OfficialDocument::TYPE_COTC,
         ])->render();
 
-        $browsershot = Browsershot::html($html)
-            ->showBackground()
-            ->allowFileAccess()
-            ->emulateMedia('print');
-
         $paper = match ($template?->paper_size) {
             'letter' => 'Letter',
             'legal' => 'Legal',
@@ -47,12 +42,25 @@ class BrowsershotOfficialDocumentRenderer implements OfficialDocumentRenderer
         $landscape = $template
             ? $template->orientation === 'landscape'
             : $document->type === OfficialDocument::TYPE_COTC;
-        $browsershot->format($paper)->margins(0, 0, 0, 0);
+
+        return $this->renderHtml($html, $paper, $landscape, $document->type === OfficialDocument::TYPE_COTC && ($template === null || $template->usesOfficialArtwork()));
+    }
+
+    public function renderHtml(string $html, string $paper = 'A4', bool $landscape = false, bool $preferCssPageSize = false): string
+    {
+        $browsershot = Browsershot::html($html)
+            ->showBackground()
+            ->allowFileAccess()
+            ->emulateMedia('print')
+            ->format($paper)
+            ->margins(0, 0, 0, 0);
+
         if ($landscape) {
             $browsershot->landscape();
         }
-        if ($document->type === OfficialDocument::TYPE_COTC && ($template === null || $template->usesOfficialArtwork())) {
-            $browsershot->windowSize(1056, 816)->setOption('preferCSSPageSize', true);
+
+        if ($preferCssPageSize) {
+            $browsershot->setOption('preferCSSPageSize', true);
         }
 
         $this->applyConfiguredBinaries($browsershot);

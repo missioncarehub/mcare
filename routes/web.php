@@ -24,6 +24,7 @@ use App\Http\Controllers\AdmissionApplicationController;
 use App\Http\Controllers\Alumni\AlumniCareerHubController;
 use App\Http\Controllers\Auth\AccountSessionController;
 use App\Http\Controllers\Auth\EmailVerificationController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\ClassroomCommentController;
 use App\Http\Controllers\CompetencyWorkbookController;
@@ -95,6 +96,25 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::post('/login', [AccountSessionController::class, 'store'])
         ->middleware(['throttle:admin-login', 'private.response'])
         ->name('login.store');
+
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'create'])
+        ->middleware('private.response')
+        ->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'sendOtp'])
+        ->middleware(['throttle:password-reset', 'private.response'])
+        ->name('password.email');
+    Route::get('/forgot-password/otp', [ForgotPasswordController::class, 'otpForm'])
+        ->middleware('private.response')
+        ->name('password.otp');
+    Route::post('/forgot-password/otp', [ForgotPasswordController::class, 'verifyOtp'])
+        ->middleware(['throttle:password-reset', 'private.response'])
+        ->name('password.otp.verify');
+    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'resetForm'])
+        ->middleware('private.response')
+        ->name('password.reset');
+    Route::post('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])
+        ->middleware(['throttle:password-reset', 'private.response'])
+        ->name('password.update');
 
     Route::post('/login/verify-2fa', [AdminSessionController::class, 'verifyTwoFactor'])
         ->middleware(['throttle:admin-login', 'private.response'])
@@ -310,10 +330,6 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'show'])
                     ->middleware('permission:enrollments.review')
                     ->name('enrollments.show');
-
-                Route::get('/enrollments/{enrollmentApplication}/cor', [EnrollmentReviewController::class, 'downloadCor'])
-                    ->middleware(['permission:enrollments.review', 'throttle:document-downloads'])
-                    ->name('enrollments.cor');
 
                 Route::patch('/enrollments/{enrollmentApplication}', [EnrollmentReviewController::class, 'update'])
                     ->middleware(['permission:enrollments.review', 'throttle:sensitive-mutation'])
@@ -865,9 +881,6 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::get('/documents', [TraineeDashboardController::class, 'documents'])
                     ->middleware('permission:documents.view')
                     ->name('documents');
-                Route::get('/documents/cor', [TraineeDashboardController::class, 'downloadCor'])
-                    ->middleware(['permission:documents.view', 'throttle:document-downloads'])
-                    ->name('documents.cor');
                 Route::get('/documents/cotc/{officialDocument}/download', [TraineeCertificateController::class, 'download'])
                     ->middleware(['permission:cotc.download', 'throttle:document-downloads'])
                     ->name('cotc.download');

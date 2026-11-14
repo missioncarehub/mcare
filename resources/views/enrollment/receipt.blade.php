@@ -250,7 +250,7 @@
         }
 
         @page {
-            size: A5 portrait;
+            size: Letter portrait;
             margin: 10mm;
         }
 
@@ -264,8 +264,8 @@
             .status-banner { display: none !important; }
 
             .page {
-                width: 128mm;
-                max-width: 128mm;
+                width: 196mm;
+                max-width: 196mm;
                 margin: 0;
             }
         }

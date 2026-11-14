@@ -167,7 +167,6 @@ class AccountSettingsController extends Controller
             'registrar_signature_type' => $validated['registrar_signature_type'],
             'registrar_signature_path' => $signaturePath,
             'tor_title' => $validated['tor_title'],
-            'cor_statement' => $validated['cor_statement'],
         ]);
 
         AdminActivityLog::record($request->user(), 'account.registrar.updated', $settings, [
@@ -328,7 +327,6 @@ class AccountSettingsController extends Controller
                 'max:5120',
             ],
             'tor_title' => ['nullable', 'string', 'max:180'],
-            'cor_statement' => ['nullable', 'string', 'max:1000'],
         ], [
             'not_regex' => 'This field contains characters that are not allowed for security reasons.',
             'registrar_signature_data.required' => 'Draw the registrar signature before saving.',
@@ -339,7 +337,6 @@ class AccountSettingsController extends Controller
             'registrar_name' => $validated['registrar_name'],
             'registrar_signature_type' => $validated['registrar_signature_type'],
             'tor_title' => filled($validated['tor_title'] ?? null) ? trim($validated['tor_title']) : null,
-            'cor_statement' => filled($validated['cor_statement'] ?? null) ? trim($validated['cor_statement']) : null,
         ];
     }
 

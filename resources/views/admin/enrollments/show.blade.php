@@ -196,9 +196,6 @@
                         <a href="{{ route('admin.enrollments.document-review', $application) }}" class="primary-action">
                             Review documents
                         </a>
-                        <a href="{{ route('admin.enrollments.cor', $application) }}" class="secondary-action">
-                            Generate COR
-                        </a>
                     </div>
                     @if($documentsReviewed)
                         <p class="mt-3 text-xs leading-5 text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}. Open the review page again if you need to change a file decision.</p>

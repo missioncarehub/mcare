@@ -8,6 +8,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Services\EnrollmentPaymentLifecycle;
+use App\Services\BrowsershotOfficialDocumentRenderer;
 use App\Services\OfficialReceiptNumberGenerator;
 use App\Services\PayMongoCheckoutService;
 use Illuminate\Http\JsonResponse;
@@ -377,7 +378,7 @@ class EnrollmentPaymentController extends Controller
         ]);
     }
 
-    public function downloadReceipt(Request $request): Response|RedirectResponse
+    public function downloadReceipt(Request $request, BrowsershotOfficialDocumentRenderer $pdfRenderer): Response|RedirectResponse
     {
         $application = $this->applicationFor($request);
 
@@ -395,10 +396,12 @@ class EnrollmentPaymentController extends Controller
             'receiptReturnLabel' => $this->receiptReturnLabel($request),
         ])->render();
 
-        $filename = 'mcare-receipt-'.($application->payment_reference ?: $application->payment_receipt_number ?: 'slip').'.html';
+        $pdf = $pdfRenderer->renderHtml($html, 'Letter');
 
-        return response($html, 200, [
-            'Content-Type' => 'text/html; charset=UTF-8',
+        $filename = 'mcare-receipt-'.($application->payment_reference ?: $application->payment_receipt_number ?: 'slip').'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }

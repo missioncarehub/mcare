@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\EnrollmentApplication;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\TrainingBatch;
 use App\Models\TrainingModule;
 use App\Models\TrainingSubmodule;
@@ -308,6 +309,17 @@ class TrainerDashboardController extends Controller
             ->groupBy('enrollment_application_id')
             ->map(fn ($progress) => $progress->keyBy('training_submodule_id'));
         $quizzes = $module->quizzes()->with(['questions', 'attempts.application', 'trainingSubmodule'])->get();
+        $gradedAttempts = $quizzes
+            ->flatMap(fn ($quiz) => $quiz->attempts)
+            ->where('status', QuizAttempt::STATUS_GRADED)
+            ->filter(fn ($attempt): bool => $attempt->score_percent !== null);
+        $quizScoreSummary = [
+            'quiz_count' => $quizzes->count(),
+            'submission_count' => $gradedAttempts->count(),
+            'average_score' => $gradedAttempts->isEmpty() ? null : round((float) $gradedAttempts->avg('score_percent'), 2),
+            'passed_count' => $gradedAttempts->where('passed', true)->count(),
+            'needs_review_count' => $gradedAttempts->where('passed', false)->count(),
+        ];
         $assessmentSummaryByApp = $trainees->mapWithKeys(fn (EnrollmentApplication $trainee) => [
             $trainee->id => $assessments->summary($module, $trainee),
         ]);
@@ -326,6 +338,7 @@ class TrainerDashboardController extends Controller
             'trainees' => $trainees,
             'progressByApp' => $progressByApp,
             'quizzes' => $quizzes,
+            'quizScoreSummary' => $quizScoreSummary,
             'assessmentSummaryByApp' => $assessmentSummaryByApp,
             'submoduleAssessmentSummaryByApp' => $submoduleAssessmentSummaryByApp,
             'classroomComments' => $comments->visibleFor($request->user(), $module),

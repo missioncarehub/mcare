@@ -148,6 +148,10 @@
                                 <span>Remember me</span>
                             </label>
 
+                            <div class="auth-secondary-links auth-secondary-links-single">
+                                <a href="{{ route('password.request') }}">Forgot password?</a>
+                            </div>
+
                             <button type="submit" class="auth-primary-button disabled:cursor-not-allowed disabled:opacity-80" data-login-submit>
                                 <span data-login-submit-label>Sign In</span>
                                 <x-dashboard-icon name="arrow-right" aria-hidden="true" />

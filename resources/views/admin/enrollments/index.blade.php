@@ -144,9 +144,6 @@
                                     <a href="{{ route('admin.enrollments.show', $application) }}" class="inline-flex items-center justify-center rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:bg-purple-50">
                                         Review
                                     </a>
-                                    <a href="{{ route('admin.enrollments.cor', $application) }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-purple-200 hover:text-purple-700">
-                                        Generate COR
-                                    </a>
                                     <form method="POST" action="{{ route('admin.enrollments.destroy', $application) }}" data-confirm-title="{{ $application->accountDeletionTitle() }}" data-confirm="{{ $application->accountDeletionMessage() }}" @if($application->accountDeletionDetail()) data-confirm-detail="{{ $application->accountDeletionDetail() }}" @endif data-confirm-action="{{ $application->accountDeletionAction() }}">
                                         @csrf
                                         @method('DELETE')

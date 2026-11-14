@@ -7,6 +7,7 @@ use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
 use App\Models\User;
 use App\Mail\PaymentReceiptMail;
+use App\Services\BrowsershotOfficialDocumentRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -117,7 +118,7 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertSee('PHP 22,000.00')
             ->assertSee('PHP 2,000.00')
             ->assertSee('Print / Save PDF')
-            ->assertSee('size: A5 portrait', false);
+            ->assertSee('size: Letter portrait', false);
 
         // Once the cashier has verified the active ticket, the dashboard
         // presents the official receipt action instead of the pending ticket.
@@ -159,6 +160,20 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertSee('Ana Reyes')
             ->assertDontSee('TESDA-accredited Caregiving NC II training and assessment.', false)
             ->assertDontSee('Log in to MCARE', false);
+
+        $this->app->instance(BrowsershotOfficialDocumentRenderer::class, \Mockery::mock(BrowsershotOfficialDocumentRenderer::class, function ($mock): void {
+            $mock->shouldReceive('renderHtml')
+                ->once()
+                ->withArgs(fn (string $html, string $paper): bool => str_contains($html, 'OFFICIAL PAYMENT RECEIPT') && $paper === 'Letter')
+                ->andReturn('%PDF-1.7 receipt');
+        }));
+
+        $download = $this->actingAs($trainee)->get(route('payment.receipt.download'));
+
+        $download->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="mcare-receipt-'.$firstReference.'.pdf"');
+        $this->assertStringStartsWith('%PDF-', $download->getContent());
 
         $this->actingAs($trainee)
             ->get(route('payment.complete'))

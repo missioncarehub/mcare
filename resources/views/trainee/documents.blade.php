@@ -83,17 +83,6 @@
         <p class="mt-4 text-xs text-slate-500">For security, the trainee download can be claimed once. An interrupted or lost copy requires an admin reissue with a recorded reason.</p>
     </article>
 
-    <article class="dashboard-panel">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <p class="dashboard-section-kicker">Certificate of Registration</p>
-                <h2 class="mt-2 text-xl font-bold text-slate-950">Current registration record</h2>
-                <p class="mt-2 max-w-2xl text-sm text-slate-600">Download a registration certificate filled from your current name, program, batch, schedule, and payment status.</p>
-            </div>
-            <a class="primary-action w-full sm:w-auto" href="{{ route('trainee.documents.cor') }}">Download COR</a>
-        </div>
-    </article>
-
     <div><p class="dashboard-section-kicker">Enrollment files</p><h2 class="mt-2 text-xl font-bold text-slate-950">Submitted registration files</h2></div>
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         @foreach ($documents as $documentKey => $document)

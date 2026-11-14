@@ -157,21 +157,6 @@ class TraineePortalTest extends TestCase
             ->assertDontSee('Your account has been verified. You can now access your modules and schedule.');
     }
 
-    public function test_trainee_can_download_a_registration_certificate_from_current_enrollment_data(): void
-    {
-        $trainee = User::factory()->create(['role' => 'trainee']);
-        $batch = $this->batch();
-        $application = $this->approvedReadyApplication($trainee, EnrollmentApplication::STATUS_APPROVED, $batch);
-
-        $response = $this->actingAs($trainee)->get(route('trainee.documents.cor'));
-
-        $response->assertOk();
-        $response->assertHeader('content-type', 'application/pdf');
-        $this->assertStringStartsWith('%PDF', $response->getContent());
-        $this->assertStringContainsString('COR-', $response->headers->get('content-disposition'));
-        $this->assertNotNull($application->id);
-    }
-
     public function test_quiz_score_summary_uses_the_stored_attempt(): void
     {
         $trainer = User::factory()->create(['role' => 'trainer']);

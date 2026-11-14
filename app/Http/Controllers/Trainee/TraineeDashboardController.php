@@ -17,7 +17,6 @@ use App\Models\TrainerAnnouncement;
 use App\Models\TrainingModule;
 use App\Models\TrainingSubmodule;
 use App\Models\TrainingSubmoduleProgress;
-use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\ClassroomComments;
 use App\Services\CompletionEligibilityService;
 use App\Services\LearningPdfWatermark;
@@ -53,20 +52,6 @@ class TraineeDashboardController extends Controller
         ])->save();
 
         return back();
-    }
-
-    public function downloadCor(Request $request): Response
-    {
-        $application = $this->approvedApplicationFor($request);
-        abort_unless($application, 404);
-
-        $pdf = app(CertificateOfRegistrationRenderer::class)->render($application);
-        $filename = CertificateOfRegistrationRenderer::filename($application);
-
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ]);
     }
 
     public function modules(Request $request): View|RedirectResponse

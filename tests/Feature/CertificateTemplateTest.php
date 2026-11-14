@@ -9,7 +9,6 @@ use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
 use App\Models\User;
-use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -197,97 +196,6 @@ class CertificateTemplateTest extends TestCase
         $this->assertTrue($this->pdfContains($response->getContent(), 'PREVIEW REGISTRAR'));
     }
 
-    public function test_generate_cor_uses_the_current_enrollment_and_the_saved_template(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $applicant = User::factory()->create(['role' => 'applicant']);
-        $batch = TrainingBatch::create([
-            'name' => 'Batch 1',
-            'year' => 2026,
-            'is_active' => true,
-            'enrollment_ends_at' => now()->addMonth(),
-            'am_days' => 'MWF',
-            'am_start_time' => '08:00',
-            'am_end_time' => '12:00',
-            'am_room' => 'Skills Lab A',
-        ]);
-        $application = EnrollmentApplication::create([
-            'user_id' => $applicant->id,
-            'training_batch_id' => $batch->id,
-            'enrollment_number' => 'MCE-2026-11011',
-            'email' => $applicant->email,
-            'program' => 'Caregiving NC II',
-            'first_name' => 'Maria',
-            'last_name' => 'Santos',
-            'birth_date' => '2000-01-01',
-            'gender' => 'Female',
-            'contact_number' => '09170000000',
-            'schedule_preference' => 'AM',
-            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
-            'street' => '123 Training Street',
-            'barangay' => 'Central',
-            'city' => 'Pili',
-            'province' => 'Camarines Sur',
-            'zip_code' => '4418',
-            'educational_attainment' => 'High School Graduate',
-            'school_name' => 'MCARE High School',
-            'year_graduated' => 2020,
-            'status' => EnrollmentApplication::STATUS_PROFILE_SUBMITTED,
-            'review_released_at' => now(),
-        ]);
-
-        $this->actingAs($admin)
-            ->get(route('admin.enrollments.index'))
-            ->assertOk()
-            ->assertSee('Generate COR')
-            ->assertSee(route('admin.enrollments.cor', $application), false);
-
-        $this->actingAs($admin)
-            ->post(route('admin.learning.certificate-templates.store'), [
-                'type' => CertificateTemplate::TYPE_COR,
-                'title' => 'Registrar copy of registration',
-                'body' => 'Issued for {{trainee_name}}. Payment is {{payment_status}}.',
-                'paper_size' => 'a4',
-                'orientation' => 'portrait',
-                'signatory_name' => 'Amina Dela Cruz',
-                'signatory_role' => 'Registrar',
-            ])
-            ->assertRedirect(route('admin.learning.certificate-templates'))
-            ->assertSessionHas('saved');
-
-        $first = $this->actingAs($admin)->get(route('admin.enrollments.cor', $application));
-        $first->assertOk();
-        $first->assertHeader('content-type', 'application/pdf');
-        $pdf = $first->getContent();
-        $this->assertStringStartsWith('%PDF', $pdf);
-        foreach ([
-            'Registrar copy of registration',
-            'Issued for Maria Santos',
-            'Payment is Fully paid',
-            'COR-MCE-2026-11011',
-            'Maria Santos',
-            'Caregiving NC II',
-            'Batch 1 2026',
-            'MWF',
-            'Fully paid',
-            'Amina Dela Cruz',
-            now()->format('F j, Y'),
-            'MCARE OFFICIAL',
-        ] as $needle) {
-            $this->assertTrue($this->pdfContains($pdf, $needle), $needle);
-        }
-
-        $application->update([
-            'first_name' => 'Lucia',
-            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
-        ]);
-
-        $second = app(CertificateOfRegistrationRenderer::class)->render($application->fresh('batch'));
-        $this->assertTrue($this->pdfContains($second, 'Lucia Santos'), 'Lucia Santos');
-        $this->assertTrue($this->pdfContains($second, 'Partially paid'), 'Partially paid');
-        $this->assertFalse($this->pdfContains($second, 'Maria Santos'));
-    }
-
     public function test_an_imported_template_is_filled_from_the_current_record(): void
     {
         Storage::fake('local');
@@ -347,6 +255,42 @@ class CertificateTemplateTest extends TestCase
         $this->assertTrue($this->pdfContains($pdf, 'Enrollment ID: MCE-2026-SAMPLE'));
         $this->assertFalse($this->pdfContains($pdf, 'MCARE OFFICIAL'));
         $this->assertFalse($this->pdfContains($pdf, 'This certifies that'));
+
+        @unlink($png);
+    }
+
+    public function test_active_imported_tor_template_is_used_for_generation(): void
+    {
+        Storage::fake('local');
+        $png = tempnam(sys_get_temp_dir(), 'mcare-tor-template');
+        $image = imagecreatetruecolor(120, 180);
+        imagefilledrectangle($image, 0, 0, 120, 180, imagecolorallocate($image, 220, 240, 255));
+        imagepng($image, $png);
+        imagedestroy($image);
+
+        $backgroundPath = 'certificate-templates/imported-tor.png';
+        Storage::disk('local')->put($backgroundPath, file_get_contents($png));
+        CertificateTemplate::create([
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'is_active' => true,
+            'title' => 'Imported Transcript Layout',
+            'body' => 'Prepared for {{trainee_name}}.',
+            'paper_size' => 'a4',
+            'orientation' => 'portrait',
+            'use_official_artwork' => false,
+            'background_path' => $backgroundPath,
+            'field_layout' => CertificateTemplate::defaultFieldLayout(OfficialDocument::TYPE_TOR, 'portrait'),
+            'signatory_name' => 'Amina Dela Cruz',
+            'signatory_role' => 'Registrar',
+        ]);
+
+        $pdf = app(FpdfOfficialDocumentRenderer::class)->render($this->document(OfficialDocument::TYPE_TOR));
+
+        $this->assertTrue($this->pdfContains($pdf, 'Imported Transcript Layout'));
+        $this->assertTrue($this->pdfContains($pdf, 'Prepared for Maria Reyes Santos.'));
+        $this->assertTrue($this->pdfContains($pdf, 'Provide Care and Support to Infants and Toddlers'));
+        $this->assertFalse($this->pdfContains($pdf, 'OFFICIAL TRANSCRIPT OF RECORD'));
 
         @unlink($png);
     }

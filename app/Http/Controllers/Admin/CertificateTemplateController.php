@@ -10,7 +10,6 @@ use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
-use App\Services\CertificateOfRegistrationRenderer;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,7 +57,6 @@ class CertificateTemplateController extends Controller
             'type' => $type,
             'heading' => match ($label) {
                 'COTC' => 'Certificate of Training Completion',
-                'COR' => 'Certificate of Registration',
                 default => 'Transcript of Records',
             },
             'section' => [
@@ -77,7 +75,7 @@ class CertificateTemplateController extends Controller
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:180'],
-            'body' => [in_array($type, [OfficialDocument::TYPE_COTC, CertificateTemplate::TYPE_COR], true) ? 'required' : 'nullable', 'string', 'max:2000'],
+            'body' => [$type === OfficialDocument::TYPE_COTC ? 'required' : 'nullable', 'string', 'max:2000'],
             'paper_size' => ['required', Rule::in(['letter', 'a4', 'legal'])],
             'orientation' => ['required', Rule::in(['portrait', 'landscape'])],
             'signatory_name' => ['nullable', 'string', 'max:180'],
@@ -217,9 +215,7 @@ class CertificateTemplateController extends Controller
     {
         abort_unless(in_array($type, CertificateTemplate::managedTypes(), true), 404);
 
-        $pdf = $type === CertificateTemplate::TYPE_COR
-            ? app(CertificateOfRegistrationRenderer::class)->render($this->sampleEnrollment())
-            : $renderer->render($this->sampleDocument($type));
+        $pdf = $renderer->render($this->sampleDocument($type));
         $name = strtoupper($type).'-template-preview.pdf';
 
         return response($pdf, 200, [
@@ -243,22 +239,14 @@ class CertificateTemplateController extends Controller
         return response()->file($absolute);
     }
 
-    private function sampleEnrollment(): EnrollmentApplication
+    private function sampleDocument(string $type): OfficialDocument
     {
-        $batch = new TrainingBatch([
-            'name' => 'Batch 1',
-            'year' => 2026,
-            'training_starts_at' => '2026-01-15',
-            'training_ends_at' => '2026-07-18',
-        ]);
         $application = new EnrollmentApplication([
             'enrollment_number' => 'MCE-2026-SAMPLE',
             'program' => 'Caregiving NC II',
             'first_name' => 'Maria',
             'middle_name' => 'Reyes',
             'last_name' => 'Santos',
-            'schedule_preference' => 'AM',
-            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
             'street' => '1 Training Street',
             'barangay' => 'Central',
             'city' => 'Pili',
@@ -267,15 +255,13 @@ class CertificateTemplateController extends Controller
             'school_name' => 'MCARE School',
             'classification' => 'Student',
         ]);
+        $batch = new TrainingBatch([
+            'name' => 'Batch 1',
+            'year' => 2026,
+            'training_starts_at' => '2026-01-15',
+            'training_ends_at' => '2026-07-18',
+        ]);
         $application->setRelation('batch', $batch);
-
-        return $application;
-    }
-
-    private function sampleDocument(string $type): OfficialDocument
-    {
-        $application = $this->sampleEnrollment();
-        $batch = $application->batch;
         $unit = new CompetencyUnit([
             'code' => 'HCS323301',
             'title' => 'Provide Care and Support to Infants and Toddlers',

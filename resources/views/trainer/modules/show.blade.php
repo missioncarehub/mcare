@@ -237,6 +237,29 @@
                 <button type="button" class="primary-action text-xs" data-dashboard-dialog-open="module-quiz-dialog">Create quiz</button>
             </div>
 
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Module quiz score summary">
+                <div class="rounded-xl bg-purple-50 p-3 text-purple-950">
+                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-purple-700">Quizzes</span>
+                    <strong class="mt-1 block text-xl">{{ $quizScoreSummary['quiz_count'] }}</strong>
+                </div>
+                <div class="rounded-xl bg-stone-100 p-3 text-stone-950">
+                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-stone-600">Graded submissions</span>
+                    <strong class="mt-1 block text-xl">{{ $quizScoreSummary['submission_count'] }}</strong>
+                </div>
+                <div class="rounded-xl bg-sky-50 p-3 text-sky-950">
+                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-sky-700">Average score</span>
+                    <strong class="mt-1 block text-xl">{{ $quizScoreSummary['average_score'] === null ? '—' : number_format($quizScoreSummary['average_score'], 1).'%' }}</strong>
+                </div>
+                <div class="rounded-xl bg-emerald-50 p-3 text-emerald-950">
+                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Passed</span>
+                    <strong class="mt-1 block text-xl">{{ $quizScoreSummary['passed_count'] }}</strong>
+                </div>
+                <div class="rounded-xl bg-amber-50 p-3 text-amber-950">
+                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-amber-700">Needs review</span>
+                    <strong class="mt-1 block text-xl">{{ $quizScoreSummary['needs_review_count'] }}</strong>
+                </div>
+            </div>
+
             <div class="space-y-3">
                 @forelse($quizzes as $quiz)
                     <div class="flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between">

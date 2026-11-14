@@ -72,6 +72,13 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('password-reset', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by('password-reset:ip:'.$request->ip()),
+                Limit::perMinute(3)->by('password-reset:email:'.hash('sha256', Str::lower(trim((string) $request->input('email', 'unknown'))))),
+            ];
+        });
+
         // OAuth endpoints should not be used as an unlimited redirect/callback loop.
         RateLimiter::for('oauth', function (Request $request) use ($actorKey) {
             return Limit::perMinute(10)

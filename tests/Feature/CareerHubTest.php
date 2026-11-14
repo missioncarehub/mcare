@@ -666,6 +666,55 @@ class CareerHubTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_admin_rejection_notifies_the_alumni_applicant(): void
+    {
+        Http::fake([
+            'api.semaphore.co/*' => Http::response([['message_id' => 92, 'status' => 'Pending']], 200),
+        ]);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $graduate = $this->graduatedUser();
+        $opportunity = CareerOpportunity::create([
+            'created_by_id' => $admin->id,
+            'title' => 'Home care assistant, Naga City',
+            'estimated_salary' => '₱20,000 / month',
+            'employer' => 'MCARE-Coordinated Placement',
+            'description' => 'Career posting for a graduate applicant.',
+            'estimated_start_date' => now()->addWeek()->toDateString(),
+            'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+            'patient_age' => 72,
+            'is_published' => true,
+        ]);
+        $inquiry = CareerInquiry::create([
+            'career_opportunity_id' => $opportunity->id,
+            'user_id' => $graduate->id,
+            'name' => $graduate->name,
+            'email' => $graduate->email,
+            'contact_number' => '09170000000',
+            'message' => 'I am available for this role.',
+            'status' => CareerInquiry::STATUS_PENDING,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.learning.alumni-jobs'))
+            ->patch(route('admin.learning.alumni-jobs.inquiries.update', $inquiry), [
+                'status' => CareerInquiry::STATUS_REJECTED,
+                'admin_notes' => 'The role requires different experience.',
+            ])
+            ->assertRedirect(route('admin.learning.alumni-jobs'));
+
+        $this->assertDatabaseHas('career_inquiries', [
+            'id' => $inquiry->id,
+            'status' => CareerInquiry::STATUS_REJECTED,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $graduate->id,
+            'type' => CareerApplicationDecided::class,
+        ]);
+    }
+
     public function test_unpublished_career_cannot_receive_an_inquiry(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

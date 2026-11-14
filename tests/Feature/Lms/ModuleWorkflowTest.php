@@ -188,6 +188,30 @@ class ModuleWorkflowTest extends TestCase
         $this->assertNull($progress->submitted_at);
     }
 
+    public function test_trainer_sees_a_quiz_score_summary_for_each_module(): void
+    {
+        $trainer = $this->lmsUser('trainer');
+        $batch = $this->lmsBatch(['trainer_id' => $trainer->id]);
+        ['application' => $firstApplication] = $this->lmsTrainee($batch, ['first_name' => 'First']);
+        ['application' => $secondApplication] = $this->lmsTrainee($batch, ['first_name' => 'Second']);
+        $module = $this->lmsModule($trainer, $batch, ['title' => 'Score Summary Module']);
+        $this->lmsSubmodule($module);
+        $quiz = $this->publishedQuiz($trainer->id, $module);
+
+        $this->gradedAttempt($quiz, $firstApplication->id, 1, 80, true);
+        $this->gradedAttempt($quiz, $secondApplication->id, 1, 60, false);
+
+        $this->actingAs($trainer)
+            ->get(route('trainer.modules.show', ['module' => $module, 'tab' => 'assessments']))
+            ->assertOk()
+            ->assertSee('Module quiz score summary', false)
+            ->assertSee('Graded submissions', false)
+            ->assertSee('2')
+            ->assertSee('70.0%', false)
+            ->assertSee('Passed', false)
+            ->assertSee('Needs review', false);
+    }
+
     public function test_newly_published_classwork_resets_pending_submission_but_preserves_completed_badge(): void
     {
         $trainer = $this->lmsUser('trainer');

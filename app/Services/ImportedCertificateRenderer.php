@@ -71,7 +71,7 @@ class ImportedCertificateRenderer
      */
     private function paintFields(OfficialPdf|ImportedTemplatePdf $pdf, CertificateTemplate $template, array $values, array $context, float $width, float $height): void
     {
-        foreach (CertificateTemplate::automaticFieldLayout($template->type, $template->orientation) as $key => $box) {
+        foreach ($template->resolvedFieldLayout() as $key => $box) {
             $text = $this->fieldText($key, $template, $values, $context);
             if (trim($text) === '') {
                 continue;
