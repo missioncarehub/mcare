@@ -161,6 +161,7 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertDontSee('TESDA-accredited Caregiving NC II training and assessment.', false)
             ->assertDontSee('Log in to MCARE', false);
 
+        config(['official_documents.pdf_engine' => 'browsershot']);
         $this->app->instance(BrowsershotOfficialDocumentRenderer::class, \Mockery::mock(BrowsershotOfficialDocumentRenderer::class, function ($mock): void {
             $mock->shouldReceive('renderHtml')
                 ->once()
@@ -174,6 +175,13 @@ class TraineePaymentReceiptTest extends TestCase
             ->assertHeader('Content-Type', 'application/pdf')
             ->assertHeader('Content-Disposition', 'attachment; filename="mcare-receipt-'.$firstReference.'.pdf"');
         $this->assertStringStartsWith('%PDF-', $download->getContent());
+
+        config(['official_documents.pdf_engine' => 'fpdf']);
+        $fallbackDownload = $this->actingAs($trainee)->get(route('payment.receipt.download'));
+        $fallbackDownload->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="mcare-receipt-'.$firstReference.'.pdf"');
+        $this->assertStringStartsWith('%PDF-', $fallbackDownload->getContent());
 
         $this->actingAs($trainee)
             ->get(route('payment.complete'))

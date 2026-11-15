@@ -41,6 +41,7 @@ class AccountDeletionService
         $accountRole = $user->role;
 
         $application = $user->enrollmentApplication()->first();
+        $admissionApplication = $application?->admissionApplication()->first();
         $historicalClaim = $user->historicalAlumniClaim()->first();
         $isHistoricalAlumni = (bool) ($application?->is_historical_record
             || $historicalClaim?->status === HistoricalAlumniClaim::STATUS_APPROVED);
@@ -76,7 +77,7 @@ class AccountDeletionService
 
         $queuedJobIds = $this->queuedNotificationJobIds($user);
 
-        DB::transaction(function () use ($user, $application, $historicalClaim, $actor, $accountRole, $accountEmail, $queuedJobIds, $isHistoricalAlumni): void {
+        DB::transaction(function () use ($user, $application, $admissionApplication, $historicalClaim, $actor, $accountRole, $accountEmail, $queuedJobIds, $isHistoricalAlumni): void {
             if ($queuedJobIds !== []) {
                 DB::table('jobs')->whereIn('id', $queuedJobIds)->delete();
             }
@@ -105,6 +106,8 @@ class AccountDeletionService
 
                 $application->delete();
             }
+
+            $admissionApplication?->delete();
 
             $historicalClaim?->delete();
 

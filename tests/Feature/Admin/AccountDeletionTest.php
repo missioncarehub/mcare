@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\EnrollmentApplication;
+use App\Models\AdmissionApplication;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
@@ -186,6 +187,7 @@ class AccountDeletionTest extends TestCase
         ]);
 
         $testEmail = 'reenroll.applicant@gmail.com';
+        $admission = $this->makeApprovedAdmission(['email' => $testEmail]);
 
         // 1. Initial creation
         $applicantUser = User::factory()->create([
@@ -215,6 +217,7 @@ class AccountDeletionTest extends TestCase
             'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
             'payment_status' => EnrollmentApplication::PAYMENT_NOT_SELECTED,
             'training_batch_id' => $batch->id,
+            'admission_application_id' => $admission->id,
         ]);
 
         // 2. Admin deletes the account
@@ -224,6 +227,7 @@ class AccountDeletionTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['email' => $testEmail]);
         $this->assertDatabaseMissing('enrollment_applications', ['email' => $testEmail]);
+        $this->assertDatabaseMissing('admission_applications', ['id' => $admission->id]);
         $this->assertDatabaseMissing('deleted_account_email_blocks', [
             'email_hash' => hash('sha256', $testEmail),
         ]);
