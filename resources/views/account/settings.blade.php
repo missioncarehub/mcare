@@ -74,21 +74,40 @@
         <section id="change-password" class="dashboard-panel scroll-mt-8 space-y-4">
             <p class="dashboard-section-kicker">Security</p>
             <h2 class="text-lg font-bold text-slate-950">Change password</h2>
-            <p class="text-sm leading-6 text-slate-600">Use at least eight characters with both letters and numbers.</p>
+            <p class="text-sm leading-6 text-slate-600">Choose a strong password that meets all of these requirements:</p>
             <form method="POST" action="{{ route('account.password.update') }}" class="space-y-5">
                 @csrf
                 @method('PATCH')
-                <label class="block text-sm font-bold text-slate-700">Current password
-                    <input name="current_password" type="password" autocomplete="current-password" required class="form-field mt-2 text-base">
+                <div>
+                    <label for="current_password" class="block text-sm font-bold text-slate-700">Current password</label>
+                    <div class="relative mt-2">
+                        <input id="current_password" name="current_password" type="password" autocomplete="current-password" required class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="current_password" aria-label="Show current password" title="Show current password">
+                            <x-dashboard-icon name="eye" class="h-4 w-4" />
+                        </button>
+                    </div>
                     @error('current_password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
-                </label>
-                <label class="block text-sm font-bold text-slate-700">New password
-                    <input name="password" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-bold text-slate-700">New password</label>
+                    <div class="relative mt-2">
+                        <input id="password" name="password" type="password" autocomplete="new-password" required aria-describedby="password-requirements" class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="password" aria-label="Show new password" title="Show new password">
+                            <x-dashboard-icon name="eye" class="h-4 w-4" />
+                        </button>
+                    </div>
+                    <span id="password-requirements" class="mt-2 block text-xs font-semibold leading-5 text-slate-500">At least 10 characters, including an uppercase letter (A-Z), a lowercase letter (a-z), and a number (0-9).</span>
                     @error('password') <span class="mt-2 block text-sm font-semibold text-red-600">{{ $message }}</span> @enderror
-                </label>
-                <label class="block text-sm font-bold text-slate-700">Confirm new password
-                    <input name="password_confirmation" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
-                </label>
+                </div>
+                <div>
+                    <label for="password_confirmation" class="block text-sm font-bold text-slate-700">Confirm new password</label>
+                    <div class="relative mt-2">
+                        <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="password_confirmation" aria-label="Show password confirmation" title="Show password confirmation">
+                            <x-dashboard-icon name="eye" class="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
                 <button type="submit" class="primary-action">
                     <x-dashboard-icon name="key" class="h-4 w-4" />
                     <span>Update password</span>

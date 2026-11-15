@@ -119,12 +119,36 @@ unset($__errorArgs, $__bag); ?>
         <section id="change-password" class="dashboard-panel scroll-mt-8 space-y-4">
             <p class="dashboard-section-kicker">Security</p>
             <h2 class="text-lg font-bold text-slate-950">Change password</h2>
-            <p class="text-sm leading-6 text-slate-600">Use at least eight characters with both letters and numbers.</p>
+            <p class="text-sm leading-6 text-slate-600">Choose a strong password that meets all of these requirements:</p>
             <form method="POST" action="<?php echo e(route('account.password.update')); ?>" class="space-y-5">
                 <?php echo csrf_field(); ?>
                 <?php echo method_field('PATCH'); ?>
                 <label class="block text-sm font-bold text-slate-700">Current password
-                    <input name="current_password" type="password" autocomplete="current-password" required class="form-field mt-2 text-base">
+                    <div class="relative mt-2">
+                        <input id="current_password" name="current_password" type="password" autocomplete="current-password" required class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="current_password" aria-label="Show current password" title="Show current password">
+                            <?php if (isset($component)) { $__componentOriginal9107e671931ebb736f490bfa53db05d4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9107e671931ebb736f490bfa53db05d4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dashboard-icon','data' => ['name' => 'eye','class' => 'h-4 w-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('dashboard-icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'eye','class' => 'h-4 w-4']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $attributes = $__attributesOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__attributesOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $component = $__componentOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__componentOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+                        </button>
+                    </div>
                     <?php $__errorArgs = ['current_password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -135,7 +159,32 @@ endif;
 unset($__errorArgs, $__bag); ?>
                 </label>
                 <label class="block text-sm font-bold text-slate-700">New password
-                    <input name="password" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
+                    <div class="relative mt-2">
+                        <input id="password" name="password" type="password" autocomplete="new-password" required aria-describedby="password-requirements" class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="password" aria-label="Show new password" title="Show new password">
+                            <?php if (isset($component)) { $__componentOriginal9107e671931ebb736f490bfa53db05d4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9107e671931ebb736f490bfa53db05d4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dashboard-icon','data' => ['name' => 'eye','class' => 'h-4 w-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('dashboard-icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'eye','class' => 'h-4 w-4']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $attributes = $__attributesOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__attributesOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $component = $__componentOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__componentOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+                        </button>
+                    </div>
+                    <span id="password-requirements" class="mt-2 block text-xs font-semibold leading-5 text-slate-500">At least 10 characters, including an uppercase letter (A-Z), a lowercase letter (a-z), and a number (0-9).</span>
                     <?php $__errorArgs = ['password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -146,7 +195,31 @@ endif;
 unset($__errorArgs, $__bag); ?>
                 </label>
                 <label class="block text-sm font-bold text-slate-700">Confirm new password
-                    <input name="password_confirmation" type="password" autocomplete="new-password" required class="form-field mt-2 text-base">
+                    <div class="relative mt-2">
+                        <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required class="form-field pr-12 text-base">
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 hover:text-purple-700" data-password-toggle="password_confirmation" aria-label="Show password confirmation" title="Show password confirmation">
+                            <?php if (isset($component)) { $__componentOriginal9107e671931ebb736f490bfa53db05d4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal9107e671931ebb736f490bfa53db05d4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.dashboard-icon','data' => ['name' => 'eye','class' => 'h-4 w-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('dashboard-icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'eye','class' => 'h-4 w-4']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $attributes = $__attributesOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__attributesOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal9107e671931ebb736f490bfa53db05d4)): ?>
+<?php $component = $__componentOriginal9107e671931ebb736f490bfa53db05d4; ?>
+<?php unset($__componentOriginal9107e671931ebb736f490bfa53db05d4); ?>
+<?php endif; ?>
+                        </button>
+                    </div>
                 </label>
                 <button type="submit" class="primary-action">
                     <?php if (isset($component)) { $__componentOriginal9107e671931ebb736f490bfa53db05d4 = $component; } ?>
