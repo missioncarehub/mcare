@@ -276,6 +276,39 @@ class AdminLearningSystemTest extends TestCase
             ->assertSee('lifecycle.trainee@gmail.com');
     }
 
+    public function test_admin_can_permanently_delete_a_trainee_from_the_archive(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $trainee = User::factory()->create([
+            'role' => 'trainee',
+            'email' => 'archived.delete@gmail.com',
+        ]);
+        $batch = TrainingBatch::create([
+            'name' => 'Batch Permanent Delete',
+            'year' => 2026,
+            'is_active' => true,
+            'enrollment_ends_at' => now()->addMonth(),
+        ]);
+        $application = $this->approvedApplication($trainee, $batch);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.learning.trainees.destroy', $application))
+            ->assertRedirect(route('admin.learning.trainees', ['tab' => 'current']));
+
+        $this->actingAs($admin)
+            ->delete(route('admin.learning.trainees.archive.destroy', $application))
+            ->assertRedirect(route('admin.learning.trainees.archive'))
+            ->assertSessionHas('saved');
+
+        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertDatabaseMissing('deleted_account_email_blocks', [
+            'email_hash' => hash('sha256', $trainee->email),
+        ]);
+    }
+
     public function test_non_admin_cannot_delete_a_trainee_from_the_roster(): void
     {
         $trainee = User::factory()->create(['role' => 'trainee']);

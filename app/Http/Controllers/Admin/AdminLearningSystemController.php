@@ -20,6 +20,7 @@ use App\Notifications\TrainerModuleAssignedByAdmin;
 use App\Rules\TrainingModuleFileType;
 use App\Services\CompetencyCatalogService;
 use App\Services\CompletionEligibilityService;
+use App\Services\AccountDeletionService;
 use App\Services\LearningPdfWatermark;
 use App\Services\ModuleSubmoduleService;
 use App\Services\RollingModuleReleaseService;
@@ -327,6 +328,30 @@ class AdminLearningSystemController extends Controller
         return redirect()
             ->route('admin.learning.trainees.archive')
             ->with('saved', "{$traineeName} was restored to the {$tab} roster.");
+    }
+
+    public function destroyArchivedTrainee(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        AccountDeletionService $accounts,
+    ): RedirectResponse {
+        abort_unless(
+            $enrollmentApplication->status === EnrollmentApplication::STATUS_APPROVED
+            && $enrollmentApplication->archived_at !== null
+            && $enrollmentApplication->user !== null,
+            422,
+            'Only archived trainees with an account can be permanently deleted.'
+        );
+
+        try {
+            $deleted = $accounts->delete($enrollmentApplication->user, $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()->route('admin.learning.trainees.archive')->withErrors($exception->errors());
+        }
+
+        return redirect()
+            ->route('admin.learning.trainees.archive')
+            ->with('saved', "Account for {$deleted['label']} ({$deleted['email']}) and its archived records were permanently deleted. The Gmail address can be used again.");
     }
 
     public function modules(Request $request, TrainingModuleDeletionService $deletion, CompetencyCatalogService $catalog): View

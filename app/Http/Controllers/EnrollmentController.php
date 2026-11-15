@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminActivityLog;
 use App\Models\AdmissionApplication;
-use App\Models\DeletedAccountEmail;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentAttempt;
 use App\Models\TrainingBatch;
@@ -287,13 +286,6 @@ class EnrollmentController extends Controller
         ]);
 
         $validator->after(function ($validator) use ($currentApplication, $enrollmentBatch, $request): void {
-            if (! $currentApplication && DeletedAccountEmail::isBlocked((string) $request->input('email'))) {
-                $validator->errors()->add(
-                    'email',
-                    'This Gmail account was permanently deleted and cannot be used for a new MCARE application.',
-                );
-            }
-
             if (! $currentApplication && ! $enrollmentBatch) {
                 $validator->errors()->add(
                     'training_batch_id',

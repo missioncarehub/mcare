@@ -36,11 +36,18 @@
                                 <p class="mt-1 text-xs text-slate-500">{{ $trainee->archivedBy?->name ?: 'Administrator' }}</p>
                             </td>
                             <td class="text-right">
-                                <form method="POST" action="{{ route('admin.learning.trainees.restore', $trainee) }}" class="inline-flex" data-confirm="Restore {{ $trainee->first_name }} {{ $trainee->last_name }} to the trainee roster?">
-                                    @csrf
-                                    @method('PATCH')
-                                    <button type="submit" class="primary-action">Restore</button>
-                                </form>
+                                <div class="inline-flex gap-2">
+                                    <form method="POST" action="{{ route('admin.learning.trainees.restore', $trainee) }}" class="inline-flex" data-confirm="Restore {{ $trainee->first_name }} {{ $trainee->last_name }} to the trainee roster?">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="primary-action">Restore</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('admin.learning.trainees.archive.destroy', $trainee) }}" class="inline-flex" data-confirm="Permanently delete {{ $trainee->first_name }} {{ $trainee->last_name }}? Their account, enrollment, payment records, uploaded documents, and learning history will be removed. This cannot be undone.">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="secondary-action border-red-200 text-red-800 hover:bg-red-50">Delete permanently</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty

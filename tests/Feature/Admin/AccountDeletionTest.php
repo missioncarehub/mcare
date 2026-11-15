@@ -3,7 +3,6 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\EnrollmentApplication;
-use App\Models\DeletedAccountEmail;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
@@ -163,7 +162,7 @@ class AccountDeletionTest extends TestCase
         $this->assertFalse(Storage::disk('public')->exists($avatarPath));
     }
 
-    public function test_same_email_cannot_re_enroll_after_account_deletion(): void
+    public function test_same_email_can_re_enroll_after_account_deletion(): void
     {
         Notification::fake();
         Storage::fake('local');
@@ -225,8 +224,8 @@ class AccountDeletionTest extends TestCase
 
         $this->assertDatabaseMissing('users', ['email' => $testEmail]);
         $this->assertDatabaseMissing('enrollment_applications', ['email' => $testEmail]);
-        $this->assertDatabaseHas('deleted_account_email_blocks', [
-            'email_hash' => DeletedAccountEmail::hashFor($testEmail),
+        $this->assertDatabaseMissing('deleted_account_email_blocks', [
+            'email_hash' => hash('sha256', $testEmail),
         ]);
 
         // 3. Applicant submits fresh enrollment with the exact same email
@@ -269,10 +268,10 @@ class AccountDeletionTest extends TestCase
             'id_photo' => UploadedFile::fake()->create('id_photo.jpg', 100, 'image/jpeg'),
         ]);
 
-        $enrollmentResponse->assertRedirect(route('enrollment.create'))
-            ->assertSessionHasErrors(['email']);
-        $this->assertDatabaseMissing('users', ['email' => $testEmail]);
-        $this->assertDatabaseMissing('enrollment_applications', ['email' => $testEmail]);
+        $enrollmentResponse->assertRedirect(route('payment.show'))
+            ->assertSessionHas('payment_notice');
+        $this->assertDatabaseHas('users', ['email' => $testEmail]);
+        $this->assertDatabaseHas('enrollment_applications', ['email' => $testEmail]);
     }
 
     public function test_verified_historical_alumni_accounts_can_be_deleted(): void

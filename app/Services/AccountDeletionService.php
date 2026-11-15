@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AdminActivityLog;
 use App\Models\AlumniProfile;
-use App\Models\DeletedAccountEmail;
 use App\Models\HistoricalAlumniClaim;
 use App\Models\Quiz;
 use App\Models\TrainerAnnouncement;
@@ -106,8 +105,6 @@ class AccountDeletionService
 
                 $application->delete();
             }
-
-            DeletedAccountEmail::record($accountEmail, $accountRole);
 
             $historicalClaim?->delete();
 

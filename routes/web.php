@@ -495,6 +495,9 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::patch('/learning/trainees/{enrollmentApplication}/restore', [AdminLearningSystemController::class, 'restoreTrainee'])
                     ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.trainees.restore');
+                Route::delete('/learning/trainees/archive/{enrollmentApplication}', [AdminLearningSystemController::class, 'destroyArchivedTrainee'])
+                    ->middleware(['permission:trainees.manage', 'throttle:sensitive-mutation'])
+                    ->name('learning.trainees.archive.destroy');
                 Route::get('/learning/trainees/{enrollmentApplication}', [AdminLearningSystemController::class, 'showTrainee'])
                     ->middleware('permission:trainees.manage')
                     ->name('learning.trainees.show');

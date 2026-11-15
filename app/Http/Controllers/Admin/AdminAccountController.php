@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Mail\StaffAccountCredentialsMail;
 use App\Models\AdminActivityLog;
-use App\Models\DeletedAccountEmail;
 use App\Models\EnrollmentApplication;
 use App\Models\PaymentTransaction;
 use App\Models\TrainingBatch;
@@ -179,12 +178,6 @@ class AdminAccountController extends Controller
             'email' => Str::lower(trim((string) $request->input('email'))),
             'contact_number' => trim((string) $request->input('contact_number')),
         ]);
-
-        if (DeletedAccountEmail::isBlocked($request->input('email'))) {
-            throw ValidationException::withMessages([
-                'email' => 'This email belonged to a permanently deleted account and cannot be used for a new MCARE application.',
-            ])->errorBag('trainee');
-        }
 
         $validated = $request->validateWithBag('trainee', [
             'first_name' => ['required', 'string', 'max:100', 'regex:/\A[\pL\pM .\'-]+\z/u'],
