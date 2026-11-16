@@ -33,7 +33,10 @@ class AdminQuizController extends Controller
             'trainer',
             'batch',
             'submodules',
-            'quizzes' => fn ($query) => $query->with('trainingSubmodule')->withCount('questions'),
+            'quizzes' => fn ($query) => $query->with(['trainingSubmodule', 'trainer'])->withCount([
+                'questions',
+                'attempts as graded_attempts_count' => fn ($q) => $q->where('status', QuizAttempt::STATUS_GRADED),
+            ]),
         ]);
 
         return view('admin.learning.quizzes', [

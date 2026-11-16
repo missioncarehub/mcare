@@ -10,6 +10,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
+use App\Models\TrainingProgram;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,13 +21,22 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CertificateTemplateController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $programs = TrainingProgram::active()->orderBy('name')->get();
+        $selectedProgramId = $request->query('program_id') ? (int) $request->query('program_id') : null;
+        $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
+
         $sections = collect(CertificateTemplate::managedTypes())
-            ->mapWithKeys(function (string $type) {
+            ->mapWithKeys(function (string $type) use ($selectedProgramId) {
                 $history = CertificateTemplate::query()
-                    ->with('createdBy')
+                    ->with('createdBy', 'trainingProgram')
                     ->where('type', $type)
+                    ->when(
+                        $selectedProgramId,
+                        fn ($q) => $q->where('training_program_id', $selectedProgramId),
+                        fn ($q) => $q->whereNull('training_program_id')
+                    )
                     ->orderByDesc('version')
                     ->get();
 
@@ -39,16 +49,28 @@ class CertificateTemplateController extends Controller
 
         return view('admin.learning.certificate-templates', [
             'sections' => $sections,
+            'programs' => $programs,
+            'selectedProgram' => $selectedProgram,
+            'selectedProgramId' => $selectedProgramId,
         ]);
     }
 
-    public function edit(string $type): View
+    public function edit(Request $request, string $type): View
     {
         abort_unless(in_array($type, CertificateTemplate::managedTypes(), true), 404);
 
+        $programs = TrainingProgram::active()->orderBy('name')->get();
+        $selectedProgramId = $request->query('program_id') ? (int) $request->query('program_id') : null;
+        $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
+
         $history = CertificateTemplate::query()
-            ->with('createdBy')
+            ->with('createdBy', 'trainingProgram')
             ->where('type', $type)
+            ->when(
+                $selectedProgramId,
+                fn ($q) => $q->where('training_program_id', $selectedProgramId),
+                fn ($q) => $q->whereNull('training_program_id')
+            )
             ->orderByDesc('version')
             ->get();
         $label = CertificateTemplate::label($type);
@@ -56,7 +78,7 @@ class CertificateTemplateController extends Controller
         return view('admin.learning.certificate-template-edit', [
             'type' => $type,
             'heading' => match ($label) {
-                'COTC' => 'Certificate of Training Completion',
+                'COTC' => ($selectedProgram ? $selectedProgram->name.' — ' : '').'Certificate of Training Completion',
                 default => 'Transcript of Records',
             },
             'section' => [
@@ -64,6 +86,9 @@ class CertificateTemplateController extends Controller
                 'history' => $history,
                 'defaults' => CertificateTemplate::formDefaults($type),
             ],
+            'programs' => $programs,
+            'selectedProgram' => $selectedProgram,
+            'selectedProgramId' => $selectedProgramId,
         ]);
     }
 
@@ -74,6 +99,7 @@ class CertificateTemplateController extends Controller
         ])['type'];
 
         $validated = $request->validate([
+            'training_program_id' => ['nullable', 'integer', 'exists:training_programs,id'],
             'title' => ['required', 'string', 'max:180'],
             'body' => [$type === OfficialDocument::TYPE_COTC ? 'required' : 'nullable', 'string', 'max:2000'],
             'paper_size' => ['required', Rule::in(['letter', 'a4', 'legal'])],
@@ -84,12 +110,19 @@ class CertificateTemplateController extends Controller
             'second_signatory_role' => ['nullable', 'string', 'max:120'],
             'background' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:2048'],
             'field_layout' => ['nullable', 'string', 'max:8000'],
+            'trainee_name_y' => ['nullable', 'numeric', 'min:5', 'max:95'],
+            'trainee_name_x' => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'trainee_name_size' => ['nullable', 'numeric', 'min:12', 'max:42'],
+            'trainee_name_align' => ['nullable', Rule::in(['C', 'L', 'R'])],
+            'include_cert_no' => ['nullable', 'boolean'],
+            'include_date' => ['nullable', 'boolean'],
             'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'signature' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'second_signature' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
-        $previous = CertificateTemplate::activeFor($type);
+        $programId = ! empty($validated['training_program_id']) ? (int) $validated['training_program_id'] : null;
+        $previous = CertificateTemplate::activeFor($type, $programId);
         $importedBackground = $request->hasFile('background');
         $useArtwork = $type === OfficialDocument::TYPE_COTC && $request->boolean('use_official_artwork') && ! $importedBackground;
         $backgroundPath = null;
@@ -98,8 +131,43 @@ class CertificateTemplateController extends Controller
         } elseif (! $useArtwork && ! $request->boolean('clear_background')) {
             $backgroundPath = $previous?->background_path;
         }
+
+        // Build customized field layout prioritizing Trainee Name
+        $fieldLayout = null;
+        if ($backgroundPath) {
+            $baseLayout = $this->fieldLayout($validated['field_layout'] ?? null, $type)
+                ?? $previous?->field_layout
+                ?? CertificateTemplate::automaticFieldLayout($type, $validated['orientation']);
+
+            if (isset($validated['trainee_name_y'])) {
+                $nameX = (float) ($validated['trainee_name_x'] ?? 5);
+                $nameY = (float) $validated['trainee_name_y'];
+                $nameSize = (float) ($validated['trainee_name_size'] ?? 24);
+                $nameAlign = (string) ($validated['trainee_name_align'] ?? 'C');
+                $nameW = $nameAlign === 'C' ? 90 : 80;
+
+                $baseLayout['trainee_name'] = [
+                    'x' => $nameX,
+                    'y' => $nameY,
+                    'w' => $nameW,
+                    'h' => max(6.0, $nameSize * 0.35),
+                    'size' => $nameSize,
+                    'align' => $nameAlign,
+                ];
+
+                if (! $request->boolean('include_cert_no')) {
+                    unset($baseLayout['certificate_no']);
+                }
+                if (! $request->boolean('include_date')) {
+                    unset($baseLayout['completion_date']);
+                }
+            }
+            $fieldLayout = $baseLayout;
+        }
+
         $template = new CertificateTemplate([
             'type' => $type,
+            'training_program_id' => $programId,
             'version' => ((int) CertificateTemplate::query()->where('type', $type)->max('version')) + 1,
             'is_active' => false,
             'title' => trim($validated['title']),
@@ -108,9 +176,7 @@ class CertificateTemplateController extends Controller
             'orientation' => $useArtwork ? 'landscape' : $validated['orientation'],
             'use_official_artwork' => $useArtwork,
             'background_path' => $backgroundPath,
-            'field_layout' => $backgroundPath
-                ? ($this->fieldLayout($validated['field_layout'] ?? null, $type) ?? $previous?->field_layout)
-                : null,
+            'field_layout' => $fieldLayout,
             'logo_path' => $previous?->logo_path,
             'signatory_name' => $this->blankToNull($validated['signatory_name'] ?? null),
             'signatory_role' => $this->blankToNull($validated['signatory_role'] ?? null),
@@ -129,9 +195,13 @@ class CertificateTemplateController extends Controller
 
         $activateImmediately = $request->boolean('activate_immediately', false);
 
-        DB::transaction(function () use ($template, $type, $importedBackground, $activateImmediately): void {
+        DB::transaction(function () use ($template, $type, $programId, $importedBackground, $activateImmediately): void {
             if (! $importedBackground || $activateImmediately) {
-                CertificateTemplate::query()->where('type', $type)->where('is_active', true)->update(['is_active' => false]);
+                CertificateTemplate::query()
+                    ->where('type', $type)
+                    ->when($programId, fn ($q) => $q->where('training_program_id', $programId), fn ($q) => $q->whereNull('training_program_id'))
+                    ->where('is_active', true)
+                    ->update(['is_active' => false]);
                 $template->is_active = true;
             }
             $template->save();
@@ -139,6 +209,7 @@ class CertificateTemplateController extends Controller
 
         AdminActivityLog::record($request->user(), 'admin.certificate-template.saved', $template, [
             'type' => $type,
+            'training_program_id' => $programId,
             'version' => $template->version,
         ]);
 
@@ -146,14 +217,14 @@ class CertificateTemplateController extends Controller
 
         if ($importedBackground && ! $template->is_active) {
             return redirect()
-                ->route('admin.learning.certificate-templates.edit', $type)
+                ->route('admin.learning.certificate-templates.edit', ['type' => $type, 'program_id' => $programId])
                 ->with('saved', $label.' template version '.$template->version.' was saved. Choose Make active template when new documents should use this design.');
         }
 
-        $saved = $label.' template version '.$template->version.' is active. The next generated '.$label.' uses this text and signatory.';
+        $saved = $label.' template version '.$template->version.' is active. The next generated '.$label.' uses this template.';
 
         return redirect()
-            ->route('admin.learning.certificate-templates')
+            ->route('admin.learning.certificate-templates', ['program_id' => $programId])
             ->with('saved', $saved);
     }
 
@@ -162,13 +233,20 @@ class CertificateTemplateController extends Controller
         DB::transaction(function () use ($certificateTemplate): void {
             CertificateTemplate::query()
                 ->where('type', $certificateTemplate->type)
+                ->when(
+                    $certificateTemplate->training_program_id,
+                    fn ($q) => $q->where('training_program_id', $certificateTemplate->training_program_id),
+                    fn ($q) => $q->whereNull('training_program_id')
+                )
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
+
             $certificateTemplate->update(['is_active' => true]);
         });
 
         AdminActivityLog::record($request->user(), 'admin.certificate-template.activated', $certificateTemplate, [
             'type' => $certificateTemplate->type,
+            'training_program_id' => $certificateTemplate->training_program_id,
             'version' => $certificateTemplate->version,
         ]);
 
@@ -180,16 +258,18 @@ class CertificateTemplateController extends Controller
     public function destroy(Request $request, CertificateTemplate $certificateTemplate): RedirectResponse
     {
         $type = $certificateTemplate->type;
+        $programId = $certificateTemplate->training_program_id;
         $version = $certificateTemplate->version;
         $wasActive = (bool) $certificateTemplate->is_active;
         $label = CertificateTemplate::label($type);
 
         AdminActivityLog::record($request->user(), 'admin.certificate-template.deleted', $certificateTemplate, [
             'type' => $type,
+            'training_program_id' => $programId,
             'version' => $version,
         ]);
 
-        DB::transaction(function () use ($certificateTemplate, $wasActive, $type): void {
+        DB::transaction(function () use ($certificateTemplate, $wasActive, $type, $programId): void {
             $certificateTemplate->delete();
 
             if (! $wasActive) {
@@ -198,12 +278,13 @@ class CertificateTemplateController extends Controller
 
             CertificateTemplate::query()
                 ->where('type', $type)
+                ->when($programId, fn ($q) => $q->where('training_program_id', $programId), fn ($q) => $q->whereNull('training_program_id'))
                 ->orderByDesc('version')
                 ->first()
                 ?->update(['is_active' => true]);
         });
 
-        $restoredDefault = $wasActive && CertificateTemplate::activeFor($type) === null;
+        $restoredDefault = $wasActive && CertificateTemplate::activeFor($type, $programId) === null;
 
         return back()->with(
             'saved',
@@ -213,11 +294,12 @@ class CertificateTemplateController extends Controller
         );
     }
 
-    public function preview(string $type, FpdfOfficialDocumentRenderer $renderer): Response
+    public function preview(Request $request, string $type, FpdfOfficialDocumentRenderer $renderer): Response
     {
         abort_unless(in_array($type, CertificateTemplate::managedTypes(), true), 404);
 
-        $pdf = $renderer->render($this->sampleDocument($type));
+        $programId = $request->query('program_id') ? (int) $request->query('program_id') : null;
+        $pdf = $renderer->render($this->sampleDocument($type, $programId));
         $name = strtoupper($type).'-template-preview.pdf';
 
         return response($pdf, 200, [
@@ -241,11 +323,20 @@ class CertificateTemplateController extends Controller
         return response()->file($absolute);
     }
 
-    private function sampleDocument(string $type): OfficialDocument
+    private function sampleDocument(string $type, ?int $trainingProgramId = null): OfficialDocument
     {
+        $programName = 'Caregiving NC II';
+        if ($trainingProgramId) {
+            $prog = TrainingProgram::find($trainingProgramId);
+            if ($prog) {
+                $programName = $prog->name;
+            }
+        }
+
         $application = new EnrollmentApplication([
             'enrollment_number' => 'MCE-2026-SAMPLE',
-            'program' => 'Caregiving NC II',
+            'training_program_id' => $trainingProgramId,
+            'program' => $programName,
             'first_name' => 'Maria',
             'middle_name' => 'Reyes',
             'last_name' => 'Santos',
@@ -275,7 +366,6 @@ class CertificateTemplateController extends Controller
             'tor_grade' => 1.25,
         ]);
         $record->setRelation('unit', $unit);
-        $application->setRelation('batch', $batch);
         $application->setRelation('competencyRecords', collect([$record]));
 
         $document = new OfficialDocument([
@@ -311,7 +401,7 @@ class CertificateTemplateController extends Controller
                 'y' => $y,
                 'w' => max(8, min(100 - $x, (float) ($box['w'] ?? 20))),
                 'h' => max(4, min(40, (float) ($box['h'] ?? 6))),
-                'size' => max(7, min(28, (float) ($box['size'] ?? 11))),
+                'size' => max(7, min(42, (float) ($box['size'] ?? 11))),
                 'align' => in_array($box['align'] ?? 'C', ['L', 'C', 'R'], true) ? (string) $box['align'] : 'C',
             ];
         }

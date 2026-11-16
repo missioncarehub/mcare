@@ -23,6 +23,7 @@ class CertificateTemplate extends Model
 
     protected $fillable = [
         'type',
+        'training_program_id',
         'version',
         'is_active',
         'title',
@@ -45,11 +46,17 @@ class CertificateTemplate extends Model
     protected function casts(): array
     {
         return [
+            'training_program_id' => 'integer',
             'version' => 'integer',
             'is_active' => 'boolean',
             'use_official_artwork' => 'boolean',
             'field_layout' => 'array',
         ];
+    }
+
+    public function trainingProgram(): BelongsTo
+    {
+        return $this->belongsTo(TrainingProgram::class, 'training_program_id');
     }
 
     public function createdBy(): BelongsTo
@@ -71,14 +78,28 @@ class CertificateTemplate extends Model
         };
     }
 
-    public static function activeFor(string $type): ?self
+    public static function activeFor(string $type, ?int $trainingProgramId = null): ?self
     {
         if (! in_array($type, self::managedTypes(), true)) {
             return null;
         }
 
+        if ($trainingProgramId) {
+            $programTemplate = static::query()
+                ->where('type', $type)
+                ->where('training_program_id', $trainingProgramId)
+                ->where('is_active', true)
+                ->orderByDesc('version')
+                ->first();
+
+            if ($programTemplate) {
+                return $programTemplate;
+            }
+        }
+
         return static::query()
             ->where('type', $type)
+            ->whereNull('training_program_id')
             ->where('is_active', true)
             ->orderByDesc('version')
             ->first();

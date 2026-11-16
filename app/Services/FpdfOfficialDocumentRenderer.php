@@ -43,7 +43,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
 
     private function renderImported(OfficialDocument $document): ?string
     {
-        $template = CertificateTemplate::activeFor($document->type);
+        $template = CertificateTemplate::activeFor($document->type, $document->application?->training_program_id);
         if (! $template?->usesImportedBackground()) {
             return null;
         }
@@ -78,7 +78,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
     {
         $application = $document->application;
         $organization = config('official_documents.organization', []);
-        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_COTC);
+        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_COTC, $application?->training_program_id);
         $values = CertificateTemplate::placeholderValues($document);
         if ($template && ! $template->usesOfficialArtwork()) {
             return $this->renderManagedCotc($document, $template, $values);
@@ -188,7 +188,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             ->sortBy(fn ($record) => $record->unit?->sort_order)
             ->values();
 
-        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_TOR);
+        $template = CertificateTemplate::activeFor(OfficialDocument::TYPE_TOR, $application?->training_program_id);
         $values = CertificateTemplate::placeholderValues($document);
         $title = $template
             ? CertificateTemplate::replacePlaceholders((string) $template->title, $values)

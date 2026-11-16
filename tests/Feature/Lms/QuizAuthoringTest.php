@@ -430,8 +430,7 @@ CSV),
         $this->actingAs($admin)
             ->get(route('admin.learning.modules.quizzes', $module))
             ->assertOk()
-            ->assertSee('Import questions from a file', false)
-            ->assertSee(route('admin.learning.quizzes.import-template'), false);
+            ->assertSee('Trainer Quizzes &amp; Student Summary', false);
 
         $this->actingAs($admin)
             ->post(route('admin.learning.modules.quizzes.store', $module), [

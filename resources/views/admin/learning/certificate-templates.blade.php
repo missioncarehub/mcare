@@ -6,13 +6,44 @@
         <div>
             <p class="dashboard-section-kicker">Training records</p>
             <h1 class="dashboard-section-title mt-2 text-3xl">Certificate templates</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the templates used for the next COTC and transcript (TOR). Manage a template only when you want to change its wording, signatories, or design.</p>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                Manage dynamic certificate templates per program. Each course (e.g. Caregiving NC II) can have its own unique certificate design and layout.
+            </p>
         </div>
         <a href="{{ route('admin.learning.certificates') }}" class="secondary-action">Back to Training Records</a>
     </header>
 
     @if (session('saved'))
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('saved') }}</div>
+    @endif
+
+    {{-- Program Selector Bar --}}
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Program Certificate Designs</span>
+                <p class="mt-0.5 text-xs text-slate-600">Select a specific training program below to upload and configure its unique certificate template:</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+                <a href="{{ route('admin.learning.certificate-templates') }}" 
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all {{ is_null($selectedProgramId) ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    General Default
+                </a>
+                @foreach ($programs as $prog)
+                    <a href="{{ route('admin.learning.certificate-templates', ['program_id' => $prog->id]) }}" 
+                       class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all {{ $selectedProgramId === $prog->id ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                        {{ $prog->name }}
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    @if($selectedProgram)
+        <div class="rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+            <p class="text-xs font-bold uppercase tracking-wider text-purple-900">Active Program: {{ $selectedProgram->name }} ({{ $selectedProgram->code }})</p>
+            <p class="mt-1 text-xs text-purple-700">Any template configured and activated here will be exclusively used when generating completion documents for graduates of {{ $selectedProgram->name }}.</p>
+        </div>
     @endif
 
     <div class="grid gap-6 lg:grid-cols-2">
@@ -22,7 +53,7 @@
             $defaults = $section['defaults'];
             $label = \App\Models\CertificateTemplate::label($type);
             $heading = match ($label) {
-                'COTC' => 'Certificate of Training Completion',
+                'COTC' => ($selectedProgram ? $selectedProgram->name.' — ' : '').'Certificate of Training Completion',
                 default => 'Transcript of Records',
             };
             $usingOld = old('type') === $type;
@@ -56,7 +87,7 @@
             $organization = config('official_documents.organization', []);
             $sampleValues = [
                 'trainee_name' => 'Sample Graduate',
-                'program' => 'Caregiving NC II',
+                'program' => $selectedProgram?->name ?? 'Caregiving NC II',
                 'batch' => 'Batch 1 2026',
                 'schedule' => 'MWF | 8:00 AM - 12:00 PM',
                 'payment_status' => 'Fully paid',
@@ -71,13 +102,20 @@
             $usesImport = $savedBackground !== '' || $backgroundIsPdf;
             $templateState = ! $active
                 ? 'Default official template'
-                : ($usesImport ? 'Imported template · Version '.$active->version : 'Active template · Version '.$active->version);
+                : ($usesImport ? 'Custom Template · Version '.$active->version : 'Active Template · Version '.$active->version);
         @endphp
-        <article class="dashboard-panel flex flex-col">
-            <p class="dashboard-section-kicker">{{ $label }}</p>
+        <article class="dashboard-panel flex flex-col shadow-sm">
+            <div class="flex items-center justify-between">
+                <p class="dashboard-section-kicker">{{ $label }}</p>
+                @if($selectedProgram)
+                    <span class="rounded bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">{{ $selectedProgram->code }}</span>
+                @else
+                    <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">Default Global</span>
+                @endif
+            </div>
             <h2 class="mt-1 text-xl font-bold text-slate-950">{{ $heading }}</h2>
             <p class="mt-1 text-sm text-slate-600">{{ $templateState }}</p>
-            <div class="relative mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white" @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif>
+            <div class="relative mt-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50" @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif>
                 @if ($savedBackground !== '')
                     <img src="{{ $savedBackground }}" alt="Active {{ $label }} template" class="h-full w-full object-contain">
                 @elseif ($backgroundIsPdf)
@@ -104,7 +142,7 @@
                         <p class="mt-2 line-clamp-3 text-[9px] leading-4 text-slate-700">{{ $previewBody }}</p>
                         <div class="mt-3 space-y-1 text-left text-[9px]">
                             <p><span class="font-bold">Trainee</span> Name of the Student</p>
-                            <p><span class="font-bold">Program</span> Caregiving NC II</p>
+                            <p><span class="font-bold">Program</span> {{ $selectedProgram?->name ?? 'Caregiving NC II' }}</p>
                             <p><span class="font-bold">Payment status</span> Fully paid</p>
                         </div>
                         <p class="mt-auto pt-3 text-[9px] font-bold">{{ $field('signatory_name') ?: 'Registrar' }}</p>
@@ -114,7 +152,9 @@
             </div>
             @php $pendingImport = $section['history']->first(fn ($version) => filled($version->background_path) && ! $version->is_active); @endphp
             <div class="mt-4 flex flex-col gap-2">
-                <a href="{{ route('admin.learning.certificate-templates.edit', $type) }}" class="primary-action">Manage template</a>
+                <a href="{{ $selectedProgramId ? route('admin.learning.certificate-templates.edit', ['type' => $type, 'program_id' => $selectedProgramId]) : route('admin.learning.certificate-templates.edit', $type) }}" class="primary-action">
+                    Manage template
+                </a>
                 @if ($pendingImport)
                     <form method="POST" action="{{ route('admin.learning.certificate-templates.activate', $pendingImport) }}">
                         @csrf
@@ -123,7 +163,7 @@
                     </form>
                 @endif
                 @if ($active)
-                    <form method="POST" action="{{ route('admin.learning.certificate-templates.destroy', $active) }}" onsubmit="return confirm('Delete this saved template? The official layout is used again when no saved version remains.');">
+                    <form method="POST" action="{{ route('admin.learning.certificate-templates.destroy', $active) }}" onsubmit="return confirm('Delete this saved template? The default layout will be used when no saved version remains.');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="secondary-action w-full border-red-200 text-red-700 hover:bg-red-50">Delete saved template</button>
