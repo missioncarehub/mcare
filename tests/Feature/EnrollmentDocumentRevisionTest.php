@@ -137,6 +137,43 @@ class EnrollmentDocumentRevisionTest extends TestCase
         Notification::assertSentTo($applicant, EnrollmentDocumentsReviseRequestedNotification::class);
     }
 
+    public function test_save_review_does_not_complete_an_all_accepted_review(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $applicant = User::factory()->create(['role' => 'applicant']);
+        $application = $this->revisionApplication($applicant, [
+            'birth-certificate' => ['status' => 'accepted', 'note' => null],
+            'education-document' => ['status' => 'accepted', 'note' => null],
+            'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+            'id-photo' => ['status' => 'accepted', 'note' => null],
+            'signature' => ['status' => 'accepted', 'note' => null],
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.enrollments.documents.review', $application), [
+                'review_action' => 'save',
+                'documents' => [
+                    'birth-certificate' => ['status' => 'accepted', 'note' => null],
+                    'education-document' => ['status' => 'accepted', 'note' => null],
+                    'good-moral-certificate' => ['status' => 'accepted', 'note' => null],
+                    'id-photo' => ['status' => 'accepted', 'note' => null],
+                    'signature' => ['status' => 'accepted', 'note' => null],
+                ],
+            ])
+            ->assertRedirect(route('admin.enrollments.document-review', $application))
+            ->assertSessionHas('saved', fn (string $message): bool => str_contains($message, 'Complete document review'));
+
+        $application->refresh();
+        $this->assertNull($application->documents_reviewed_at);
+        $this->assertNull($application->documents_reviewed_by_id);
+
+        $this->actingAs($admin)
+            ->get(route('admin.enrollments.document-review', $application))
+            ->assertOk()
+            ->assertSee('All verified')
+            ->assertSee('Complete document review');
+    }
+
     public function test_signed_revision_link_shows_only_documents_marked_for_replacement(): void
     {
         $applicant = User::factory()->create(['role' => 'applicant']);

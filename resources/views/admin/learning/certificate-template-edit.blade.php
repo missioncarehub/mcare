@@ -21,7 +21,6 @@
             $label = \App\Models\CertificateTemplate::label($type);
             $heading = match ($label) {
                 'COTC' => 'Certificate of Training Completion',
-                'COR' => 'Certificate of Registration',
                 default => 'Transcript of Records',
             };
             $usingOld = old('type') === $type;
@@ -62,7 +61,7 @@
                 'payment_status' => 'Fully paid',
                 'completion_date' => now()->format('F j, Y'),
                 'generation_date' => now()->format('F j, Y'),
-                'certificate_no' => 'COR-SAMPLE',
+                'certificate_no' => 'CERT-SAMPLE',
                 'enrollment_id' => 'MCE-2026-SAMPLE',
                 'organization' => (string) ($organization['name'] ?? 'Mission Care Training Center'),
             ];
@@ -125,6 +124,11 @@
                             <option value="portrait" @selected($field('orientation') === 'portrait')>Portrait</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="checkbox" id="activate-immediately" name="activate_immediately" value="1" class="rounded border-slate-300 text-purple-600 focus:ring-purple-500" checked>
+                    <label for="activate-immediately" class="text-xs font-semibold text-slate-700">Set as active template immediately for newly generated certificates</label>
                 </div>
 
                 <button type="submit" class="primary-action">Save imported template</button>

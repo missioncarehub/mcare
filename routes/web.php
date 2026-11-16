@@ -569,6 +569,12 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::patch('/learning/quizzes/{quiz}', [TrainerQuizController::class, 'update'])
                     ->middleware(['permission:quizzes.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.quizzes.update');
+                Route::get('/learning/quizzes/{quiz}/results', [AdminQuizController::class, 'results'])
+                    ->middleware(['permission:quizzes.manage', 'permission:grades.view'])
+                    ->name('learning.quizzes.results');
+                Route::get('/learning/quizzes/{quiz}/attempts/{attempt}/download/{question}', [AdminQuizController::class, 'downloadAttemptSubmission'])
+                    ->middleware(['permission:quizzes.manage', 'permission:grades.view'])
+                    ->name('learning.quizzes.attempts.download');
                 Route::get('/learning/certificates', [CertificationController::class, 'index'])
                     ->middleware('permission:official-documents.manage')
                     ->name('learning.certificates');
@@ -901,6 +907,12 @@ Route::middleware('throttle:global-web')->group(function () {
                     Route::post('/payments/tickets', [TraineeDashboardController::class, 'generateOnsiteTicket'])
                         ->middleware(['permission:payments.view', 'throttle:sensitive-mutation'])
                         ->name('payments.tickets.store');
+                    Route::post('/payments/checkout', [TraineeDashboardController::class, 'checkout'])
+                        ->middleware(['permission:payments.view', 'throttle:6,1'])
+                        ->name('payments.checkout');
+                    Route::get('/payments/return', [TraineeDashboardController::class, 'returnFromCheckout'])
+                        ->middleware(['permission:payments.view', 'throttle:20,1'])
+                        ->name('payments.return');
                     Route::post('/payments/upload-proof', [TraineeDashboardController::class, 'uploadPaymentProof'])
                         ->middleware(['permission:payments.view', 'throttle:sensitive-mutation'])
                         ->name('payments.upload-proof');

@@ -63,10 +63,13 @@ class EnrollmentLifecycleVisibilityTest extends TestCase
         ]);
 
         $this->withSession([
-            'enrollment.admission_application_id' => $this->makeApprovedAdmission()->id,
+            'enrollment.admission_application_id' => $this->makeApprovedAdmission([
+                'training_program_id' => $program->id,
+                'program' => $program->name,
+            ])->id,
         ])->get(route('enrollment.create', ['batch' => $publishedBatch->id]))
             ->assertOk()
-            ->assertSee('Available active batches')
+            ->assertSee('Choose a batch')
             ->assertSee('Caregiving NC III')
             ->assertSee('Advanced Batch Alpha')
             ->assertSee('Required downpayment: ₱3,500.00')

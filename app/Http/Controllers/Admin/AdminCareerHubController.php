@@ -16,7 +16,9 @@ use App\Services\SemaphoreSmsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AdminCareerHubController extends Controller
@@ -96,7 +98,7 @@ class AdminCareerHubController extends Controller
             'sms_mode' => $opportunity->sms_mode,
         ]);
 
-        return back()->with('saved', $this->afterSave($opportunity, $shouldPublish, publishedNow: $shouldPublish));
+        return redirect()->route('admin.learning.alumni-jobs')->with('saved', $this->afterSave($opportunity, $shouldPublish, publishedNow: $shouldPublish));
     }
 
     public function update(Request $request, CareerOpportunity $careerOpportunity): RedirectResponse
@@ -132,7 +134,7 @@ class AdminCareerHubController extends Controller
             'published' => $careerOpportunity->is_published,
         ]);
 
-        return back()->with('saved', $this->afterSave(
+        return redirect()->route('admin.learning.alumni-jobs')->with('saved', $this->afterSave(
             $careerOpportunity,
             $shouldPublish,
             publishedNow: ! $wasPublished && $shouldPublish,
@@ -150,12 +152,12 @@ class AdminCareerHubController extends Controller
 
         $careerOpportunity->delete();
 
-        return back()->with('saved', "{$label} was removed.");
+        return redirect()->route('admin.learning.alumni-jobs')->with('saved', "{$label} was removed.");
     }
 
     public function updateInquiry(Request $request, CareerInquiry $careerInquiry): RedirectResponse
     {
-        $validated = $request->validate([
+        $validated = $this->validateReview($request, [
             'status' => ['required', Rule::in(array_keys(CareerInquiry::statuses()))],
             'admin_notes' => ['nullable', 'string', 'max:1000', 'not_regex:/[<>]/u'],
         ]);
@@ -207,9 +209,11 @@ class AdminCareerHubController extends Controller
             $this->notifyCareerDecision($careerInquiry, 'rejected', $request->user());
         }
 
-        return back()->with('saved', $filledOpening
-            ? 'Inquiry approved. The posting is closed and other pending applicants were marked not selected.'
-            : 'Inquiry for '.$careerInquiry->opportunity?->listingTitle().' was updated.');
+        $decision = strtolower(CareerInquiry::statuses()[$careerInquiry->status]);
+        $title = $careerInquiry->opportunity?->listingTitle() ?: 'this career';
+
+        return redirect($this->reviewUrl($request))
+            ->with('saved', 'Application for '.$title.' was marked '.$decision.'.');
     }
 
     private function fillCareerOpening(CareerInquiry $approved, User $admin): void
@@ -259,7 +263,11 @@ class AdminCareerHubController extends Controller
             : 'The opening for '.$career.' was filled. Your application was not selected.';
 
         if ($graduate) {
-            $graduate->notify(new CareerApplicationDecided($inquiry, $decision));
+            try {
+                $graduate->notify(new CareerApplicationDecided($inquiry, $decision));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         }
 
         $number = $inquiry->contact_number
@@ -286,7 +294,7 @@ class AdminCareerHubController extends Controller
 
         $careerInquiry->delete();
 
-        return back()->with('saved', 'Inquiry for '.$label.' was removed.');
+        return redirect($this->reviewUrl($request))->with('saved', 'Inquiry for '.$label.' was removed.');
     }
 
     public function credential(Request $request, CareerInquiry $careerInquiry, int $index)
@@ -320,7 +328,7 @@ class AdminCareerHubController extends Controller
     {
         abort_unless($careerInquiry->certificateIsPendingReview(), 404);
 
-        $validated = $request->validate([
+        $validated = $this->validateReview($request, [
             'certificate_status' => ['required', Rule::in([
                 CareerInquiry::CERT_APPROVED,
                 CareerInquiry::CERT_REJECTED,
@@ -351,7 +359,28 @@ class AdminCareerHubController extends Controller
             ? 'Placement certificate approved. This career is now awarded in the alumni career history.'
             : 'Placement certificate was returned to the alumni for resubmission.';
 
-        return back()->with('saved', $message);
+        return redirect($this->reviewUrl($request))->with('saved', $message);
+    }
+
+    private function reviewUrl(Request $request): string
+    {
+        $lastPage = max(1, (int) ceil(CareerInquiry::query()->count() / 8));
+        $page = min($lastPage, max(1, $request->integer('inquiry_page', 1)));
+
+        return route('admin.learning.alumni-jobs', $page > 1 ? ['inquiry_page' => $page] : []);
+    }
+
+    /** @param array<string, mixed> $rules */
+    private function validateReview(Request $request, array $rules): array
+    {
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            throw (new ValidationException($validator))
+                ->redirectTo($this->reviewUrl($request));
+        }
+
+        return $validator->validated();
     }
 
     /** @return array<string, mixed> */
@@ -455,7 +484,7 @@ class AdminCareerHubController extends Controller
 
         if ($sms['delivered'] && $sms['sent'] > 0) {
             $audience = $opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE ? 'senior alumni' : 'alumni';
-            $note = 'SMS sent to '.$sms['sent'].' '.$audience.'.';
+            $note = 'Semaphore accepted SMS for '.$sms['sent'].' '.$audience.'.';
 
             return $sms['skipped'] > 0
                 ? $note.' '.$sms['skipped'].' '.$audience.' had no valid contact number.'
@@ -464,6 +493,10 @@ class AdminCareerHubController extends Controller
 
         if ($sms['delivered']) {
             return 'No graduate contact numbers were available for SMS.';
+        }
+
+        if ($opportunity->smsNeedsReconciliation()) {
+            return 'SMS submission status is unknown. Check Semaphore message history before resending.';
         }
 
         if (filled($opportunity->sms_last_error)) {

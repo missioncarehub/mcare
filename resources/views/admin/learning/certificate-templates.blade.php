@@ -6,7 +6,7 @@
         <div>
             <p class="dashboard-section-kicker">Training records</p>
             <h1 class="dashboard-section-title mt-2 text-3xl">Certificate templates</h1>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the templates used for the next COTC, transcript, and Certificate of Registration. Manage a template only when you want to change its wording, signatories, or design.</p>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These are the templates used for the next COTC and transcript (TOR). Manage a template only when you want to change its wording, signatories, or design.</p>
         </div>
         <a href="{{ route('admin.learning.certificates') }}" class="secondary-action">Back to Training Records</a>
     </header>
@@ -15,7 +15,7 @@
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('saved') }}</div>
     @endif
 
-    <div class="grid gap-6 lg:grid-cols-3">
+    <div class="grid gap-6 lg:grid-cols-2">
     @foreach ($sections as $type => $section)
         @php
             $active = $section['active'];
@@ -23,7 +23,6 @@
             $label = \App\Models\CertificateTemplate::label($type);
             $heading = match ($label) {
                 'COTC' => 'Certificate of Training Completion',
-                'COR' => 'Certificate of Registration',
                 default => 'Transcript of Records',
             };
             $usingOld = old('type') === $type;
@@ -63,7 +62,7 @@
                 'payment_status' => 'Fully paid',
                 'completion_date' => now()->format('F j, Y'),
                 'generation_date' => now()->format('F j, Y'),
-                'certificate_no' => 'COR-SAMPLE',
+                'certificate_no' => 'CERT-SAMPLE',
                 'enrollment_id' => 'MCE-2026-SAMPLE',
                 'organization' => (string) ($organization['name'] ?? 'Mission Care Training Center'),
             ];

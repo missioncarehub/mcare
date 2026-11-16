@@ -393,6 +393,8 @@ class EnrollmentReviewController extends Controller
 
         $review = $this->validatedDocumentReview($request, $enrollmentApplication);
         $saveOnly = $request->input('review_action') === 'save';
+        $previousReview = $enrollmentApplication->document_review ?? [];
+        $reviewWasComplete = $enrollmentApplication->documents_reviewed_at !== null;
 
         $enrollmentApplication->forceFill([
             'document_review' => $review,
@@ -400,17 +402,38 @@ class EnrollmentReviewController extends Controller
 
         $pending = $this->pendingDocumentApprovals($enrollmentApplication);
 
+        if ($saveOnly) {
+            // Saving is not the same action as completing the review. Preserve
+            // an existing completion only when the accepted review is unchanged.
+            if ($pending !== [] || $previousReview !== $review || ! $reviewWasComplete) {
+                $enrollmentApplication->forceFill([
+                    'documents_reviewed_at' => null,
+                    'documents_reviewed_by_id' => null,
+                ]);
+            }
+
+            $enrollmentApplication->save();
+
+            AdminActivityLog::record($request->user(), 'enrollment.documents.review.saved', $enrollmentApplication, [
+                'applicant_email' => $enrollmentApplication->email,
+                'review' => $review,
+                'pending_documents' => $pending,
+            ]);
+
+            $notice = $pending === []
+                ? 'Document statuses saved. Select Complete document review when you are ready to record completion.'
+                : 'Document statuses saved. Accept every required document before completing the review; you can email revision requests for files marked Needs replacement.';
+
+            return redirect()
+                ->route('admin.enrollments.document-review', $enrollmentApplication)
+                ->with('saved', $notice);
+        }
+
         if ($pending !== []) {
             $enrollmentApplication->forceFill([
                 'documents_reviewed_at' => null,
                 'documents_reviewed_by_id' => null,
             ])->save();
-
-            if ($saveOnly) {
-                return redirect()
-                    ->route('admin.enrollments.document-review', $enrollmentApplication)
-                    ->with('saved', 'Document statuses saved. Needs replacement stays selected, and you can email the revision request next.');
-            }
 
             $message = 'Document review cannot be completed while required documents are pending: '.implode(', ', $pending).'. Accept every required document first.';
 

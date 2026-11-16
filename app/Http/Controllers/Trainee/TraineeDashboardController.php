@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Trainee;
 
+use App\Exceptions\PayMongoCheckoutException;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\AdminAnnouncement;
@@ -22,6 +23,8 @@ use App\Services\CompletionEligibilityService;
 use App\Services\LearningPdfWatermark;
 use App\Services\ModuleAssessmentService;
 use App\Services\ModuleSubmoduleService;
+use App\Services\OfficialReceiptNumberGenerator;
+use App\Services\PayMongoCheckoutService;
 use App\Services\TraineeClassworkSequence;
 use App\Services\TrainingCalendarService;
 use Illuminate\Http\RedirectResponse;
@@ -326,6 +329,236 @@ class TraineeDashboardController extends Controller
         return redirect()
             ->route('trainee.payments')
             ->with('saved', $message);
+    }
+
+    public function checkout(Request $request, PayMongoCheckoutService $payMongo): RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        abort_unless($application, 403);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
+            'transaction_type' => ['required', Rule::in(['downpayment', 'installment', 'balance_settlement'])],
+        ]);
+
+        $remainingBalance = $application->remainingBalance();
+
+        if ($application->payment_status === EnrollmentApplication::PAYMENT_PAID || $remainingBalance <= 0) {
+            return redirect()
+                ->route('trainee.payments')
+                ->with('payment_notice', 'Your program tuition is already fully paid. No further payments are required.');
+        }
+
+        if (! $payMongo->ready()) {
+            return redirect()
+                ->route('trainee.payments')
+                ->withErrors([
+                    'payment' => 'Online payment via PayMongo is currently not configured or unavailable. Please configure PAYMONGO_SECRET_KEY in .env or generate an On-Site Payment Ticket.',
+                ]);
+        }
+
+        $amount = round((float) $validated['amount'], 2);
+
+        if ($amount > $remainingBalance) {
+            throw ValidationException::withMessages([
+                'amount' => 'The payment amount cannot exceed your remaining balance of PHP '.number_format($remainingBalance, 2).'.',
+            ]);
+        }
+
+        $fixedAmount = match ($validated['transaction_type']) {
+            'downpayment' => min(
+                (float) ($application->downpayment_amount ?? 2000.00),
+                $remainingBalance,
+            ),
+            'balance_settlement' => $remainingBalance,
+            default => null,
+        };
+
+        if ($fixedAmount !== null && abs($amount - $fixedAmount) > 0.009) {
+            $amount = $fixedAmount;
+        }
+
+        $typeLabel = match ($validated['transaction_type']) {
+            'downpayment' => 'Downpayment',
+            'balance_settlement' => 'Full Balance Settlement',
+            default => 'Tuition Installment',
+        };
+
+        $merchantRef = $this->uniqueOnlineReference();
+        $amountMinor = (int) round($amount * 100);
+
+        $attempt = PaymentAttempt::create([
+            'enrollment_application_id' => $application->id,
+            'provider' => 'paymongo',
+            'merchant_reference' => $merchantRef,
+            'idempotency_key' => (string) Str::uuid(),
+            'amount_minor' => $amountMinor,
+            'currency' => 'PHP',
+            'status' => PaymentAttempt::STATUS_CREATING,
+            'livemode' => $payMongo->isLiveMode(),
+            'meta' => [
+                'created_for' => $validated['transaction_type'],
+                'amount' => $amount,
+                'created_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        $title = 'MCARE Caregiving NC II - '.$typeLabel;
+        $description = $typeLabel.' payment (PHP '.number_format($amount, 2).') for '.$application->first_name.' '.$application->last_name;
+
+        $payload = $payMongo->buildCheckoutPayload(
+            $attempt,
+            $application,
+            title: $title,
+            description: $description,
+            successUrl: route('trainee.payments.return'),
+            cancelUrl: route('trainee.payments'),
+        );
+
+        $attempt->forceFill([
+            'meta' => array_merge($attempt->meta ?? [], [
+                'checkout_payload' => $payload,
+                'checkout_payload_sha256' => hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)),
+            ]),
+        ])->save();
+
+        try {
+            $checkout = $payMongo->createCheckout($attempt);
+        } catch (PayMongoCheckoutException $exception) {
+            $attempt->forceFill([
+                'status' => PaymentAttempt::STATUS_FAILED,
+                'meta' => array_merge($attempt->meta ?? [], [
+                    'failure_reason' => $exception->getMessage(),
+                ]),
+            ])->save();
+
+            return redirect()
+                ->route('trainee.payments')
+                ->withErrors([
+                    'payment' => 'Secure PayMongo checkout could not be initiated: '.$exception->getMessage(),
+                ]);
+        }
+
+        $attempt->forceFill([
+            'provider_checkout_id' => $checkout['checkout_id'],
+            'checkout_url' => $checkout['checkout_url'],
+            'status' => PaymentAttempt::STATUS_PENDING,
+        ])->save();
+
+        $application->forceFill([
+            'payment_method' => 'online',
+            'payment_reference' => $merchantRef,
+            'paymongo_checkout_reference' => $checkout['checkout_id'],
+            'paymongo_checkout_url' => $checkout['checkout_url'],
+        ])->save();
+
+        AdminActivityLog::record($request->user(), 'trainee.payment.checkout_started', $application, [
+            'amount' => $amount,
+            'checkout_id' => $checkout['checkout_id'],
+            'transaction_type' => $validated['transaction_type'],
+        ]);
+
+        return redirect()->away($checkout['checkout_url']);
+    }
+
+    public function returnFromCheckout(Request $request, PayMongoCheckoutService $payMongo): RedirectResponse
+    {
+        $application = $this->approvedApplicationFor($request);
+        abort_unless($application, 403);
+
+        $checkoutId = $application->paymongo_checkout_reference;
+
+        if (! is_string($checkoutId) || ! str_starts_with($checkoutId, 'cs_')) {
+            return redirect()
+                ->route('trainee.payments')
+                ->with('payment_notice', 'No active PayMongo checkout session found.');
+        }
+
+        try {
+            $session = $payMongo->retrieveCheckout($checkoutId);
+        } catch (PayMongoCheckoutException $e) {
+            return redirect()
+                ->route('trainee.payments')
+                ->withErrors(['payment' => 'Could not verify PayMongo checkout session. If your payment succeeded, it will be credited automatically.']);
+        }
+
+        $payment = $session ? $payMongo->paidPaymentFrom($session['attributes'] ?? []) : null;
+
+        if (! $session || ! $payment) {
+            return redirect()
+                ->route('trainee.payments')
+                ->with('payment_notice', 'You returned from PayMongo. The payment is not yet verified or was not completed.');
+        }
+
+        $paidAt = now();
+        $attempt = PaymentAttempt::query()
+            ->where('enrollment_application_id', $application->id)
+            ->where('provider_checkout_id', $session['checkout_id'])
+            ->first();
+
+        if ($attempt && $attempt->status !== PaymentAttempt::STATUS_PAID) {
+            $attempt->forceFill([
+                'provider_payment_id' => $payment['id'],
+                'provider_payment_intent_id' => $payment['payment_intent_id'] ?? null,
+                'status' => PaymentAttempt::STATUS_PAID,
+                'paid_at' => $paidAt,
+            ])->save();
+        }
+
+        $amount = round(($payment['amount'] ?? 0) / 100, 2);
+        if ($amount <= 0 && $attempt) {
+            $amount = round($attempt->amount_minor / 100, 2);
+        }
+
+        $purpose = $attempt?->meta['created_for'] ?? 'installment';
+        $txType = match ($purpose) {
+            'downpayment' => PaymentTransaction::TYPE_DOWNPAYMENT,
+            'balance_settlement' => PaymentTransaction::TYPE_BALANCE,
+            default => PaymentTransaction::TYPE_INSTALLMENT,
+        };
+
+        $orNumber = app(OfficialReceiptNumberGenerator::class)->generate();
+
+        PaymentTransaction::firstOrCreate([
+            'enrollment_application_id' => $application->id,
+            'payment_channel' => PaymentTransaction::CHANNEL_ONLINE,
+            'reference_number' => $payment['id'],
+        ], [
+            'user_id' => $application->user_id,
+            'transaction_type' => $txType,
+            'amount' => $amount,
+            'or_number' => $orNumber,
+            'status' => PaymentTransaction::STATUS_VERIFIED,
+            'paid_at' => $paidAt,
+            'verified_at' => $paidAt,
+            'notes' => 'Online payment of ₱'.number_format($amount, 2).' verified via PayMongo (Payment ID: '.$payment['id'].').',
+        ]);
+
+        $application->refresh();
+        $application->recalculatePaymentStatus();
+
+        AdminActivityLog::record($request->user(), 'trainee.payment.online_verified', $application, [
+            'amount' => $amount,
+            'payment_id' => $payment['id'],
+            'checkout_id' => $session['checkout_id'],
+        ]);
+
+        return redirect()
+            ->route('trainee.payments')
+            ->with('saved', 'Online payment of ₱'.number_format($amount, 2).' via PayMongo confirmed successfully! Your payment ledger has been updated.');
+    }
+
+    private function uniqueOnlineReference(): string
+    {
+        do {
+            $ref = 'MCARE-ONL-'.now()->format('ymd').'-'.Str::upper(Str::random(6));
+        } while (
+            PaymentAttempt::query()->where('merchant_reference', $ref)->exists()
+            || PaymentTransaction::query()->where('reference_number', $ref)->exists()
+            || EnrollmentApplication::query()->where('payment_reference', $ref)->exists()
+        );
+
+        return $ref;
     }
 
     public function uploadPaymentProof(Request $request): RedirectResponse

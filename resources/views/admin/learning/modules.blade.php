@@ -18,6 +18,7 @@
     $activeTab = $activeTab ?? 'modules';
     $isUnitsTab = $activeTab === 'units';
     $isOutcomesTab = $activeTab === 'outcomes';
+    $isSubmissionsTab = $activeTab === 'submissions';
     $selectedOutcomeUnitId = (string) old('competency_unit_id', $editingOutcome?->competency_unit_id ?? ($filters['unit_id'] ?? ''));
 @endphp
 <section class="space-y-6">
@@ -27,6 +28,8 @@
                 Add, edit, or delete Caregiving NC II competency units. Selectable units appear when trainers create classwork.
             @elseif ($isOutcomesTab)
                 Add, edit, or delete learning outcomes for each unit. These titles become suggested submodules in classwork.
+            @elseif ($isSubmissionsTab)
+                Monitor and review all graded quiz attempts submitted by trainees across all batches and learning modules.
             @else
                 Upload Caregiving NC II core modules on behalf of a trainer, assign them to specific batches, and manage learning codes and subtopics.
             @endif
@@ -35,15 +38,18 @@
             <button type="button" class="primary-action" data-dashboard-dialog-open="admin-preset-dialog">Add unit</button>
         @elseif ($isOutcomesTab)
             <button type="button" class="primary-action" data-dashboard-dialog-open="admin-outcome-dialog">Add outcome</button>
+        @elseif ($isSubmissionsTab)
+            <a href="{{ route('admin.learning.modules') }}" class="secondary-action">Back to learning modules</a>
         @else
             <button type="button" class="primary-action" data-dashboard-dialog-open="admin-module-dialog"><x-dashboard-icon name="plus" class="h-4 w-4" />Add module</button>
         @endif
     </header>
 
     <nav class="lms-context-tabs" aria-label="LMS module sections">
-        <a href="{{ route('admin.learning.modules') }}" class="{{ $isUnitsTab || $isOutcomesTab ? '' : 'is-active' }}" @unless($isUnitsTab || $isOutcomesTab) aria-current="page" @endunless>Learning modules</a>
+        <a href="{{ route('admin.learning.modules') }}" class="{{ ! $isUnitsTab && ! $isOutcomesTab && ! $isSubmissionsTab ? 'is-active' : '' }}" @if(! $isUnitsTab && ! $isOutcomesTab && ! $isSubmissionsTab) aria-current="page" @endif>Learning modules</a>
         <a href="{{ route('admin.learning.modules', ['tab' => 'units']) }}" class="{{ $isUnitsTab ? 'is-active' : '' }}" @if($isUnitsTab) aria-current="page" @endif>Units</a>
         <a href="{{ route('admin.learning.modules', ['tab' => 'outcomes']) }}" class="{{ $isOutcomesTab ? 'is-active' : '' }}" @if($isOutcomesTab) aria-current="page" @endif>Outcomes</a>
+        <a href="{{ route('admin.learning.modules', ['tab' => 'submissions']) }}" class="{{ $isSubmissionsTab ? 'is-active' : '' }}" @if($isSubmissionsTab) aria-current="page" @endif>Quiz submissions</a>
     </nav>
 
     @if ($isUnitsTab)
@@ -295,7 +301,185 @@
         ])
     </dialog>
 
-    @unless ($isUnitsTab || $isOutcomesTab)
+    @if ($isSubmissionsTab)
+    <section class="space-y-6" aria-labelledby="submissions-hub-title">
+        <!-- Summary KPI Cards -->
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Submissions</span>
+                <strong class="mt-2 block text-2xl font-bold text-slate-900">{{ number_format($submissionsSummary['total'] ?? 0) }}</strong>
+                <small class="text-xs text-slate-500">Graded attempts across all quizzes</small>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Average Score</span>
+                <strong class="mt-2 block text-2xl font-bold text-sky-950">{{ ($submissionsSummary['average'] ?? null) !== null ? number_format((float) $submissionsSummary['average'], 1).'%' : '—' }}</strong>
+                <small class="text-xs text-slate-500">Overall cohort performance</small>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Passed</span>
+                <strong class="mt-2 block text-2xl font-bold text-emerald-950">{{ number_format($submissionsSummary['passed'] ?? 0) }}</strong>
+                <small class="text-xs text-slate-500">{{ ($submissionsSummary['total'] ?? 0) > 0 ? number_format((($submissionsSummary['passed'] ?? 0) / $submissionsSummary['total']) * 100, 1) : 0 }}% pass rate</small>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-rose-700">Needs Review / Failed</span>
+                <strong class="mt-2 block text-2xl font-bold text-rose-950">{{ number_format($submissionsSummary['failed'] ?? 0) }}</strong>
+                <small class="text-xs text-slate-500">Below passing threshold</small>
+            </article>
+        </div>
+
+        <!-- Filter Bar -->
+        <form method="GET" action="{{ route('admin.learning.modules') }}" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-4">
+            <input type="hidden" name="tab" value="submissions">
+            <div class="md:col-span-2">
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Search student or quiz</label>
+                <input name="search" value="{{ $filters['search'] ?? '' }}" class="form-field" placeholder="Search by trainee name, email, or quiz title...">
+            </div>
+            <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Batch</label>
+                <select name="batch_id" class="form-field">
+                    <option value="">All batches</option>
+                    @foreach($batches as $batch)
+                        <option value="{{ $batch->id }}" @selected((int)($filters['batch_id'] ?? 0) === $batch->id)>{{ $batch->name }} {{ $batch->year }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Result</label>
+                <select name="result" class="form-field">
+                    <option value="">All results</option>
+                    <option value="passed" @selected(($filters['result'] ?? '') === 'passed')>Passed</option>
+                    <option value="failed" @selected(($filters['result'] ?? '') === 'failed')>Failed</option>
+                </select>
+            </div>
+            <div class="flex gap-2 md:col-span-4">
+                <button type="submit" class="primary-action">Filter submissions</button>
+                <a href="{{ route('admin.learning.modules', ['tab' => 'submissions']) }}" class="secondary-action">Reset</a>
+            </div>
+        </form>
+
+        <!-- Submissions Table -->
+        <div class="dashboard-table-wrap overflow-x-auto">
+            <div class="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-slate-950">Submitted Quizzes</h2>
+                    <p class="mt-0.5 text-xs text-slate-500">All student quiz submissions across batches and modules in a single unified view.</p>
+                </div>
+                <span class="text-xs font-semibold text-slate-500">Showing {{ $quizSubmissions->firstItem() ?? 0 }} - {{ $quizSubmissions->lastItem() ?? 0 }} of {{ $quizSubmissions->total() }}</span>
+            </div>
+            <table class="dashboard-table w-full min-w-[64rem]">
+                <thead>
+                    <tr>
+                        <th>Trainee</th>
+                        <th>Quiz &amp; Module</th>
+                        <th>Batch / Trainer</th>
+                        <th>Attempt</th>
+                        <th>Submitted</th>
+                        <th>Score</th>
+                        <th>Result</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($quizSubmissions as $submission)
+                        @php
+                            $user = $submission->application?->user;
+                            $quiz = $submission->quiz;
+                            $module = $quiz?->trainingModule;
+                            $batch = $submission->application?->batch ?? $quiz?->batch;
+                        @endphp
+                        <tr>
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                                        {{ strtoupper(substr($submission->application?->first_name ?? 'T', 0, 1).substr($submission->application?->last_name ?? 'R', 0, 1)) }}
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-slate-950">{{ $submission->application?->first_name }} {{ $submission->application?->last_name }}</p>
+                                        <p class="text-xs text-slate-500">{{ $submission->application?->email ?? $user?->email }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <p class="font-bold text-slate-950">{{ $quiz?->title ?? 'Untitled Quiz' }}</p>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    @if($module?->module_code)
+                                        <span class="rounded bg-purple-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-purple-900 ring-1 ring-purple-300">
+                                            {{ $module->module_code }}
+                                        </span>
+                                    @endif
+                                    <span class="text-xs text-slate-500">{{ $module?->title ?? 'No module' }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <p class="text-xs font-semibold text-slate-900">{{ $batch ? $batch->name.' '.$batch->year : 'General' }}</p>
+                                <p class="mt-0.5 text-xs text-slate-500">Trainer: {{ $quiz?->trainer?->name ?? 'Unassigned' }}</p>
+                            </td>
+                            <td>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                                    #{{ $submission->attempt_number }}
+                                </span>
+                            </td>
+                            <td>
+                                <p class="text-xs text-slate-700">{{ $submission->submitted_at?->format('M d, Y') ?? '—' }}</p>
+                                <p class="text-[11px] text-slate-400">{{ $submission->submitted_at?->format('g:i A') ?? '' }}</p>
+                            </td>
+                            <td>
+                                <p class="text-sm font-bold text-slate-950">{{ $submission->score }} / {{ $submission->total_questions }}</p>
+                                <p class="text-xs text-slate-500">{{ number_format((float) $submission->score_percent, 1) }}%</p>
+                            </td>
+                            <td>
+                                @if($submission->passed)
+                                    <span class="dashboard-pill bg-emerald-50 text-emerald-700 ring-emerald-100">
+                                        Passed
+                                    </span>
+                                @else
+                                    <span class="dashboard-pill bg-rose-50 text-rose-700 ring-rose-100">
+                                        Failed
+                                    </span>
+                                @endif
+                                @php
+                                    $submittedFiles = collect($submission->answers ?? [])->filter(fn ($ans) => is_array($ans) && ($ans['type'] ?? null) === 'file');
+                                @endphp
+                                @if($submittedFiles->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @foreach($submittedFiles as $qId => $fileAnswer)
+                                            <a href="{{ route('admin.learning.quizzes.attempts.download', ['quiz' => $quiz, 'attempt' => $submission, 'question' => $qId]) }}"
+                                               class="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+                                               title="{{ $fileAnswer['original_name'] ?? 'Submitted File' }}">
+                                                <x-dashboard-icon name="file-text" class="h-3 w-3" />
+                                                <span>{{ \Illuminate\Support\Str::limit($fileAnswer['original_name'] ?? 'File', 12) }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </td>
+                            <td>
+                                @if($quiz)
+                                    <a href="{{ route('admin.learning.quizzes.results', $quiz) }}" class="secondary-action !min-h-9 !px-3 text-xs">
+                                        View quiz results
+                                    </a>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="py-14 text-center text-slate-500">
+                                No quiz submissions match these filters.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+            @if($quizSubmissions->hasPages())
+                <div class="border-t border-slate-200 px-5 py-4">
+                    {{ $quizSubmissions->links() }}
+                </div>
+            @endif
+        </div>
+    </section>
+    @endif
+
+    @unless ($isUnitsTab || $isOutcomesTab || $isSubmissionsTab)
     <form method="GET" data-auto-filter class="dashboard-panel grid gap-4 md:grid-cols-4">
         <div class="md:col-span-2">
             <label class="mb-2 block text-xs font-bold uppercase text-slate-500">Search module, code, or trainer</label>

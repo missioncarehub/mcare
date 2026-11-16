@@ -32,7 +32,7 @@ class AdminAccountController extends Controller
         $roleFilter = $request->query('role', 'all');
         $search = trim((string) $request->query('search', ''));
         $visibleOperationalAccounts = function ($accounts): void {
-            $accounts->whereIn('role', ['trainer', 'trainee'])
+            $accounts->whereIn('role', ['trainer', 'trainee', 'alumni'])
                 ->orWhere(function ($applicants): void {
                     $applicants->where('role', 'applicant')
                         ->where(function ($eligible): void {
@@ -44,7 +44,7 @@ class AdminAccountController extends Controller
         };
 
         $query = User::query()
-            ->whereIn('role', ['trainer', 'trainee', 'applicant'])
+            ->whereIn('role', ['trainer', 'trainee', 'applicant', 'alumni'])
             ->where($visibleOperationalAccounts)
             ->with(['enrollmentApplication.batch', 'roles', 'alumniProfile'])
             ->when($roleFilter !== 'all' && in_array($roleFilter, ['trainer', 'trainee', 'applicant', 'alumni'], true), function ($q) use ($roleFilter) {

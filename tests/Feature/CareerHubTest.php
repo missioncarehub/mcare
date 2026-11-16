@@ -14,9 +14,12 @@ use App\Notifications\CareerApplicationDecided;
 use App\Notifications\CareerAwarded;
 use App\Notifications\CareerOpportunityPublished;
 use App\Notifications\LmsAnnouncementPublished;
+use App\Services\CareerGraduateNotifier;
 use App\Services\SemaphoreSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -123,7 +126,7 @@ class CareerHubTest extends TestCase
                 'sms_send_immediately' => '1',
             ])
             ->assertRedirect()
-            ->assertSessionHas('saved', 'Career opportunity published and alumni were notified. SMS sent to 1 senior alumni. 1 senior alumni had no valid contact number.');
+            ->assertSessionHas('saved', 'Career opportunity published and alumni were notified. Semaphore accepted SMS for 1 senior alumni. 1 senior alumni had no valid contact number.');
 
         $opportunity = CareerOpportunity::query()->firstOrFail();
         $this->assertSame(CareerOpportunity::SMS_IMMEDIATE, $opportunity->sms_mode);
@@ -850,6 +853,168 @@ class CareerHubTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.alumni.show', User::factory()->create(['role' => 'trainee'])))
             ->assertNotFound();
+    }
+
+    public function test_decisions_return_to_career_hub_after_opening_credentials(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $inquiry = $this->careerReviewInquiry();
+        $path = UploadedFile::fake()->create('credentials.pdf', 20, 'application/pdf')->store('career-credentials', 'local');
+        $inquiry->update(['credential_paths' => [['path' => $path, 'name' => 'credentials.pdf']]]);
+        $attachment = route('admin.learning.alumni-jobs.inquiries.credential', [$inquiry, 0]);
+        $hub = route('admin.learning.alumni-jobs');
+
+        foreach ([CareerInquiry::STATUS_APPROVED, CareerInquiry::STATUS_REJECTED] as $status) {
+            $this->actingAs($admin)->get($attachment)->assertOk();
+            $this->assertSame($attachment, session('_previous.url'));
+            $message = 'Application for Review career was marked '.$status.'.';
+            $this->from($attachment)->patch(route('admin.learning.alumni-jobs.inquiries.update', $inquiry), [
+                'status' => $status,
+                'admin_notes' => 'Reviewed qualifications.',
+                'career_inquiry_id' => $inquiry->id,
+            ])->assertRedirect($hub)->assertSessionHas('saved', $message);
+            $this->assertSame($status, $inquiry->fresh()->status);
+            $page = $this->get($hub)->assertOk()->assertSee('data-dashboard-toast', false);
+            $this->assertSame(1, substr_count($page->getContent(), $message));
+        }
+
+        $this->from($attachment)->patch(route('admin.learning.alumni-jobs.inquiries.update', $inquiry), [
+            'status' => 'invalid',
+            'admin_notes' => 'Keep these notes.',
+            'career_inquiry_id' => $inquiry->id,
+        ])->assertRedirect($hub)->assertSessionHasErrors('status')
+            ->assertSessionHasInput('admin_notes', 'Keep these notes.');
+        $this->assertSame(CareerInquiry::STATUS_REJECTED, $inquiry->fresh()->status);
+        $this->get($hub)->assertOk()->assertSee('data-auto-open="true"', false)->assertSee('Keep these notes.');
+    }
+
+    public function test_certificate_review_forms_are_separate_and_return_to_hub(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $path = UploadedFile::fake()->create('placement.pdf', 20, 'application/pdf')->store('career-certificates', 'local');
+        $inquiry = $this->careerReviewInquiry([
+            'status' => CareerInquiry::STATUS_APPROVED,
+            'certificate_status' => CareerInquiry::CERT_PENDING_REVIEW,
+            'placement_certificate' => ['path' => $path, 'name' => 'placement.pdf'],
+        ]);
+        $page = $this->actingAs($admin)->get(route('admin.learning.alumni-jobs'))->assertOk();
+        preg_match('/<dialog id="career-inquiry-'.$inquiry->id.'".*?<\/dialog>/s', $page->getContent(), $dialog);
+        $this->assertNotEmpty($dialog);
+        preg_match_all('/<\/?form\b[^>]*>/i', $dialog[0], $forms);
+        $depth = 0;
+        $count = 0;
+        foreach ($forms[0] as $form) {
+            $closing = str_starts_with($form, '</');
+            $depth += $closing ? -1 : 1;
+            $count += $closing ? 0 : 1;
+            $this->assertContains($depth, [0, 1], 'Certificate and decision forms must not be nested.');
+        }
+        $this->assertSame(0, $depth);
+        $this->assertSame(3, $count);
+        $attachment = route('admin.learning.alumni-jobs.inquiries.placement-certificate', $inquiry);
+        foreach ([CareerInquiry::CERT_APPROVED, CareerInquiry::CERT_REJECTED] as $status) {
+            $inquiry->refresh()->update(['certificate_status' => CareerInquiry::CERT_PENDING_REVIEW]);
+            $this->get($attachment)->assertOk();
+            $this->from($attachment)->patch(route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry), [
+                'certificate_status' => $status,
+            ])->assertRedirect(route('admin.learning.alumni-jobs'))->assertSessionHas('saved');
+            $this->assertSame($status, $inquiry->fresh()->certificate_status);
+        }
+    }
+
+    public function test_priority_sms_lock_and_stale_models_do_not_duplicate_submission(): void
+    {
+        Http::fake(['api.semaphore.co/*' => Http::response([['message_id' => 51, 'status' => 'Queued']], 200)]);
+        $this->seniorAlumni();
+        $opportunity = $this->careerReviewInquiry()->opportunity;
+        $opportunity->update(['sms_mode' => CareerOpportunity::SMS_IMMEDIATE]);
+        $notifier = app(CareerGraduateNotifier::class);
+        $lock = Cache::lock('career_opportunity_sms_'.$opportunity->id, 60);
+        $this->assertTrue($lock->get());
+        try {
+            $this->assertFalse($notifier->sendDueSms($opportunity)['delivered']);
+            Http::assertNothingSent();
+        } finally {
+            $lock->release();
+        }
+        $this->assertTrue($notifier->sendDueSms($opportunity)['delivered']);
+        $this->assertNull($opportunity->sms_sent_at, 'Deliberately retain a stale caller model.');
+        $this->assertTrue($notifier->sendDueSms($opportunity)['delivered']);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->url() === SemaphoreSmsService::PRIORITY_ENDPOINT && ! isset($request['scheduled']));
+        $this->assertStringContainsString('accepted by Semaphore', $opportunity->fresh()->smsStatusLabel());
+    }
+
+    public function test_sms_timeout_is_unknown_and_is_not_resubmitted(): void
+    {
+        $attempts = 0;
+        Http::fake(function () use (&$attempts) {
+            $attempts++;
+            throw new ConnectionException('Simulated response timeout.');
+        });
+        $this->seniorAlumni();
+        $opportunity = $this->careerReviewInquiry()->opportunity;
+        $opportunity->update(['sms_mode' => CareerOpportunity::SMS_IMMEDIATE]);
+        $notifier = app(CareerGraduateNotifier::class);
+        $this->assertFalse($notifier->dispatchIfDue($opportunity)['delivered']);
+        $current = $opportunity->fresh();
+        $this->assertNull($current->sms_sent_at);
+        $this->assertSame(SemaphoreSmsService::UNKNOWN_SUBMISSION_ERROR, $current->sms_last_error);
+        $this->assertTrue($current->smsNeedsReconciliation());
+        $this->assertFalse($notifier->dueOpportunities()->contains('id', $opportunity->id));
+        $this->assertFalse($notifier->sendDueSms($opportunity)['delivered']);
+        $this->artisan('career:send-scheduled-sms')->assertSuccessful();
+        $this->assertSame(1, $attempts);
+    }
+
+    public function test_review_redirect_preserves_the_application_list_page(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $inquiry = $this->careerReviewInquiry();
+        $inquiry->forceFill(['created_at' => now()->subDay()])->save();
+        for ($i = 0; $i < 8; $i++) {
+            $newer = $inquiry->replicate();
+            $newer->user_id = $this->graduatedUser()->id;
+            $newer->created_at = now();
+            $newer->save();
+        }
+        $hub = route('admin.learning.alumni-jobs', ['inquiry_page' => 2]);
+        $this->actingAs($admin)->get($hub)->assertOk()->assertSee('career-inquiry-'.$inquiry->id, false);
+        $this->from(route('admin.learning.alumni-jobs.inquiries.credential', [$inquiry, 0]))
+            ->patch(route('admin.learning.alumni-jobs.inquiries.update', $inquiry), [
+                'status' => CareerInquiry::STATUS_APPROVED,
+                'inquiry_page' => 2,
+            ])->assertRedirect($hub)->assertSessionHas('saved');
+    }
+
+    private function careerReviewInquiry(array $overrides = []): CareerInquiry
+    {
+        $graduate = $this->graduatedUser();
+        $opportunity = CareerOpportunity::create([
+            'title' => 'Review career',
+            'employer' => 'MCARE-Coordinated Placement',
+            'description' => 'Privacy-minimal career posting.',
+            'estimated_salary' => '18000 per month',
+            'estimated_start_date' => now()->addWeek(),
+            'patient_gender' => CareerOpportunity::GENDER_FEMALE,
+            'mobility_status' => CareerOpportunity::MOBILITY_AMBULATORY,
+            'patient_age' => 70,
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+
+        return CareerInquiry::create([
+            'career_opportunity_id' => $opportunity->id,
+            'user_id' => $graduate->id,
+            'name' => $graduate->name,
+            'email' => $graduate->email,
+            'contact_number' => '09170000000',
+            'message' => 'I would like to apply.',
+            'status' => CareerInquiry::STATUS_PENDING,
+            ...$overrides,
+        ]);
     }
 
     private function graduatedUser(array $overrides = []): User

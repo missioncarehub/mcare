@@ -374,20 +374,84 @@
                 </div>
             </div>
 
-            <div class="dashboard-panel space-y-4">
+            <div id="online-checkout" class="dashboard-panel space-y-4 border-2 border-sky-100">
                 <div class="flex items-center gap-2.5 text-slate-900">
                     <x-dashboard-icon name="credit-card" class="h-5 w-5 text-sky-700" />
                     <h3 class="font-bold text-sm">Online Payment Portal</h3>
                 </div>
                 <p class="text-xs leading-5 text-slate-600">
-                    Prefer online payment via GCash, Maya, or Credit/Debit card? Open the PayMongo checkout portal.
+                    Pay securely online using PayMongo. Supports GCash, Maya, QR Ph, and Credit/Debit cards. Your payment ledger updates immediately upon completion.
                 </p>
-                <a href="{{ route('payment.show') }}" class="secondary-action w-full justify-center">
-                    <x-dashboard-icon name="arrow-up-right-from-square" class="h-4 w-4" />
-                    <span>Open Online Checkout</span>
-                </a>
+
+                @if ($balance <= 0)
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-900 flex items-center gap-2">
+                        <x-dashboard-icon name="circle-check" class="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>Program tuition is fully settled. No online payment required.</span>
+                    </div>
+                @else
+                    <form method="POST" action="{{ route('trainee.payments.checkout') }}" data-single-action data-submit-label="Connecting to PayMongo..." class="space-y-3">
+                        @csrf
+                        <div>
+                            <label for="online-transaction-type" class="mb-1 block text-[11px] font-bold uppercase text-slate-600">Payment purpose</label>
+                            <select id="online-transaction-type" name="transaction_type" class="form-field text-xs" required>
+                                @if (! $application->isDownpaymentSatisfied())
+                                    <option value="downpayment" data-suggested="{{ number_format($downpayment, 2, '.', '') }}">Downpayment (₱{{ number_format($downpayment, 2) }})</option>
+                                @endif
+                                <option value="installment" data-suggested="{{ number_format(min($balance, 5000), 2, '.', '') }}" selected>Tuition installment / Custom amount</option>
+                                <option value="balance_settlement" data-suggested="{{ number_format($balance, 2, '.', '') }}">Full balance settlement (₱{{ number_format($balance, 2) }})</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="online-amount" class="mb-1 block text-[11px] font-bold uppercase text-slate-600">Amount (PHP)</label>
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-slate-500">₱</span>
+                                <input id="online-amount" name="amount" type="number" step="0.01" min="1" max="{{ number_format($balance, 2, '.', '') }}" required class="form-field pl-7 text-xs font-bold" value="{{ old('amount', number_format($ticketDefaultAmount, 2, '.', '')) }}">
+                            </div>
+                            <p class="mt-1 text-[10px] text-slate-400">Remaining balance: ₱{{ number_format($balance, 2) }}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 py-1">
+                            <span class="font-medium text-slate-400">Accepted:</span>
+                            <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">GCash</span>
+                            <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">Maya</span>
+                            <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">Cards</span>
+                            <span class="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-800">QR Ph</span>
+                        </div>
+                        <button type="submit" class="primary-action w-full justify-center !bg-sky-600 hover:!bg-sky-700 text-white">
+                            <x-dashboard-icon name="arrow-up-right-from-square" class="h-4 w-4" />
+                            <span>Open PayMongo Checkout</span>
+                        </button>
+                    </form>
+                @endif
             </div>
         </aside>
     </div>
 </section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const onlineTypeSelect = document.getElementById('online-transaction-type');
+        const onlineAmountInput = document.getElementById('online-amount');
+        if (onlineTypeSelect && onlineAmountInput) {
+            onlineTypeSelect.addEventListener('change', () => {
+                const opt = onlineTypeSelect.selectedOptions[0];
+                if (opt && opt.dataset.suggested) {
+                    onlineAmountInput.value = opt.dataset.suggested;
+                }
+            });
+        }
+
+        const onsiteTypeSelect = document.getElementById('ticket-transaction-type');
+        const onsiteAmountInput = document.getElementById('ticket-amount');
+        if (onsiteTypeSelect && onsiteAmountInput) {
+            onsiteTypeSelect.addEventListener('change', () => {
+                const opt = onsiteTypeSelect.selectedOptions[0];
+                if (opt && opt.value === 'balance_settlement') {
+                    onsiteAmountInput.value = '{{ number_format($balance, 2, '.', '') }}';
+                } else if (opt && opt.value === 'downpayment') {
+                    onsiteAmountInput.value = '{{ number_format($downpayment, 2, '.', '') }}';
+                }
+            });
+        }
+    });
+</script>
 @endsection

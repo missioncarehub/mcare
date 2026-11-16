@@ -174,12 +174,22 @@ class CareerOpportunity extends Model
         return implode('. ', $parts);
     }
 
+    public function smsNeedsReconciliation(): bool
+    {
+        return str_starts_with((string) $this->sms_last_error, 'SMS submission status is unknown.')
+            || str_contains((string) $this->sms_last_error, 'could not be reached');
+    }
+
     public function smsStatusLabel(): string
     {
         if ($this->sms_sent_at) {
             return $this->sms_sent_count > 0
-                ? 'SMS sent to '.$this->sms_sent_count.' '.str('graduate')->plural($this->sms_sent_count)
+                ? 'SMS accepted by Semaphore for '.$this->sms_sent_count.' '.str('graduate')->plural($this->sms_sent_count)
                 : 'SMS skipped, no graduate numbers';
+        }
+
+        if ($this->smsNeedsReconciliation()) {
+            return 'SMS submission status is unknown. Check Semaphore message history before resending.';
         }
 
         if (filled($this->sms_last_error)) {

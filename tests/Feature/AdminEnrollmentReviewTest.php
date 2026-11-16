@@ -175,13 +175,13 @@ class AdminEnrollmentReviewTest extends TestCase
             ->assertOk()
             ->assertSee('Review documents')
             ->assertSee(route('admin.enrollments.document-review', $application), false)
-            ->assertDontSee('>Done for review</button>', false);
+            ->assertDontSee('>Complete document review</button>', false);
 
         $this->actingAs($admin)
             ->get(route('admin.enrollments.document-review', $application))
             ->assertOk()
             ->assertSee('Review documents')
-            ->assertSee('Done for review')
+            ->assertSee('Complete document review')
             ->assertSee('Back to application');
     }
 

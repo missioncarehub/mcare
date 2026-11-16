@@ -160,6 +160,14 @@ class PrepareDemoGraduate extends Command
             $this->completeCompetencies($application, $assessor, $gradeScale);
             $this->completeLearningRequirements($application, $assessor);
 
+            $application->forceFill([
+                'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            ])->save();
+
+            $user->forceFill([
+                'trainee_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            ])->save();
+
             return compact('user', 'batch', 'application', 'password');
         });
 

@@ -5,6 +5,7 @@
     $activeBatch = $assignedBatch ?? $batches->firstWhere('is_active', true);
     $moduleList = collect($modules);
     $quizList = collect($quizzes ?? []);
+    $submissionList = collect($submissions ?? []);
     $publishedModuleCount = $moduleList->where('is_published', true)->count();
     $activeQuizCount = $quizList->where('is_published', true)->count();
 @endphp
@@ -29,6 +30,9 @@
             </button>
             <button type="button" class="rounded-xl px-4 py-2 text-xs font-bold transition lms-filter-btn" data-classwork-tab="assessments">
                 Quizzes & Assessments ({{ $quizList->count() }})
+            </button>
+            <button type="button" class="rounded-xl px-4 py-2 text-xs font-bold transition lms-filter-btn" data-classwork-tab="submissions">
+                Quiz Submissions ({{ $submissionList->count() }})
             </button>
         </div>
         <div class="text-xs text-stone-500 font-medium">
@@ -566,6 +570,184 @@
             @endforelse
         </div>
     </section>
+
+    <!-- SECTION: ALL STUDENT QUIZ SUBMISSIONS -->
+    <section id="submissions-hub" aria-labelledby="submissions-list-title" class="lms-content-section" data-section-kind="submissions" style="display: none;">
+        <div class="lms-section-heading">
+            <div>
+                <p class="lms-eyebrow">Learner Evaluations</p>
+                <h2 id="submissions-list-title">All Student Quiz Submissions ({{ $submissionList->count() }})</h2>
+                <p class="text-xs text-stone-500 mt-1">Review all student submitted quiz attempts across all your modules in one unified list.</p>
+            </div>
+            <div class="lms-heading-stats">
+                <span>{{ $submissionList->count() }} total submissions</span>
+                <span>{{ $submissionList->where('passed', true)->count() }} passed</span>
+            </div>
+        </div>
+
+        @php
+            $subCount = $submissionList->count();
+            $avgScore = $submissionList->avg('score_percent');
+            $passedCount = $submissionList->where('passed', true)->count();
+            $failedCount = $submissionList->where('passed', false)->count();
+        @endphp
+
+        <!-- Metrics Grid -->
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+            <article class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-stone-500">Total Submissions</span>
+                <strong class="mt-1 block text-2xl font-bold text-stone-900">{{ number_format($subCount) }}</strong>
+                <small class="text-xs text-stone-500">Graded attempts across all quizzes</small>
+            </article>
+            <article class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Average Score</span>
+                <strong class="mt-1 block text-2xl font-bold text-sky-950">{{ $avgScore !== null ? number_format((float) $avgScore, 1).'%' : '—' }}</strong>
+                <small class="text-xs text-stone-500">Overall class performance</small>
+            </article>
+            <article class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Passed</span>
+                <strong class="mt-1 block text-2xl font-bold text-emerald-950">{{ number_format($passedCount) }}</strong>
+                <small class="text-xs text-stone-500">{{ $subCount > 0 ? number_format(($passedCount / $subCount) * 100, 1) : 0 }}% pass rate</small>
+            </article>
+            <article class="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-rose-700">Needs Review / Failed</span>
+                <strong class="mt-1 block text-2xl font-bold text-rose-950">{{ number_format($failedCount) }}</strong>
+                <small class="text-xs text-stone-500">Below passing threshold</small>
+            </article>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm mb-4">
+            <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[16rem]">
+                <div class="relative flex-1 min-w-[12rem]">
+                    <input type="text" id="submissions-search" class="form-field w-full text-xs" placeholder="Search by student name, email, or quiz title...">
+                </div>
+                <select id="submissions-quiz-filter" class="form-field text-xs min-w-[10rem]">
+                    <option value="">All Quizzes</option>
+                    @foreach($quizzes as $q)
+                        <option value="{{ $q->id }}">{{ $q->title }}</option>
+                    @endforeach
+                </select>
+                <select id="submissions-result-filter" class="form-field text-xs min-w-[8rem]">
+                    <option value="">All Results</option>
+                    <option value="passed">Passed</option>
+                    <option value="failed">Did Not Pass</option>
+                </select>
+            </div>
+            <p class="text-xs text-stone-500 font-medium" id="submissions-counter">
+                Showing {{ $subCount }} {{ str('submission')->plural($subCount) }}
+            </p>
+        </div>
+
+        <!-- Submissions Table -->
+        <div class="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs" id="submissions-table">
+                    <thead class="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3">Student</th>
+                            <th class="px-4 py-3">Quiz & Module</th>
+                            <th class="px-4 py-3">Attempt</th>
+                            <th class="px-4 py-3">Submitted</th>
+                            <th class="px-4 py-3">Score</th>
+                            <th class="px-4 py-3">Result</th>
+                            <th class="px-4 py-3">Attachments</th>
+                            <th class="px-4 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        @forelse($submissionList as $attempt)
+                            @php
+                                $learner = $attempt->application;
+                                $learnerName = $learner ? trim($learner->first_name.' '.$learner->last_name) : ($attempt->application?->user?->name ?? 'Trainee');
+                                $submittedFiles = collect($attempt->answers ?? [])->filter(fn ($ans) => is_array($ans) && ($ans['type'] ?? null) === 'file');
+                            @endphp
+                            <tr class="hover:bg-stone-50/70 transition submission-row"
+                                data-student-name="{{ strtolower($learnerName) }}"
+                                data-student-email="{{ strtolower($learner?->email ?? '') }}"
+                                data-quiz-id="{{ $attempt->quiz_id }}"
+                                data-quiz-title="{{ strtolower($attempt->quiz?->title ?? '') }}"
+                                data-result="{{ $attempt->passed ? 'passed' : 'failed' }}">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2.5">
+                                        <x-user-avatar
+                                            :user="$learner?->user"
+                                            :name="$learnerName"
+                                            class="grid h-8 w-8 place-items-center rounded-full bg-purple-100 text-xs font-bold text-purple-800"
+                                        />
+                                        <div class="min-w-0">
+                                            <strong class="block text-stone-900 font-bold truncate">{{ $learnerName }}</strong>
+                                            <span class="block text-[11px] text-stone-500 truncate">{{ $learner?->email }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="min-w-0 max-w-[14rem]">
+                                        <strong class="block text-stone-900 font-semibold truncate">{{ $attempt->quiz?->title }}</strong>
+                                        <span class="block text-[11px] text-purple-700 truncate">{{ $attempt->quiz?->trainingModule?->title ?? 'Module assessment' }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 font-semibold text-stone-700">
+                                    #{{ $attempt->attempt_number }}
+                                </td>
+                                <td class="px-4 py-3 text-stone-600 whitespace-nowrap">
+                                    {{ $attempt->submitted_at?->format('M d, Y g:i A') ?? '—' }}
+                                </td>
+                                <td class="px-4 py-3 font-bold text-stone-900 whitespace-nowrap">
+                                    {{ number_format((float) $attempt->score_percent, 1) }}%
+                                    <span class="text-[10px] font-normal text-stone-500 block">({{ $attempt->earned_points }}/{{ $attempt->total_points }} pts)</span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    @if($attempt->passed)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                                            <x-dashboard-icon name="circle-check" class="h-3 w-3" />
+                                            Passed
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700 ring-1 ring-rose-200">
+                                            <x-dashboard-icon name="xmark" class="h-3 w-3" />
+                                            Did not pass
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3">
+                                    @if($submittedFiles->isNotEmpty())
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach($submittedFiles as $qId => $fileAnswer)
+                                                <a href="{{ route('trainer.quizzes.attempts.download', ['quiz' => $attempt->quiz, 'attempt' => $attempt, 'question' => $qId]) }}"
+                                                   class="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 hover:bg-purple-100"
+                                                   title="{{ $fileAnswer['original_name'] ?? 'Submitted File' }}">
+                                                    <x-dashboard-icon name="document" class="h-3 w-3" />
+                                                    <span>{{ str($fileAnswer['original_name'] ?? 'File')->limit(12) }}</span>
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-stone-400 text-[11px]">None</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    @if($attempt->quiz)
+                                        <a href="{{ route('trainer.quizzes.results', $attempt->quiz) }}" class="primary-action text-xs py-1 px-3">
+                                            Review Quiz
+                                        </a>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr id="no-submissions-row">
+                                <td colspan="8" class="px-4 py-12 text-center text-stone-500">
+                                    <x-dashboard-icon name="list-check" class="mx-auto h-8 w-8 text-stone-300 mb-2" />
+                                    <p class="font-bold">No student quiz submissions yet</p>
+                                    <p class="text-xs text-stone-400 mt-0.5">When trainees submit quizzes, their attempts and scores will be listed here.</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
 </div>
 
 <script>
@@ -783,13 +965,14 @@
         quickQuizModule?.addEventListener('change', filterQuickSubmodules);
         filterQuickSubmodules();
 
-        // Filter Sub-Tabs Switching (All / Modules / Assessments)
+        // Filter Sub-Tabs Switching (Modules / Assessments / Submissions)
         const filterButtons = document.querySelectorAll('[data-classwork-tab]');
         const moduleSection = document.querySelector('[data-section-kind="modules"]');
         const assessmentSection = document.querySelector('[data-section-kind="assessments"]');
+        const submissionSection = document.querySelector('[data-section-kind="submissions"]');
 
         function setActiveTab(tab) {
-            const activeTab = tab === 'assessments' ? 'assessments' : 'modules';
+            const activeTab = ['modules', 'assessments', 'submissions'].includes(tab) ? tab : 'modules';
             filterButtons.forEach(btn => {
                 const isCurrent = btn.dataset.classworkTab === activeTab;
                 btn.className = isCurrent
@@ -798,15 +981,9 @@
                 btn.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
             });
 
-            if (moduleSection && assessmentSection) {
-                if (activeTab === 'modules') {
-                    moduleSection.style.display = 'block';
-                    assessmentSection.style.display = 'none';
-                } else {
-                    moduleSection.style.display = 'none';
-                    assessmentSection.style.display = 'block';
-                }
-            }
+            if (moduleSection) moduleSection.style.display = activeTab === 'modules' ? 'block' : 'none';
+            if (assessmentSection) assessmentSection.style.display = activeTab === 'assessments' ? 'block' : 'none';
+            if (submissionSection) submissionSection.style.display = activeTab === 'submissions' ? 'block' : 'none';
         }
 
         filterButtons.forEach(btn => {
@@ -820,11 +997,57 @@
         const tabParam = urlParams.get('tab');
         const hash = window.location.hash;
 
-        if (tabParam === 'assessments' || hash === '#assessments' || hash === '#assessments-hub') {
+        if (tabParam === 'submissions' || hash === '#submissions' || hash === '#submissions-hub') {
+            setActiveTab('submissions');
+        } else if (tabParam === 'assessments' || hash === '#assessments' || hash === '#assessments-hub') {
             setActiveTab('assessments');
         } else if (tabParam === 'modules') {
             setActiveTab('modules');
-        } else setActiveTab('modules');
+        } else {
+            setActiveTab('modules');
+        }
+
+        // Live Submissions Filter
+        const subSearch = document.getElementById('submissions-search');
+        const subQuiz = document.getElementById('submissions-quiz-filter');
+        const subResult = document.getElementById('submissions-result-filter');
+        const subRows = document.querySelectorAll('.submission-row');
+        const subCounter = document.getElementById('submissions-counter');
+
+        function filterSubmissions() {
+            if (!subRows.length) return;
+            const searchVal = (subSearch?.value || '').toLowerCase().trim();
+            const quizVal = (subQuiz?.value || '').trim();
+            const resultVal = (subResult?.value || '').trim();
+
+            let visibleCount = 0;
+            subRows.forEach(row => {
+                const name = row.dataset.studentName || '';
+                const email = row.dataset.studentEmail || '';
+                const quizId = row.dataset.quizId || '';
+                const quizTitle = row.dataset.quizTitle || '';
+                const result = row.dataset.result || '';
+
+                const matchesSearch = !searchVal || name.includes(searchVal) || email.includes(searchVal) || quizTitle.includes(searchVal);
+                const matchesQuiz = !quizVal || quizId === quizVal;
+                const matchesResult = !resultVal || result === resultVal;
+
+                if (matchesSearch && matchesQuiz && matchesResult) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (subCounter) {
+                subCounter.textContent = `Showing ${visibleCount} of ${subRows.length} submissions`;
+            }
+        }
+
+        subSearch?.addEventListener('input', filterSubmissions);
+        subQuiz?.addEventListener('change', filterSubmissions);
+        subResult?.addEventListener('change', filterSubmissions);
 
         const quizModuleSelect = document.getElementById('quick-quiz-module');
         document.querySelectorAll('[data-quiz-module-id]').forEach(button => {

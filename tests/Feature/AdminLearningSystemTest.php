@@ -164,7 +164,7 @@ class AdminLearningSystemTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('Roster filters')
-            ->assertSee('Delete')
+            ->assertSee('Archive')
             ->assertSee('View details')
             ->assertSee($application->email);
 
@@ -173,7 +173,7 @@ class AdminLearningSystemTest extends TestCase
             ->assertOk()
             ->assertSee('Pause')
             ->assertSee('Graduate')
-            ->assertSee('Delete')
+            ->assertSee('Archive trainee')
             ->assertSee($application->email);
 
         $this->actingAs($admin)

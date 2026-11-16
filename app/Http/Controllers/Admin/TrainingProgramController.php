@@ -148,11 +148,9 @@ class TrainingProgramController extends Controller
         $wantsPublish = $request->boolean('program_is_active');
         $hasBatch = $program !== null && $program->batches()->exists();
 
-        if ($wantsPublish && ! $hasBatch) {
+        if ($program !== null && $wantsPublish && ! $hasBatch) {
             throw ValidationException::withMessages([
-                'program_is_active' => $program === null
-                    ? 'Create the program first, add a batch, then publish it.'
-                    : 'Add at least one batch to this program before publishing it.',
+                'program_is_active' => 'Add at least one batch to this program before publishing it.',
             ])->errorBag('program');
         }
 

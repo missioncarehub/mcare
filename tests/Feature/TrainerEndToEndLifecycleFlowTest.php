@@ -161,7 +161,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         ]);
 
         Notification::assertSentTo($traineeUser, LmsAnnouncementPublished::class, function ($notification) {
-            return $notification->queue === 'mail';
+            return $notification->announcement->title === 'Welcome to Caregiving Batch Alpha';
         });
 
         // =========================================================================
@@ -181,6 +181,7 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
             'training_batch_id' => $batch->id,
             'module_file' => $primaryPdf,
             'supplementary_files' => [$worksheetPdf],
+            'competency_unit_id' => $unit->id,
             'is_published' => '1',
         ]);
 
@@ -196,8 +197,8 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         $module = TrainingModule::where('module_code', 'HCS323301')->firstOrFail();
         $submodule = $module->fresh()->submodules()->firstOrFail();
 
-        Notification::assertSentTo($traineeUser, LmsModulePublished::class, function ($notification) {
-            return $notification->queue === 'mail';
+        Notification::assertSentTo($traineeUser, LmsModulePublished::class, function ($notification) use ($module) {
+            return $notification->module->id === $module->id;
         });
 
         // =========================================================================
@@ -236,8 +237,8 @@ class TrainerEndToEndLifecycleFlowTest extends TestCase
         $this->assertTrue($quiz->is_published);
         $this->assertEquals(2, $quiz->questions()->count());
 
-        Notification::assertSentTo($traineeUser, LmsQuizPublished::class, function ($notification) {
-            return $notification->queue === 'mail';
+        Notification::assertSentTo($traineeUser, LmsQuizPublished::class, function ($notification) use ($quiz) {
+            return $notification->quiz->id === $quiz->id;
         });
 
         // =========================================================================

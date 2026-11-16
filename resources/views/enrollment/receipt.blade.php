@@ -251,7 +251,7 @@
 
         @page {
             size: Letter portrait;
-            margin: 10mm;
+            margin: 15mm;
         }
 
         @media print {
@@ -264,9 +264,11 @@
             .status-banner { display: none !important; }
 
             .page {
-                width: 196mm;
-                max-width: 196mm;
-                margin: 0;
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                box-shadow: none;
+                border: none;
             }
         }
     </style>

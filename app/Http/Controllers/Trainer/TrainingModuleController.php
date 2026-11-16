@@ -92,6 +92,7 @@ class TrainingModuleController extends Controller
                 $module = TrainingModule::create([
                     'trainer_id' => $trainer->id,
                     'training_batch_id' => $batchId,
+                    'competency_unit_id' => $validated['competency_unit_id'] ?? null,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
                     'competency_category' => $validated['competency_category'] ?? null,
@@ -236,6 +237,7 @@ class TrainingModuleController extends Controller
                 }
                 $attributes = [
                     'training_batch_id' => $batchId,
+                    'competency_unit_id' => $validated['competency_unit_id'] ?? null,
                     'target_enrollment_application_id' => $targetTrainee?->id,
                     'module_code' => $validated['module_code'] ?? null,
                     'competency_category' => $validated['competency_category'] ?? null,
@@ -606,6 +608,7 @@ class TrainingModuleController extends Controller
 
         $validated = $request->validate([
             'module_code' => ['nullable', 'string', 'max:50'],
+            'competency_unit_id' => ['nullable', 'integer', 'exists:competency_units,id'],
             'competency_category' => ['nullable', 'string', Rule::in(['core', 'common', 'basic', 'custom'])],
             'submodule_titles' => ['nullable', 'array', 'max:30'],
             'submodule_titles.*' => ['nullable', 'string', 'max:255'],

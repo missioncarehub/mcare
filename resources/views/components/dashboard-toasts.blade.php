@@ -1,7 +1,7 @@
 @php
     $toastItems = [];
 
-    $pushToast = function (string $type, string|array $message, int $duration) use (&$toastItems): void {
+    $pushToast = function (string $type, string|array $message, int $duration, ?string $icon = null) use (&$toastItems): void {
         $messages = is_array($message)
             ? $message
             : [trim($message)];
@@ -18,11 +18,12 @@
             'type' => $type,
             'messages' => $messages,
             'duration' => $duration,
+            'icon' => $icon,
         ];
     };
 
     if (session('saved')) {
-        $pushToast('success', (string) session('saved'), 5000);
+        $pushToast('success', (string) session('saved'), 5000, (string) session('saved_icon', 'circle-check'));
     }
 
     if (session('status')) {
@@ -70,10 +71,11 @@
                 class="dashboard-toast dashboard-toast-{{ $toast['type'] }}"
                 data-dashboard-toast
                 data-auto-dismiss="{{ $toast['duration'] }}"
+                data-flash-icon="{{ $toast['icon'] ?? $toastIcons[$toast['type']] ?? 'bell' }}"
                 role="{{ $toast['type'] === 'error' ? 'alert' : 'status' }}"
             >
                 <span class="dashboard-toast-icon" aria-hidden="true">
-                    <x-dashboard-icon :name="$toastIcons[$toast['type']] ?? 'bell'" class="h-4 w-4" />
+                    <x-dashboard-icon :name="$toast['icon'] ?? $toastIcons[$toast['type']] ?? 'bell'" class="h-4 w-4" />
                 </span>
                 <div class="dashboard-toast-body">
                     @if (count($toast['messages']) === 1)

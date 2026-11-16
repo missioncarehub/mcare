@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivityLog;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\TrainingModule;
 use App\Services\ModuleSubmoduleService;
 use App\Services\QuizQuestionImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class AdminQuizController extends Controller
 {
@@ -102,5 +106,57 @@ class AdminQuizController extends Controller
             ->with('saved', $importedQuestions === null
                 ? 'Quiz created. Import a question file or add questions below.'
                 : 'Imported '.count($importedQuestions).' '.str('question')->plural(count($importedQuestions)).'. Review them, then save.');
+    }
+
+    public function results(Request $request, Quiz $quiz): View
+    {
+        $this->authorize('viewAny', Quiz::class);
+
+        $gradedAttempts = $quiz->attempts()->where('status', QuizAttempt::STATUS_GRADED);
+
+        return view('admin.learning.quiz-results', [
+            'quiz' => $quiz->load(['batch', 'targetTrainee', 'questions', 'trainingModule']),
+            'attempts' => $quiz->attempts()
+                ->with(['application.user'])
+                ->where('status', QuizAttempt::STATUS_GRADED)
+                ->latest('submitted_at')
+                ->paginate(20),
+            'classSummary' => [
+                'average' => (clone $gradedAttempts)->avg('score_percent'),
+                'highest' => (clone $gradedAttempts)->max('score_percent'),
+                'lowest' => (clone $gradedAttempts)->min('score_percent'),
+                'passed' => (clone $gradedAttempts)->where('passed', true)->count(),
+            ],
+        ]);
+    }
+
+    public function downloadAttemptSubmission(
+        Request $request,
+        Quiz $quiz,
+        QuizAttempt $attempt,
+        int $question,
+    ): BinaryFileResponse {
+        $this->authorize('viewAny', Quiz::class);
+        abort_unless((int) $attempt->quiz_id === (int) $quiz->id, 404);
+
+        $answers = $attempt->answers ?? [];
+        $answer = $answers[$question] ?? $answers[(string) $question] ?? null;
+
+        abort_unless(is_array($answer) && ($answer['type'] ?? null) === 'file', 404);
+        $path = $answer['file_path'] ?? null;
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        $filename = basename($answer['original_name'] ?? 'submission');
+        $fallbackFilename = str($filename)->ascii()->replaceMatches('/[^A-Za-z0-9._-]/', '-')->toString();
+
+        return response()->file(Storage::disk('local')->path($path), [
+            'Content-Type' => ($answer['mime_type'] ?? null) ?: 'application/octet-stream',
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_ATTACHMENT,
+                $filename,
+                $fallbackFilename
+            ),
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

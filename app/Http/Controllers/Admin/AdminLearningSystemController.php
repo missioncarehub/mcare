@@ -10,6 +10,8 @@ use App\Models\CompetencyUnit;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\PaymentTransaction;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\TraineeAttendance;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
@@ -360,7 +362,8 @@ class AdminLearningSystemController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'batch_id' => ['nullable', 'integer', 'exists:training_batches,id'],
             'published' => ['nullable', Rule::in(['yes', 'no'])],
-            'tab' => ['nullable', 'string', Rule::in(['modules', 'presets', 'units', 'outcomes'])],
+            'tab' => ['nullable', 'string', Rule::in(['modules', 'presets', 'units', 'outcomes', 'submissions'])],
+            'result' => ['nullable', 'string', Rule::in(['passed', 'failed'])],
             'edit_preset' => ['nullable', 'integer', 'exists:competency_units,id'],
             'edit_unit' => ['nullable', 'integer', 'exists:competency_units,id'],
             'edit_outcome' => ['nullable', 'integer', 'exists:competency_outcomes,id'],
@@ -416,7 +419,46 @@ class AdminLearningSystemController extends Controller
             ? 'outcomes'
             : (($editingPreset || $requestedTab === 'units')
                 ? 'units'
-                : ($requestedTab === 'outcomes' ? 'outcomes' : 'modules'));
+                : ($requestedTab === 'outcomes'
+                    ? 'outcomes'
+                    : ($requestedTab === 'submissions' ? 'submissions' : 'modules')));
+
+        // Fetch all student submitted quizzes for the unified submissions tab
+        $submissionsQuery = QuizAttempt::query()
+            ->with(['quiz.trainingModule', 'quiz.batch', 'quiz.trainer', 'application.batch', 'application.user'])
+            ->where('status', QuizAttempt::STATUS_GRADED)
+            ->latest('submitted_at');
+
+        if ($batchId = $filters['batch_id'] ?? null) {
+            $submissionsQuery->whereHas('quiz', fn ($q) => $q->where('training_batch_id', $batchId));
+        }
+
+        if ($search = trim((string) ($filters['search'] ?? ''))) {
+            $submissionsQuery->where(function ($builder) use ($search) {
+                $builder->whereHas('application', fn ($app) => $app
+                    ->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"))
+                ->orWhereHas('quiz', fn ($q) => $q->where('title', 'like', "%{$search}%"));
+            });
+        }
+
+        if (isset($filters['result'])) {
+            if ($filters['result'] === 'passed') {
+                $submissionsQuery->where('passed', true);
+            } elseif ($filters['result'] === 'failed') {
+                $submissionsQuery->where('passed', false);
+            }
+        }
+
+        $allSubmissions = (clone $submissionsQuery)->get();
+        $submissionsSummary = [
+            'total' => $allSubmissions->count(),
+            'average' => $allSubmissions->avg('score_percent'),
+            'passed' => $allSubmissions->where('passed', true)->count(),
+            'failed' => $allSubmissions->where('passed', false)->count(),
+        ];
+        $quizSubmissions = $submissionsQuery->paginate(20)->appends(collect($filters)->except(['edit_preset', 'edit_unit', 'edit_outcome'])->all());
 
         return view('admin.learning.modules', [
             'batches' => $this->batches(),
@@ -430,6 +472,8 @@ class AdminLearningSystemController extends Controller
             'editingPreset' => $editingPreset,
             'editingOutcome' => $editingOutcome,
             'activeTab' => $activeTab,
+            'quizSubmissions' => $quizSubmissions,
+            'submissionsSummary' => $submissionsSummary,
         ]);
     }
 

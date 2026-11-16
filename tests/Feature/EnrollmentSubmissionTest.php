@@ -470,6 +470,11 @@ class EnrollmentSubmissionTest extends TestCase
         ]);
 
         $this->post(route('enrollment.store'), $this->validEnrollmentPayload([
+            'admission' => $this->makeApprovedAdmission([
+                'email' => 'nc3.applicant@gmail.com',
+                'training_program_id' => $program->id,
+                'program' => $program->name,
+            ]),
             'training_batch_id' => $batch->id,
             'email' => 'nc3.applicant@gmail.com',
         ]))->assertRedirect(route('payment.show'));

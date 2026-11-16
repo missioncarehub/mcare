@@ -81,8 +81,6 @@ class ImportedCertificateRenderer
             $y = $height * (((float) $box['y']) / 100);
             $boxWidth = $width * (((float) $box['w']) / 100);
             $boxHeight = $height * (((float) $box['h']) / 100);
-            $pdf->SetFillColor(255, 252, 255);
-            $pdf->Rect($x, $y, $boxWidth, $boxHeight, 'F');
             $signature = match ($key) {
                 'signatory' => $context['signatory_signature'] ?? null,
                 'second_signatory' => $context['second_signatory_signature'] ?? null,

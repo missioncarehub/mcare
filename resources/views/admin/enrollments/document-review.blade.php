@@ -4,6 +4,10 @@
     @php
         $documentsReadyForApproval = $pendingDocumentApprovals === [];
         $releasedForReview = $application->isReleasedForReview();
+        $pendingDocumentCount = count($pendingDocumentApprovals);
+        $documentReviewStatusLabel = $documentsReadyForApproval
+            ? 'All required documents accepted'
+            : $pendingDocumentCount.' '.\Illuminate\Support\Str::plural('document', $pendingDocumentCount).' '.($pendingDocumentCount === 1 ? 'needs' : 'need').' attention';
     @endphp
 
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -99,7 +103,7 @@
             <div class="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap gap-3">
                     <button type="submit" name="review_action" value="save" class="secondary-action" @disabled(! $releasedForReview)>Save review</button>
-                    <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Done for review</button>
+                    <button type="submit" class="primary-action" @disabled(! $releasedForReview)>Complete document review</button>
                 </div>
                 @if($documentsReadyForApproval && $application->documents_reviewed_at)
                     <p class="text-xs text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}</p>

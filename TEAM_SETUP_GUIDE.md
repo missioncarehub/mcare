@@ -307,6 +307,16 @@ Stop any of these visible processes with `Ctrl+C` in its terminal.
 
 Use ngrok when a teammate needs a public HTTPS address for a phone, a remote reviewer, Google OAuth over a public domain, or a PayMongo webhook.
 
+For this checkout's one-command local tunnel, start XAMPP MySQL and run:
+
+```powershell
+.\Start-NgrokMcare.ps1
+```
+
+The script verifies that the .env selects mcare_dbs, checks Laravel's database connection before opening the tunnel, starts ngrok on port 8000, reads its HTTPS URL from the local ngrok inspector, and temporarily updates APP_URL, SESSION_SECURE_COOKIE, and APP_DEBUG (debugging is disabled while public). It starts Laravel and the mail,default worker only after those settings are refreshed. Press Ctrl+C in that PowerShell window to stop the tunnel; the script stops only processes it started and restores the previous local .env values. The database remains in local XAMPP MySQL.
+
+Configure an ngrok authtoken once with the official ngrok setup command below; keep it in ngrok's local config, not MCARE's .env:
+
 1. Create the teammate's own [ngrok account](https://dashboard.ngrok.com/signup).
 2. Install ngrok using the [official Windows instructions](https://ngrok.com/download/windows).
 3. Copy the teammate's authtoken from the ngrok dashboard.
@@ -340,7 +350,7 @@ Update `.env` to use that exact HTTPS base URL:
 
 ```dotenv
 APP_URL=https://example-name.ngrok-free.app
-TRUSTED_PROXIES=*
+TRUSTED_PROXIES=127.0.0.1,::1
 SESSION_SECURE_COOKIE=true
 GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
 ```
@@ -673,7 +683,7 @@ Confirm:
 
 ```dotenv
 APP_URL=https://the-current-ngrok-domain
-TRUSTED_PROXIES=*
+TRUSTED_PROXIES=127.0.0.1,::1
 SESSION_SECURE_COOKIE=true
 ```
 

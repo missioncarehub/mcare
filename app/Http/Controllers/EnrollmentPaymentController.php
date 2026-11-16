@@ -55,6 +55,10 @@ class EnrollmentPaymentController extends Controller
             ]);
         }
 
+        if ($application->hasEnrollmentPaymentClearance() && $request->user()?->role === 'trainee') {
+            return redirect()->route('trainee.payments');
+        }
+
         if ($paymentLifecycle->handleVerifiedPayment($application)) {
             return redirect()->route('payment.complete');
         }

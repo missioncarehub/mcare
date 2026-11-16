@@ -384,4 +384,198 @@ class AccountDeletionTest extends TestCase
         $applicantResponse->assertSee('special.applicant@gmail.com');
         $applicantResponse->assertDontSee('special.trainer@gmail.com');
     }
+
+    public function test_admin_can_delete_trainee_and_same_email_can_reapply(): void
+    {
+        $admin = $this->adminUser();
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC II',
+            'code' => 'CG-NC-II',
+            'total_program_fee' => 22000,
+            'downpayment_amount' => 2000,
+            'is_active' => true,
+        ]);
+        $batch = TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'name' => 'Batch Trainee Test',
+            'year' => 2026,
+            'is_active' => true,
+        ]);
+
+        $traineeEmail = 'trainee.delete.test@gmail.com';
+        $trainee = User::factory()->create([
+            'role' => 'trainee',
+            'name' => 'Test Trainee',
+            'email' => $traineeEmail,
+        ]);
+
+        $admission = AdmissionApplication::create([
+            'application_number' => 'APP-2026-TRDEL',
+            'first_name' => 'Test',
+            'last_name' => 'Trainee',
+            'email' => $traineeEmail,
+            'contact_number' => '09171234567',
+            'educational_attainment' => 'College Graduate',
+            'program' => 'Caregiving NC II',
+            'training_program_id' => $program->id,
+            'status' => AdmissionApplication::STATUS_APPROVED,
+            'privacy_consent_at' => now(),
+        ]);
+
+        $application = EnrollmentApplication::create([
+            'user_id' => $trainee->id,
+            'email' => $traineeEmail,
+            'first_name' => 'Test',
+            'last_name' => 'Trainee',
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => 'Street 1',
+            'barangay' => 'Barangay 1',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'University',
+            'year_graduated' => 2022,
+            'program' => 'Caregiving NC II',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'training_batch_id' => $batch->id,
+            'admission_application_id' => $admission->id,
+        ]);
+
+        // Delete trainee via admin
+        $this->actingAs($admin)
+            ->delete(route('admin.accounts.destroy', $trainee))
+            ->assertRedirect(route('admin.accounts.index'));
+
+        $this->assertDatabaseMissing('users', ['id' => $trainee->id]);
+        $this->assertDatabaseMissing('enrollment_applications', ['id' => $application->id]);
+        $this->assertDatabaseMissing('admission_applications', ['email' => $traineeEmail]);
+
+        // Trainee can submit a fresh admission application without duplicate email error
+        $applyResponse = $this->post(route('applications.store'), [
+            'first_name' => 'Test',
+            'last_name' => 'Trainee',
+            'email' => $traineeEmail,
+            'contact_number' => '09171234567',
+            'educational_attainment' => 'College Graduate',
+            'training_program_id' => $program->id,
+            'privacy_consent' => '1',
+        ]);
+
+        $applyResponse->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('admission_applications', ['email' => $traineeEmail]);
+    }
+
+    public function test_admin_can_delete_trainer_with_modules_and_quizzes(): void
+    {
+        $admin = $this->adminUser();
+        $trainer = User::factory()->create([
+            'role' => 'trainer',
+            'name' => 'Lead Trainer',
+            'email' => 'lead.trainer@gmail.com',
+        ]);
+
+        $module = \App\Models\TrainingModule::create([
+            'trainer_id' => $trainer->id,
+            'title' => 'Trainer Module 1',
+            'description' => 'Module description',
+            'file_path' => 'modules/test.pdf',
+            'original_file_name' => 'test.pdf',
+            'is_published' => true,
+        ]);
+
+        $submodule = \App\Models\TrainingSubmodule::create([
+            'training_module_id' => $module->id,
+            'title' => 'Submodule 1',
+            'content' => 'Submodule content',
+            'position' => 1,
+            'is_published' => true,
+        ]);
+
+        $quiz = \App\Models\Quiz::create([
+            'trainer_id' => $trainer->id,
+            'title' => 'Trainer Quiz 1',
+            'is_published' => true,
+            'passing_score_percent' => 75,
+        ]);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.accounts.destroy', $trainer))
+            ->assertRedirect(route('admin.accounts.index'));
+
+        $this->assertDatabaseMissing('users', ['id' => $trainer->id]);
+        $this->assertDatabaseMissing('training_modules', ['id' => $module->id]);
+        $this->assertDatabaseMissing('training_submodules', ['id' => $submodule->id]);
+        $this->assertDatabaseMissing('quizzes', ['id' => $quiz->id]);
+    }
+
+    public function test_admin_can_delete_alumni_and_same_email_can_reapply(): void
+    {
+        $admin = $this->adminUser();
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC II',
+            'code' => 'CG-NC-II-ALUM',
+            'total_program_fee' => 22000,
+            'downpayment_amount' => 2000,
+            'is_active' => true,
+        ]);
+
+        $alumniEmail = 'alumni.delete.test@gmail.com';
+        $alumni = User::factory()->create([
+            'role' => 'alumni',
+            'name' => 'Graduate Alumni',
+            'email' => $alumniEmail,
+        ]);
+
+        \App\Models\AlumniProfile::create([
+            'user_id' => $alumni->id,
+            'employment_status' => 'Employed',
+            'is_available_for_hiring' => true,
+        ]);
+
+        $opportunity = \App\Models\CareerOpportunity::create([
+            'title' => 'Caregiver Position',
+            'employer' => 'Health Care Org',
+            'company_name' => 'Health Care Org',
+            'location' => 'Iriga City',
+            'employment_type' => 'Full-time',
+            'description' => 'Looking for certified caregivers',
+            'is_active' => true,
+        ]);
+
+        \App\Models\CareerInquiry::create([
+            'career_opportunity_id' => $opportunity->id,
+            'user_id' => $alumni->id,
+            'name' => 'Graduate Alumni',
+            'email' => $alumniEmail,
+            'contact_number' => '09171234567',
+            'message' => 'I would like to apply.',
+        ]);
+
+        $this->actingAs($admin)
+            ->delete(route('admin.accounts.destroy', $alumni))
+            ->assertRedirect(route('admin.accounts.index'));
+
+        $this->assertDatabaseMissing('users', ['id' => $alumni->id]);
+        $this->assertDatabaseMissing('alumni_profiles', ['user_id' => $alumni->id]);
+        $this->assertDatabaseMissing('career_inquiries', ['user_id' => $alumni->id]);
+
+        // Same email can re-apply cleanly
+        $applyResponse = $this->post(route('applications.store'), [
+            'first_name' => 'Graduate',
+            'last_name' => 'Alumni',
+            'email' => $alumniEmail,
+            'contact_number' => '09171234567',
+            'educational_attainment' => 'College Graduate',
+            'training_program_id' => $program->id,
+            'privacy_consent' => '1',
+        ]);
+
+        $applyResponse->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('admission_applications', ['email' => $alumniEmail]);
+    }
 }

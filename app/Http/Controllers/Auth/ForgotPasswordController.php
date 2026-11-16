@@ -43,7 +43,7 @@ class ForgotPasswordController extends Controller
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         try {
-            Mail::mailer('smtp')->to($user->email)->send(new PasswordResetOtpMail(
+            Mail::to($user->email)->send(new PasswordResetOtpMail(
                 recipientName: $user->name ?: 'MCARE account holder',
                 code: $code,
                 expiresInMinutes: $ttlMinutes,

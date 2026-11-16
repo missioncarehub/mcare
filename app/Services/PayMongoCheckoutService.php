@@ -281,6 +281,10 @@ class PayMongoCheckoutService
     public function buildCheckoutPayload(
         PaymentAttempt $attempt,
         EnrollmentApplication $application,
+        ?string $title = null,
+        ?string $description = null,
+        ?string $successUrl = null,
+        ?string $cancelUrl = null,
     ): array {
         $methods = $this->enabledMethods();
 
@@ -288,21 +292,24 @@ class PayMongoCheckoutService
             throw new PayMongoCheckoutException('No PayMongo payment methods are configured.');
         }
 
+        $lineItemName = $title ?: ('MCARE '.($application->program ?: 'training program').' downpayment');
+        $lineItemDesc = $description ?: 'Enrollment downpayment for Mission Care Training Center';
+
         return [
             'data' => [
                 'attributes' => [
                     'line_items' => [[
-                        'name' => 'MCARE '.($application->program ?: 'training program').' downpayment',
-                        'description' => 'Enrollment downpayment for Mission Care Training Center',
+                        'name' => $lineItemName,
+                        'description' => $lineItemDesc,
                         'amount' => $attempt->amount_minor,
                         'currency' => $attempt->currency,
                         'quantity' => 1,
                     ]],
                     'payment_method_types' => $methods,
-                    'success_url' => route('payment.return'),
-                    'cancel_url' => route('payment.cancel'),
+                    'success_url' => $successUrl ?: route('payment.return'),
+                    'cancel_url' => $cancelUrl ?: route('payment.cancel'),
                     'reference_number' => $attempt->merchant_reference,
-                    'description' => 'MCARE enrollment downpayment',
+                    'description' => $description ?: 'MCARE enrollment downpayment',
                     'send_email_receipt' => true,
                     'show_description' => true,
                     'show_line_items' => true,

@@ -22,6 +22,10 @@
             : 'pre_enlistment';
 
         $documentsReadyForApproval = $pendingDocumentApprovals === [];
+        $pendingDocumentCount = count($pendingDocumentApprovals);
+        $documentReviewStatusLabel = $documentsReadyForApproval
+            ? 'All required documents accepted'
+            : $pendingDocumentCount.' '.\Illuminate\Support\Str::plural('document', $pendingDocumentCount).' '.($pendingDocumentCount === 1 ? 'needs' : 'need').' attention';
         $paymentReadyForApproval = $application->hasEnrollmentPaymentClearance();
         $documentReviewSubmitted = $application->documents_reviewed_at !== null || filled($application->document_review);
         $documentsReviewed = $documentsReadyForApproval && $application->documents_reviewed_at !== null;
@@ -200,7 +204,7 @@
                     @if($documentsReviewed)
                         <p class="mt-3 text-xs leading-5 text-slate-500">Last reviewed {{ $application->documents_reviewed_at->format('M d, Y g:i A') }} by {{ $application->documentReviewer?->name ?? 'Admin' }}. Open the review page again if you need to change a file decision.</p>
                     @elseif(! $documentsReadyForApproval)
-                        <p class="mt-3 text-xs leading-5 text-amber-700">Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Accept every required document before review can be completed.</p>
+                        <p class="mt-3 text-xs leading-5 text-amber-700">Needs attention: {{ implode(', ', $pendingDocumentApprovals) }}. Accept every required document before review can be completed.</p>
                     @endif
                 </div>
             </section>
@@ -277,7 +281,7 @@
                         </p>
                         <p class="mt-2 text-sm leading-6 text-amber-900" data-document-review-notice-body>
                             @if (! $documentsReadyForApproval)
-                                Pending: {{ implode(', ', $pendingDocumentApprovals) }}. Open the document review page and mark every required file as Accepted.
+                                Needs attention: {{ implode(', ', $pendingDocumentApprovals) }}. Open the document review page and mark every required file as Accepted.
                             @else
                                 Open the document review page, preview the files, then finish that review. Approval requires every required document to be accepted.
                             @endif

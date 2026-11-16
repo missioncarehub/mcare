@@ -8,6 +8,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\User;
 use App\Notifications\CareerOpportunityPublished;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
 class CareerGraduateNotifier
@@ -28,7 +29,30 @@ class CareerGraduateNotifier
     /** @return array{sent: int, skipped: int, delivered: bool} */
     public function sendDueSms(CareerOpportunity $opportunity): array
     {
-        if ($opportunity->sms_sent_at || ! $opportunity->is_published || $opportunity->sms_mode === CareerOpportunity::SMS_NONE) {
+        $lock = Cache::lock('career_opportunity_sms_'.$opportunity->id, 60);
+
+        if (! $lock->get()) {
+            return ['sent' => 0, 'skipped' => 0, 'delivered' => false];
+        }
+
+        try {
+            // Re-read after acquiring the lock: another sender may have finished.
+            $current = $opportunity->fresh();
+
+            if (! $current) {
+                return ['sent' => 0, 'skipped' => 0, 'delivered' => false];
+            }
+
+            return $this->submitSms($current);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /** @return array{sent: int, skipped: int, delivered: bool} */
+    private function submitSms(CareerOpportunity $opportunity): array
+    {
+        if ($opportunity->sms_sent_at || ! $opportunity->is_published || $opportunity->sms_mode === CareerOpportunity::SMS_NONE || $opportunity->smsNeedsReconciliation()) {
             return ['sent' => (int) $opportunity->sms_sent_count, 'skipped' => (int) $opportunity->sms_skipped_count, 'delivered' => (bool) $opportunity->sms_sent_at];
         }
 
@@ -64,12 +88,9 @@ class CareerGraduateNotifier
                 ? $opportunity->sms_scheduled_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s')
                 : null;
 
-            $result = $this->sms->send(
-                $numbers,
-                $opportunity->graduateSmsMessage(),
-                $scheduledAt,
-                $opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE,
-            );
+            $result = $opportunity->sms_mode === CareerOpportunity::SMS_IMMEDIATE
+                ? $this->sms->sendPriority($numbers, $opportunity->graduateSmsMessage())
+                : $this->sms->send($numbers, $opportunity->graduateSmsMessage(), $scheduledAt);
             $delivered = $result['sent'];
             $error = $result['error'] ?? null;
         }
@@ -108,10 +129,8 @@ class CareerGraduateNotifier
             ->where('is_published', true)
             ->whereNull('sms_sent_at')
             ->whereIn('sms_mode', [CareerOpportunity::SMS_IMMEDIATE, CareerOpportunity::SMS_SCHEDULED])
-            ->where(function ($query) {
-                $query->whereNull('sms_last_error')
-                    ->orWhere('sms_last_error', 'like', '%could not be reached%');
-            })
+            // A timeout may happen after acceptance. Do not automatically resend it.
+            ->whereNull('sms_last_error')
             ->get();
     }
 

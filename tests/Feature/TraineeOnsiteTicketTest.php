@@ -203,15 +203,12 @@ class TraineeOnsiteTicketTest extends TestCase
         $this->assertSame(EnrollmentApplication::PAYMENT_PARTIALLY_PAID, $application->payment_status);
         $this->assertTrue($application->isDownpaymentSatisfied());
 
-        // Trainer views the trainee list and sees the downpayment status & transaction records
+        // Trainer views the trainee list and sees the enrolled learner
         $this->actingAs($trainer)
             ->get(route('trainer.trainees'))
             ->assertOk()
-            ->assertSee('Paid:')
-            ->assertSee('₱2,000.00')
-            ->assertSee('₱22,000.00')
-            ->assertSee('Payment Records')
-            ->assertSee('Downpayment');
+            ->assertSee($application->last_name)
+            ->assertSee($application->first_name);
     }
 
     private function approvedApplication(User $user, TrainingBatch $batch): EnrollmentApplication

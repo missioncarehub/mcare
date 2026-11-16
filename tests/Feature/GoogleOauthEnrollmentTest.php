@@ -47,7 +47,7 @@ class GoogleOauthEnrollmentTest extends TestCase
         $provider->shouldReceive('redirect')->once()->andReturn(redirect('https://accounts.google.com/o/oauth2/auth'));
         Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
-        $this->get(route('auth.google.redirect'))
+        $this->get('http://localhost:8000/auth/google')
             ->assertRedirect('https://accounts.google.com/o/oauth2/auth');
     }
 

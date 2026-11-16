@@ -68,7 +68,7 @@
                 <h2 class="text-lg font-bold text-stone-950">Module progression</h2>
                 <p class="text-xs text-stone-500">{{ number_format($moduleProgressTotal) }} learner-module records</p>
             </div>
-            <p class="mt-1 text-sm text-stone-600">Where trainees currently stand across every module of every batch.</p>
+            <p class="mt-1 text-sm text-stone-600">Recorded progress across every module and batch.</p>
 
             <div class="mt-4 space-y-3">
                 @foreach($progressLabels as $status => $meta)
@@ -105,7 +105,7 @@
                 <h2 class="text-lg font-bold text-stone-950">Attendance snapshot</h2>
                 <p class="text-xs text-stone-500">Last 30 days · since {{ $attendance['window_start']->format('M d, Y') }}</p>
             </div>
-            <p class="mt-1 text-sm text-stone-600">Trainer-logged classroom attendance across all active batches.</p>
+            <p class="mt-1 text-sm text-stone-600">Recorded attendance across all batches.</p>
 
             <div class="mt-4 grid grid-cols-2 gap-3">
                 @foreach($attendanceLabels as $status => $meta)
@@ -140,7 +140,7 @@
     <section class="border border-stone-200 bg-white p-6">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h2 class="text-lg font-bold text-stone-950">Payments & revenue</h2>
-            <p class="text-xs text-stone-500">Verified transactions only</p>
+            <p class="text-xs text-stone-500">Revenue uses verified transactions; paid counts use application payment status.</p>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div class="rounded-lg border border-stone-100 bg-emerald-50/40 p-4">
@@ -148,19 +148,19 @@
                 <p class="mt-1 text-2xl font-bold text-emerald-800">{{ $peso($kpis['revenue_verified']) }}</p>
             </div>
             <div class="rounded-lg border border-stone-100 bg-white p-4">
-                <p class="text-xs uppercase tracking-wide text-stone-500">This month</p>
+                <p class="text-xs uppercase tracking-wide text-stone-500">Verified revenue this month</p>
                 <p class="mt-1 text-2xl font-bold text-stone-950">{{ $peso($kpis['revenue_this_month']) }}</p>
             </div>
             <div class="rounded-lg border border-stone-100 bg-white p-4">
-                <p class="text-xs uppercase tracking-wide text-stone-500">Fully paid trainees</p>
+                <p class="text-xs uppercase tracking-wide text-stone-500">Fully paid applications</p>
                 <p class="mt-1 text-2xl font-bold text-stone-950">{{ number_format($kpis['fully_paid']) }}</p>
             </div>
             <div class="rounded-lg border border-stone-100 bg-white p-4">
-                <p class="text-xs uppercase tracking-wide text-stone-500">Partially paid</p>
+                <p class="text-xs uppercase tracking-wide text-stone-500">Partially paid applications</p>
                 <p class="mt-1 text-2xl font-bold text-stone-950">{{ number_format($kpis['partially_paid']) }}</p>
             </div>
             <div class="rounded-lg border border-stone-100 bg-amber-50/40 p-4">
-                <p class="text-xs uppercase tracking-wide text-stone-500">Awaiting verification</p>
+                <p class="text-xs uppercase tracking-wide text-stone-500">Transactions awaiting verification</p>
                 <p class="mt-1 text-2xl font-bold text-amber-800">{{ number_format($kpis['pending_payments']) }}</p>
             </div>
         </div>
@@ -171,7 +171,7 @@
         <div class="flex flex-wrap items-baseline justify-between gap-2">
             <div>
                 <h2 class="text-lg font-bold text-stone-950">Per-batch breakdown</h2>
-                <p class="text-sm text-stone-600">Compare enrollment, schedule mix, approvals, payments, and published modules side by side.</p>
+                <p class="text-sm text-stone-600">Compare application counts, schedule preferences, payment status, and modules by batch.</p>
             </div>
             <p class="text-xs text-stone-500">{{ $batches->count() }} {{ Str::plural('batch', $batches->count()) }}</p>
         </div>
@@ -183,17 +183,17 @@
                         <th>Batch</th>
                         <th>Enrollment</th>
                         <th>Training</th>
-                        <th class="text-right">Apps</th>
-                        <th class="text-right">Pending</th>
-                        <th class="text-right">Approved</th>
-                        <th class="text-right">Denied</th>
-                        <th class="text-right">AM</th>
-                        <th class="text-right">PM</th>
-                        <th class="text-right">Paid</th>
-                        <th class="text-right">Partial</th>
-                        <th class="text-right">Active</th>
-                        <th class="text-right">Graduated</th>
-                        <th class="text-right">Modules</th>
+                        <th class="text-right">Applications</th>
+                        <th class="text-right">Pre-enlistment</th>
+                        <th class="text-right">Approved applications</th>
+                        <th class="text-right">Denied applications</th>
+                        <th class="text-right">AM preference</th>
+                        <th class="text-right">PM preference</th>
+                        <th class="text-right">Fully paid applications</th>
+                        <th class="text-right">Partially paid applications</th>
+                        <th class="text-right">Active learners</th>
+                        <th class="text-right">Graduated learners</th>
+                        <th class="text-right">Total modules</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -223,7 +223,7 @@
                         <td class="text-right text-indigo-700">{{ number_format($batch->graduated_count) }}</td>
                         <td class="text-right">
                             {{ number_format($batch->modules_count) }}
-                            <span class="text-xs text-slate-400">({{ number_format($batch->published_modules_count) }} live)</span>
+                            <span class="text-xs text-slate-400">({{ number_format($batch->published_modules_count) }} published)</span>
                         </td>
                     </tr>
                 @empty
@@ -239,7 +239,7 @@
         <div class="flex flex-wrap items-baseline justify-between gap-2">
             <div>
                 <h2 class="text-lg font-bold text-stone-950">Learners leading module completion</h2>
-                <p class="text-sm text-stone-600">Top approved trainees by modules marked competent.</p>
+                <p class="text-sm text-stone-600">Approved trainees with the most completed modules.</p>
             </div>
             <p class="text-xs text-stone-500">Top {{ $topTrainees->count() }}</p>
         </div>

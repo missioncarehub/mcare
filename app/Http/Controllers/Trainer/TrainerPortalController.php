@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EnrollmentApplication;
 use App\Models\ModuleProgress;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\TraineeAttendance;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
@@ -127,10 +128,24 @@ class TrainerPortalController extends Controller
             ->latest('id')
             ->get();
 
+        $quizIds = $quizzes->pluck('id');
+        $submissions = QuizAttempt::query()
+            ->with([
+                'quiz.trainingModule',
+                'quiz.batch',
+                'application.user',
+                'application.batch',
+            ])
+            ->whereIn('quiz_id', $quizIds)
+            ->where('status', QuizAttempt::STATUS_GRADED)
+            ->latest('submitted_at')
+            ->get();
+
         return view('trainer.resources', [
             'batches' => $assignedBatch ? collect([$assignedBatch]) : collect(),
             'modules' => $modules,
             'quizzes' => $quizzes,
+            'submissions' => $submissions,
             'trainees' => $this->approvedTrainees($assignedBatch)->with('batch')->get(),
             'assignedBatch' => $assignedBatch,
             'catalogUnits' => $catalog->caregivingUnits(true),

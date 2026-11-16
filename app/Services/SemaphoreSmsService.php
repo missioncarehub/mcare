@@ -14,6 +14,17 @@ class SemaphoreSmsService
 
     public const PRIORITY_ENDPOINT = 'https://api.semaphore.co/api/v4/priority';
 
+    public const UNKNOWN_SUBMISSION_ERROR = 'SMS submission status is unknown. Check Semaphore message history before resending.';
+
+    /**
+     * @param  list<string>  $numbers
+     * @return array{sent: bool, status: ?int, error: ?string}
+     */
+    public function sendPriority(array $numbers, string $message): array
+    {
+        return $this->send($numbers, $message, priority: true);
+    }
+
     public function configured(): bool
     {
         return filled(config('services.semaphore.key'));
@@ -62,7 +73,7 @@ class SemaphoreSmsService
                 'recipients' => count($recipients),
             ]);
 
-            return ['sent' => false, 'status' => null, 'error' => 'Semaphore could not be reached.'];
+            return ['sent' => false, 'status' => null, 'error' => self::UNKNOWN_SUBMISSION_ERROR];
         } catch (Throwable $exception) {
             report($exception);
 

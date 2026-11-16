@@ -94,7 +94,7 @@
                         <p class="text-sm font-bold text-slate-900">Graduate SMS</p>
                         <p class="text-xs leading-5 text-slate-500">Send immediately reaches senior alumni only. A scheduled text reaches both junior and senior alumni. Only alumni with a valid contact number are included.</p>
                         @include('admin.learning.partials.career-sms-preview')
-                        <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" name="sms_send_immediately" value="1" @checked(old('sms_send_immediately')) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-500"><span><span class="block font-bold text-slate-900">Send SMS immediately</span><span class="mt-1 block leading-5">Text senior alumni as soon as this career is published, using Semaphore’s priority queue so the message is not held for several minutes. This uses 2 credits per text. Leave this unchecked and set a schedule to text junior and senior alumni on the regular queue.</span></span></label>
+                        <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" name="sms_send_immediately" value="1" @checked(old('sms_send_immediately')) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-500"><span><span class="block font-bold text-slate-900">Send SMS immediately (priority)</span><span class="mt-1 block leading-5">Text senior alumni as soon as this career is published, using Semaphore’s priority queue. Priority SMS costs 2 credits per 160-character segment; longer messages use more credits. Phone arrival depends on the mobile network. Leave this unchecked and set a schedule to text junior and senior alumni on the regular queue.</span></span></label>
                         <div><label for="career-sms-scheduled-at" class="form-label">Or schedule SMS date and time</label><input id="career-sms-scheduled-at" name="sms_scheduled_at" type="datetime-local" min="{{ now()->format('Y-m-d\\TH:i') }}" value="{{ old('sms_scheduled_at') }}" class="form-field">@error('sms_scheduled_at', 'careerCreate')<p class="form-error">{{ $message }}</p>@enderror</div>
                     </div>
                 </div>
@@ -153,7 +153,7 @@
                                     <p class="text-xs leading-5 {{ filled($job->sms_last_error) && ! $job->sms_sent_at ? 'font-semibold text-rose-600' : 'text-slate-500' }}">{{ $job->smsStatusLabel() }}</p>
                                     @include('admin.learning.partials.career-sms-preview', ['opportunity' => $job])
                                     @unless($job->sms_sent_at)
-                                        <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" name="sms_send_immediately" value="1" @checked($job->sms_mode === \App\Models\CareerOpportunity::SMS_IMMEDIATE) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-500"><span class="font-bold text-slate-900">Send SMS immediately</span></label>
+                                        <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" name="sms_send_immediately" value="1" @checked($job->sms_mode === \App\Models\CareerOpportunity::SMS_IMMEDIATE) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-500"><span><span class="block font-bold text-slate-900">Send SMS immediately (priority)</span><span class="mt-1 block leading-5">Text senior alumni through Semaphore’s priority queue when published. Priority SMS costs 2 credits per 160-character segment; longer messages use more credits.</span></span></label>
                                         <div><label for="job-sms-{{ $job->id }}" class="form-label">Or schedule SMS date and time</label><input id="job-sms-{{ $job->id }}" name="sms_scheduled_at" type="datetime-local" min="{{ now()->format('Y-m-d\\TH:i') }}" value="{{ $job->sms_scheduled_at?->format('Y-m-d\\TH:i') }}" class="form-field"></div>
                                     @endunless
                                 </div>
@@ -230,15 +230,15 @@
                             <td class="px-3 py-4">
                                 <div class="flex flex-wrap justify-end gap-2">
                                     @if ($inquiry->certificateIsPendingReview())
-                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Approve this placement certificate and award the career in alumni history?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button></form>
-                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" data-confirm="Return this certificate to the alumni for resubmission?">@csrf @method('PATCH')<input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return cert</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Approve this placement certificate and award the career in alumni history?">@csrf @method('PATCH')<input type="hidden" name="career_inquiry_id" value="{{ $inquiry->id }}"><input type="hidden" name="certificate_status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Return this certificate to the alumni for resubmission?">@csrf @method('PATCH')<input type="hidden" name="career_inquiry_id" value="{{ $inquiry->id }}"><input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return cert</button></form>
                                     @endif
                                     @if ($inquiry->isPending())
-                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Approve this application? This fills the opening, closes the posting, and marks every other pending applicant as not selected.">@csrf @method('PATCH')<input type="hidden" name="status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approve</button></form>
-                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" data-confirm="Reject this application?">@csrf @method('PATCH')<input type="hidden" name="status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Reject</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Approve this application? This fills the opening, closes the posting, and marks every other pending applicant as not selected.">@csrf @method('PATCH')<input type="hidden" name="status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="circle-check" class="h-4 w-4" />Approve</button></form>
+                                        <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Reject this application?">@csrf @method('PATCH')<input type="hidden" name="status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Reject</button></form>
                                     @endif
                                     <button type="button" data-dashboard-dialog-open="career-inquiry-{{ $inquiry->id }}" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="pencil" class="h-4 w-4" />Review</button>
-                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.destroy', $inquiry) }}" data-confirm="Remove this application?">@csrf @method('DELETE')<button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50">Remove</button></form>
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.destroy', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Remove this application?">@csrf @method('DELETE')<button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50">Remove</button></form>
                                 </div>
                             </td>
                         </tr>
@@ -249,15 +249,15 @@
             </table>
         </div>
         @foreach ($inquiries as $inquiry)
-            <dialog id="career-inquiry-{{ $inquiry->id }}" data-dashboard-dialog class="career-review-dialog m-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-inquiry-title-{{ $inquiry->id }}">
-                <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
+            <dialog id="career-inquiry-{{ $inquiry->id }}" data-dashboard-dialog data-auto-open="{{ (string) old('career_inquiry_id') === (string) $inquiry->id && $errors->any() ? 'true' : 'false' }}" class="m-auto max-h-[90vh] w-[min(96vw,36rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/45" aria-labelledby="career-inquiry-title-{{ $inquiry->id }}">
+                <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
                     <div>
                         <h2 id="career-inquiry-title-{{ $inquiry->id }}" class="font-display text-xl font-bold text-slate-900">Review application</h2>
                         <p class="mt-1 text-xs text-slate-500">{{ $inquiry->opportunity?->listingTitle() ?? 'Removed career' }}</p>
                     </div>
                     <button type="button" data-dashboard-dialog-close class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close application review"><x-dashboard-icon name="xmark" class="h-4 w-4" /></button>
                 </div>
-                <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div class="grid gap-4 p-6">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
                         <p><span class="font-bold text-slate-900">Applicant:</span> {{ $inquiry->name }}</p>
                         <p class="mt-1"><span class="font-bold text-slate-900">Email:</span> {{ $inquiry->email }}</p>
@@ -271,7 +271,7 @@
                                 @foreach ($inquiry->credential_paths as $idx => $credential)
                                     <li class="flex items-center gap-2 text-sm">
                                         <x-dashboard-icon name="file-text" class="h-4 w-4 shrink-0 text-purple-600" />
-                                        <a href="{{ route('admin.learning.alumni-jobs.inquiries.credential', [$inquiry, $idx]) }}" target="_blank" class="truncate font-semibold text-purple-700 underline decoration-purple-200 hover:text-purple-900">{{ data_get($credential, 'name', 'Credential '.($idx + 1)) }}</a>
+                                        <a href="{{ route('admin.learning.alumni-jobs.inquiries.credential', [$inquiry, $idx]) }}" target="_blank" rel="noopener" class="truncate font-semibold text-purple-700 underline decoration-purple-200 hover:text-purple-900">{{ data_get($credential, 'name', 'Credential '.($idx + 1)) }}</a>
                                     </li>
                                 @endforeach
                             </ul>
@@ -282,7 +282,7 @@
                             <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Placement certificate</p>
                             <p class="mt-2 text-sm font-semibold text-slate-900">{{ $inquiry->certificateStatusLabel() ?? 'Not started' }}</p>
                             @if ($inquiry->placement_certificate)
-                                <a href="{{ route('admin.learning.alumni-jobs.inquiries.placement-certificate', $inquiry) }}" target="_blank" class="mt-2 inline-flex items-center gap-1 text-sm font-bold text-purple-700 underline decoration-purple-200 hover:text-purple-900">
+                                <a href="{{ route('admin.learning.alumni-jobs.inquiries.placement-certificate', $inquiry) }}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-sm font-bold text-purple-700 underline decoration-purple-200 hover:text-purple-900">
                                     <x-dashboard-icon name="file-text" class="h-4 w-4" />
                                     View placement certificate
                                 </a>
@@ -292,45 +292,36 @@
                             @endif
                             @if ($inquiry->certificateIsPendingReview())
                                 <div class="mt-4 flex flex-wrap gap-2">
-                                    <button type="submit" form="inquiry-award-{{ $inquiry->id }}" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button>
-                                    <button type="submit" form="inquiry-return-cert-{{ $inquiry->id }}" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return certificate</button>
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Approve this placement certificate and award the career?">@csrf @method('PATCH')<input type="hidden" name="career_inquiry_id" value="{{ $inquiry->id }}"><input type="hidden" name="certificate_status" value="approved"><button type="submit" class="secondary-action border-emerald-200 text-emerald-700 hover:bg-emerald-50 inline-flex items-center gap-1"><x-dashboard-icon name="award" class="h-4 w-4" />Award career</button></form>
+                                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" data-confirm="Return this certificate for resubmission?">@csrf @method('PATCH')<input type="hidden" name="career_inquiry_id" value="{{ $inquiry->id }}"><input type="hidden" name="certificate_status" value="rejected"><button type="submit" class="secondary-action border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><x-dashboard-icon name="xmark" class="h-4 w-4" />Return certificate</button></form>
                                 </div>
                             @endif
                         </div>
                     @endif
+                    <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', ['careerInquiry' => $inquiry, 'inquiry_page' => $inquiries->currentPage()]) }}" class="grid gap-4" data-dashboard-dialog-form data-submit-label="Saving decision...">
+                        @csrf @method('PATCH')
+                        <input type="hidden" name="career_inquiry_id" value="{{ $inquiry->id }}">
+                        <div>
+                            <label for="inquiry-status-{{ $inquiry->id }}" class="form-label">Decision</label>
+                            <select id="inquiry-status-{{ $inquiry->id }}" name="status" required class="form-field">
+                                @foreach ($inquiryStatuses as $value => $label)
+                                    <option value="{{ $value }}" @selected(((string) old('career_inquiry_id') === (string) $inquiry->id ? old('status', $inquiry->status) : $inquiry->status) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('status')<p class="form-error">{{ $message }}</p>@enderror
+                            <p class="mt-2 text-xs leading-5 text-slate-500">Approving fills this opening, closes the posting, and marks other pending applicants as not selected.</p>
+                        </div>
+                        <div>
+                            <label for="inquiry-notes-{{ $inquiry->id }}" class="form-label">Admin notes <span class="font-normal text-slate-400">(optional)</span></label>
+                            <textarea id="inquiry-notes-{{ $inquiry->id }}" name="admin_notes" rows="3" maxlength="1000" class="form-field">{{ (string) old('career_inquiry_id') === (string) $inquiry->id ? old('admin_notes', $inquiry->admin_notes) : $inquiry->admin_notes }}</textarea>
+                            @error('admin_notes')<p class="form-error">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                            <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
+                            <button type="submit" data-action-button class="primary-action">Save decision</button>
+                        </div>
+                    </form>
                 </div>
-                <form method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.update', $inquiry) }}" class="shrink-0 space-y-4 border-t border-slate-200 bg-white px-6 py-5" data-dashboard-dialog-form data-submit-label="Saving decision...">
-                    @csrf @method('PATCH')
-                    <div>
-                        <label for="inquiry-status-{{ $inquiry->id }}" class="form-label">Decision</label>
-                        <select id="inquiry-status-{{ $inquiry->id }}" name="status" required class="form-field">
-                            @foreach ($inquiryStatuses as $value => $label)
-                                <option value="{{ $value }}" @selected(old('status', $inquiry->status) === $value)>{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        @error('status')<p class="form-error">{{ $message }}</p>@enderror
-                        <p class="mt-2 text-xs leading-5 text-slate-500">Approving fills this opening, closes the posting, and marks other pending applicants as not selected.</p>
-                    </div>
-                    <div>
-                        <label for="inquiry-notes-{{ $inquiry->id }}" class="form-label">Admin notes <span class="font-normal text-slate-400">(optional)</span></label>
-                        <textarea id="inquiry-notes-{{ $inquiry->id }}" name="admin_notes" rows="3" maxlength="1000" class="form-field">{{ old('admin_notes', $inquiry->admin_notes) }}</textarea>
-                        @error('admin_notes')<p class="form-error">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                        <button type="button" data-dashboard-dialog-close class="secondary-action">Cancel</button>
-                        <button type="submit" data-action-button class="primary-action">Save decision</button>
-                    </div>
-                </form>
-                @if ($inquiry->certificateIsPendingReview())
-                    <form id="inquiry-award-{{ $inquiry->id }}" method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" class="hidden" data-confirm="Approve this placement certificate and award the career?">
-                        @csrf @method('PATCH')
-                        <input type="hidden" name="certificate_status" value="approved">
-                    </form>
-                    <form id="inquiry-return-cert-{{ $inquiry->id }}" method="POST" action="{{ route('admin.learning.alumni-jobs.inquiries.certificate.update', $inquiry) }}" class="hidden" data-confirm="Return this certificate for resubmission?">
-                        @csrf @method('PATCH')
-                        <input type="hidden" name="certificate_status" value="rejected">
-                    </form>
-                @endif
             </dialog>
         @endforeach
         @if ($inquiries->hasPages())<div class="mt-5 border-t border-slate-100 pt-5">{{ $inquiries->links() }}</div>@endif

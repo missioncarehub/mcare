@@ -127,8 +127,10 @@ class CertificateTemplateController extends Controller
             }
         }
 
-        DB::transaction(function () use ($template, $type, $importedBackground): void {
-            if (! $importedBackground) {
+        $activateImmediately = $request->boolean('activate_immediately', false);
+
+        DB::transaction(function () use ($template, $type, $importedBackground, $activateImmediately): void {
+            if (! $importedBackground || $activateImmediately) {
                 CertificateTemplate::query()->where('type', $type)->where('is_active', true)->update(['is_active' => false]);
                 $template->is_active = true;
             }

@@ -161,7 +161,7 @@
                                         @method('DELETE')
                                         <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold uppercase tracking-wide text-red-700 hover:bg-red-50" aria-label="Archive {{ $trainee->first_name }} {{ $trainee->last_name }}">
                                             <x-dashboard-icon name="trash-2" class="h-4 w-4" />
-                                            <span>Delete</span>
+                                            <span>Archive</span>
                                         </button>
                                     </form>
                                     <a href="{{ route('admin.learning.trainees.show', $trainee) }}" class="secondary-action inline-flex h-10 items-center gap-2">

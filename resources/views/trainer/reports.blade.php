@@ -32,8 +32,8 @@
         ['key' => 'modules', 'label' => 'Published modules', 'icon' => 'book-open', 'tone' => 'bg-violet-50 text-violet-700 ring-violet-100'],
         ['key' => 'module_completions', 'label' => 'Module completions', 'icon' => 'circle-check', 'tone' => 'bg-emerald-50 text-emerald-700 ring-emerald-100'],
         ['key' => 'awaiting_evaluation', 'label' => 'Awaiting evaluation', 'icon' => 'clipboard-list', 'tone' => 'bg-amber-50 text-amber-700 ring-amber-100'],
-        ['key' => 'paid', 'label' => 'Payments verified', 'icon' => 'credit-card', 'tone' => 'bg-teal-50 text-teal-700 ring-teal-100'],
-        ['key' => 'payment_pending', 'label' => 'Payment pending', 'icon' => 'clock', 'tone' => 'bg-rose-50 text-rose-700 ring-rose-100'],
+        ['key' => 'paid', 'label' => 'Fully paid trainees', 'icon' => 'credit-card', 'tone' => 'bg-teal-50 text-teal-700 ring-teal-100'],
+        ['key' => 'payment_pending', 'label' => 'Trainees awaiting payment', 'icon' => 'clock', 'tone' => 'bg-rose-50 text-rose-700 ring-rose-100'],
     ];
 @endphp
 
@@ -67,7 +67,7 @@
                 @if($card['key'] === 'modules')
                     <p class="mt-1 text-xs text-stone-500">{{ number_format($stats['total_modules']) }} in catalog for this batch</p>
                 @elseif($card['key'] === 'trainees')
-                    <p class="mt-1 text-xs text-stone-500">{{ number_format($stats['am']) }} AM · {{ number_format($stats['pm']) }} PM</p>
+                    <p class="mt-1 text-xs text-stone-500">{{ number_format($stats['am']) }} AM schedule · {{ number_format($stats['pm']) }} PM schedule</p>
                 @elseif($card['key'] === 'paid')
                     <p class="mt-1 text-xs text-stone-500">{{ number_format($stats['partial_paid']) }} partially paid</p>
                 @endif
@@ -144,7 +144,7 @@
         <div class="flex flex-wrap items-baseline justify-between gap-2">
             <div>
                 <h2 class="text-lg font-bold text-stone-950">Trainee progress</h2>
-                <p class="text-sm text-stone-600">Ranked by modules marked competent.</p>
+                <p class="text-sm text-stone-600">Ranked by completed modules.</p>
             </div>
             <p class="text-xs text-stone-500">{{ $traineeRows->count() }} {{ Str::plural('trainee', $traineeRows->count()) }}</p>
         </div>
@@ -155,11 +155,11 @@
                     <tr>
                         <th>Trainee</th>
                         <th>Schedule</th>
-                        <th class="text-right">Completed</th>
-                        <th class="text-right">In-progress</th>
-                        <th>Progress</th>
-                        <th>Payment</th>
-                        <th>State</th>
+                        <th class="text-right">Modules completed</th>
+                        <th class="text-right">Modules in progress</th>
+                        <th>Module completion</th>
+                        <th>Payment status</th>
+                        <th>Learning status</th>
                     </tr>
                 </thead>
                 <tbody>

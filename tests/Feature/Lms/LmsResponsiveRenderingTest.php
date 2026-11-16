@@ -192,6 +192,7 @@ class LmsResponsiveRenderingTest extends TestCase
         $application->forceFill([
             'learning_status' => \App\Models\EnrollmentApplication::LEARNING_GRADUATED,
         ])->save();
+        $trainee->refresh();
 
         $this->actingAs($trainee)
             ->get(route('trainee.dashboard'))
