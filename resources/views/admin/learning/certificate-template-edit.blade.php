@@ -443,50 +443,53 @@
                     @endif
                 </p>
 
-                {{-- Dedicated Fitted Preview Viewport Stage (Equal height, clean margins, centered document) --}}
-                <div class="relative mt-4 flex h-[460px] sm:h-[500px] w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100/70 p-3">
+                <div class="mt-4 rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
                     @if($isTor)
-                        {{-- High-Fidelity Official TOR Preview Canvas (Fitted & Centered) --}}
-                        <div id="tor-preview-wrapper" class="relative flex h-full max-h-full max-w-full items-center justify-center overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-900/10 transition-all [container-type:size]" style="aspect-ratio: 210 / 297" data-import-frame>
-                            @include('admin.learning.partials.tor-default-preview', [
-                                'organization' => $organization,
-                                'torTitle' => $field('title') ?: 'OFFICIAL TRANSCRIPT OF RECORDS',
-                                'torTrainee' => 'MARIA REYES SANTOS',
-                                'torProgram' => mb_strtoupper($programTitleDisplay),
-                                'torHours' => $courseHours,
-                                'torRemarks' => $field('body') ?: 'For Records and Reference Purposes',
-                                'torRows' => $torRows,
-                                'torTrainer' => $field('second_signatory_name') ?: 'Lead Trainer',
-                                'torTrainerRole' => $field('second_signatory_role') ?: 'Lead Trainer',
-                                'torRegistrar' => $field('signatory_name') ?: 'TVI Registrar',
-                                'torRegistrarRole' => $field('signatory_role') ?: 'Registrar',
-                                'torLive' => true,
-                                'savedBackground' => $savedBackground,
-                                'backgroundIsPdf' => $backgroundIsPdf,
-                            ])
+                        {{-- High-Fidelity Official TOR Preview Canvas (Proportionately Sized & Centered) --}}
+                        <div class="mx-auto" style="max-width: 420px;">
+                            <div id="tor-preview-wrapper" class="relative overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-900/10 transition-all" style="aspect-ratio: 210 / 297; container-type: size;" data-import-frame>
+                                @include('admin.learning.partials.tor-default-preview', [
+                                    'organization' => $organization,
+                                    'torTitle' => $field('title') ?: 'OFFICIAL TRANSCRIPT OF RECORDS',
+                                    'torTrainee' => 'MARIA REYES SANTOS',
+                                    'torProgram' => mb_strtoupper($programTitleDisplay),
+                                    'torHours' => $courseHours,
+                                    'torRemarks' => $field('body') ?: 'For Records and Reference Purposes',
+                                    'torRows' => $torRows,
+                                    'torTrainer' => $field('second_signatory_name') ?: 'Lead Trainer',
+                                    'torTrainerRole' => $field('second_signatory_role') ?: 'Lead Trainer',
+                                    'torRegistrar' => $field('signatory_name') ?: 'TVI Registrar',
+                                    'torRegistrarRole' => $field('signatory_role') ?: 'Registrar',
+                                    'torLive' => true,
+                                    'savedBackground' => $savedBackground,
+                                    'backgroundIsPdf' => $backgroundIsPdf,
+                                ])
 
-                            <img src="{{ $savedBackground }}" alt="Imported {{ $label }} template" class="absolute inset-0 h-full w-full object-fill pointer-events-none" data-import-image @unless($savedBackground !== '') hidden @endunless>
-                            <iframe title="Imported {{ $label }} PDF" class="pointer-events-none absolute inset-0 h-full w-full bg-white" data-import-pdf @if($savedImportUrl !== '' && $backgroundIsPdf) src="{{ $savedImportUrl }}" @else hidden @endif></iframe>
-                            <p class="hidden" data-import-empty>Import a finished design to preview it here.</p>
+                                <img src="{{ $savedBackground }}" alt="Imported {{ $label }} template" class="absolute inset-0 h-full w-full object-fill pointer-events-none" data-import-image @unless($savedBackground !== '') hidden @endunless>
+                                <iframe title="Imported {{ $label }} PDF" class="pointer-events-none absolute inset-0 h-full w-full bg-white" data-import-pdf @if($savedImportUrl !== '' && $backgroundIsPdf) src="{{ $savedImportUrl }}" @else hidden @endif></iframe>
+                                <p class="hidden" data-import-empty>Import a finished design to preview it here.</p>
+                            </div>
                         </div>
 
                     @else
-                        {{-- COTC Certificate Preview Frame (Fitted & Centered) --}}
-                        <div class="relative flex h-full max-h-full max-w-full items-center justify-center overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-100 shadow-inner" 
-                             @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif 
-                             data-import-frame>
-                            <img src="{{ $savedBackground }}" alt="Imported {{ $label }} template" class="absolute inset-0 h-full w-full object-fill pointer-events-none" data-import-image @unless($savedBackground !== '') hidden @endunless>
-                            <iframe title="Imported {{ $label }} PDF" class="pointer-events-none absolute inset-0 h-full w-full bg-white" data-import-pdf @if($savedImportUrl !== '' && $backgroundIsPdf) src="{{ $savedImportUrl }}" @else hidden @endif></iframe>
-                            
-                            <p class="absolute inset-0 grid place-items-center px-6 text-center text-xs font-semibold text-slate-400" data-import-empty @if($savedImportUrl !== '') hidden @endif>
-                                Import a finished design to preview it here.
-                            </p>
+                        {{-- COTC Certificate Preview Frame (Proportionately Sized & Centered) --}}
+                        <div class="mx-auto" style="max-width: 540px;">
+                            <div class="relative overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-100 shadow-inner" 
+                                 @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif 
+                                 data-import-frame>
+                                <img src="{{ $savedBackground }}" alt="Imported {{ $label }} template" class="absolute inset-0 h-full w-full object-fill pointer-events-none" data-import-image @unless($savedBackground !== '') hidden @endunless>
+                                <iframe title="Imported {{ $label }} PDF" class="pointer-events-none absolute inset-0 h-full w-full bg-white" data-import-pdf @if($savedImportUrl !== '' && $backgroundIsPdf) src="{{ $savedImportUrl }}" @else hidden @endif></iframe>
+                                
+                                <p class="absolute inset-0 grid place-items-center px-6 text-center text-xs font-semibold text-slate-400" data-import-empty @if($savedImportUrl !== '') hidden @endif>
+                                    Import a finished design to preview it here.
+                                </p>
 
-                            {{-- Visual Trainee Name Overlay --}}
-                            <div id="preview-trainee-name" 
-                                 class="pointer-events-none absolute font-bold text-slate-900 transition-all font-serif drop-shadow-sm" 
-                                 style="left: 5%; top: {{ $currentNameY }}%; width: 90%; font-size: 16px; text-align: {{ $currentNameAlign === 'C' ? 'center' : ($currentNameAlign === 'R' ? 'right' : 'left') }};">
-                                JUAN DELA CRUZ
+                                {{-- Visual Trainee Name Overlay --}}
+                                <div id="preview-trainee-name" 
+                                     class="pointer-events-none absolute font-bold text-slate-900 transition-all font-serif drop-shadow-sm" 
+                                     style="left: 5%; top: {{ $currentNameY }}%; width: 90%; font-size: 16px; text-align: {{ $currentNameAlign === 'C' ? 'center' : ($currentNameAlign === 'R' ? 'right' : 'left') }};">
+                                    JUAN DELA CRUZ
+                                </div>
                             </div>
                         </div>
                     @endif
