@@ -75,11 +75,28 @@ class CertificateTemplateController extends Controller
             ->get();
         $label = CertificateTemplate::label($type);
 
+        $competencyUnits = collect();
+        if ($type === OfficialDocument::TYPE_TOR) {
+            $competencyUnits = CompetencyUnit::query()
+                ->when($selectedProgram?->code, fn ($q, $code) => $q->where('program_code', $code))
+                ->where('is_tor_included', true)
+                ->orderBy('sort_order')
+                ->get();
+
+            if ($competencyUnits->isEmpty()) {
+                $competencyUnits = CompetencyUnit::query()
+                    ->where('is_tor_included', true)
+                    ->orderBy('sort_order')
+                    ->take(12)
+                    ->get();
+            }
+        }
+
         return view('admin.learning.certificate-template-edit', [
             'type' => $type,
             'heading' => match ($label) {
                 'COTC' => ($selectedProgram ? $selectedProgram->name.' — ' : '').'Certificate of Training Completion',
-                default => 'Transcript of Records',
+                default => ($selectedProgram ? $selectedProgram->name.' — ' : '').'Transcript of Records',
             },
             'section' => [
                 'active' => $history->firstWhere('is_active', true),
@@ -89,6 +106,7 @@ class CertificateTemplateController extends Controller
             'programs' => $programs,
             'selectedProgram' => $selectedProgram,
             'selectedProgramId' => $selectedProgramId,
+            'competencyUnits' => $competencyUnits,
         ]);
     }
 
@@ -191,6 +209,13 @@ class CertificateTemplateController extends Controller
             if ($request->hasFile($input)) {
                 $template->{$column} = $request->file($input)->store('certificate-templates', 'local');
             }
+        }
+
+        if ($request->boolean('clear_signature')) {
+            $template->signature_path = null;
+        }
+        if ($request->boolean('clear_second_signature')) {
+            $template->second_signature_path = null;
         }
 
         $activateImmediately = $request->boolean('activate_immediately', false);
@@ -326,10 +351,11 @@ class CertificateTemplateController extends Controller
     private function sampleDocument(string $type, ?int $trainingProgramId = null): OfficialDocument
     {
         $programName = 'Caregiving NC II';
+        $programModel = null;
         if ($trainingProgramId) {
-            $prog = TrainingProgram::find($trainingProgramId);
-            if ($prog) {
-                $programName = $prog->name;
+            $programModel = TrainingProgram::find($trainingProgramId);
+            if ($programModel) {
+                $programName = $programModel->name;
             }
         }
 
@@ -348,6 +374,9 @@ class CertificateTemplateController extends Controller
             'school_name' => 'MCARE School',
             'classification' => 'Student',
         ]);
+        if ($programModel) {
+            $application->setRelation('trainingProgram', $programModel);
+        }
         $batch = new TrainingBatch([
             'name' => 'Batch 1',
             'year' => 2026,

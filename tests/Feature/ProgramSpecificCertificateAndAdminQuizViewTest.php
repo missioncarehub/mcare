@@ -169,4 +169,121 @@ class ProgramSpecificCertificateAndAdminQuizViewTest extends TestCase
         $this->assertSame('Caregiving NC II Dedicated Certificate', $saved->title);
         $this->assertTrue($saved->is_active);
     }
+
+    public function test_admin_tor_template_edit_view_shows_transcript_fields(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC II',
+            'code' => 'CG-NC2',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates.edit', [
+                'type' => OfficialDocument::TYPE_TOR,
+                'program_id' => $program->id,
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('Manage Caregiving NC II — Transcript of Records');
+        $response->assertSee('Document Heading / Title');
+        $response->assertSee('OFFICIAL TRANSCRIPT OF RECORDS');
+        $response->assertSee('Official Transcript Remarks');
+        $response->assertSee('Certified by (Registrar)');
+        $response->assertSee('Prepared by (Trainer)');
+        $response->assertSee('A4 (210 × 297 mm)');
+        $response->assertSee('Included Competency Units (TESDA Matrix)');
+    }
+
+    public function test_admin_can_save_program_specific_tor_template_and_it_renders_correctly(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving Elderly Services NC II',
+            'code' => 'CES-NC2',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.learning.certificate-templates.store'), [
+                'type' => OfficialDocument::TYPE_TOR,
+                'training_program_id' => $program->id,
+                'title' => 'ACADEMIC TRANSCRIPT OF COMPETENCY RECORDS',
+                'body' => 'Graduated with high competency honors.',
+                'paper_size' => 'a4',
+                'orientation' => 'portrait',
+                'signatory_name' => 'Amina Dela Cruz',
+                'signatory_role' => 'Registrar Officer',
+                'second_signatory_name' => 'Paolo Reyes',
+                'second_signatory_role' => 'Master Trainer',
+                'activate_immediately' => '1',
+            ]);
+
+        $response->assertRedirect(route('admin.learning.certificate-templates', ['program_id' => $program->id]));
+        $response->assertSessionHas('saved');
+
+        $savedTor = CertificateTemplate::activeFor(OfficialDocument::TYPE_TOR, $program->id);
+        $this->assertNotNull($savedTor);
+        $this->assertSame($program->id, $savedTor->training_program_id);
+        $this->assertSame('ACADEMIC TRANSCRIPT OF COMPETENCY RECORDS', $savedTor->title);
+        $this->assertSame('Graduated with high competency honors.', $savedTor->body);
+        $this->assertSame('Amina Dela Cruz', $savedTor->signatory_name);
+        $this->assertSame('Paolo Reyes', $savedTor->second_signatory_name);
+
+        // Verify that rendering an official TOR document uses the program-specific template and program name
+        $batch = new TrainingBatch([
+            'name' => 'Batch 2026-CES',
+            'training_program_id' => $program->id,
+            'year' => 2026,
+            'training_starts_at' => '2026-02-01',
+            'training_ends_at' => '2026-08-01',
+        ]);
+        $application = new EnrollmentApplication([
+            'user_id' => $admin->id,
+            'enrollment_number' => 'MCE-2026-CES-001',
+            'email' => 'juana@example.com',
+            'training_program_id' => $program->id,
+            'first_name' => 'Juana',
+            'last_name' => 'Batumbakal',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+        ]);
+        $application->setRelation('batch', $batch);
+        $application->setRelation('trainingProgram', $program);
+        $application->setRelation('competencyRecords', collect());
+
+        $doc = new OfficialDocument([
+            'type' => OfficialDocument::TYPE_TOR,
+            'version' => 1,
+            'document_number' => 'MCARE-TOR-CES-001',
+            'generated_at' => now(),
+        ]);
+        $doc->setRelation('application', $application);
+
+        $pdfContent = app(FpdfOfficialDocumentRenderer::class)->render($doc);
+        $this->assertStringStartsWith('%PDF-', $pdfContent);
+        $this->assertTrue($this->pdfContains($pdfContent, 'ACADEMIC TRANSCRIPT OF COMPETENCY RECORDS'));
+        $this->assertTrue($this->pdfContains($pdfContent, 'Graduated with high competency honors.'));
+        $this->assertTrue($this->pdfContains($pdfContent, 'AMINA DELA CRUZ'));
+        $this->assertTrue($this->pdfContains($pdfContent, 'CAREGIVING ELDERLY SERVICES NC II'));
+    }
+
+    private function pdfContains(string $pdf, string $needle): bool
+    {
+        if (str_contains($pdf, $needle)) {
+            return true;
+        }
+
+        if (preg_match_all('/stream\r?\n(.+?)\r?\nendstream/s', $pdf, $matches)) {
+            foreach ($matches[1] as $stream) {
+                $decoded = @gzuncompress($stream);
+                if (is_string($decoded) && str_contains($decoded, $needle)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

@@ -18,6 +18,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
     {
         $document->loadMissing([
             'application.batch',
+            'application.trainingProgram',
             'application.competencyRecords.unit',
         ]);
 
@@ -270,10 +271,12 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $pdf->SetFillColor(156, 122, 195);
         $pdf->Rect($marginX + 4, $y, $contentWidth - 8, 1.2, 'F');
 
+        $programTitle = mb_strtoupper((string) ($application->trainingProgram?->name ?? 'CAREGIVING NC II'));
+
         $y = 41.0;
         $this->writeFitted($pdf, $marginX, $y, $contentWidth, 8, $this->latin($title), 'Times', 'B', 13.5, 'C', 'M', 11);
         $this->writeFitted($pdf, $marginX, $y + 9, $contentWidth, 9, '"'.$fullName.'"', 'Times', 'B', 16, 'C', 'M', 10);
-        $this->writeFitted($pdf, $marginX, $y + 19, $contentWidth, 7, 'CAREGIVING NC II', 'Times', 'B', 12.5, 'C', 'M', 10);
+        $this->writeFitted($pdf, $marginX, $y + 19, $contentWidth, 7, $this->latin($programTitle), 'Times', 'B', 12.5, 'C', 'M', 10);
         $hours = (int) ($organization['course_hours'] ?? 786);
         $this->writeFitted($pdf, $marginX, $y + 26, $contentWidth, 8, $this->latin("Course\n({$hours} Hours)"), 'Times', 'I', 10, 'C', 'T', 8);
 
@@ -318,7 +321,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             $leftWidth,
             19,
             'TITLE/COURSE:',
-            "CAREGIVING NC II\nDate Completed/Graduated:\n".$this->latin($application->batch?->training_ends_at?->format('F j, Y') ?? '-'),
+            $this->latin($programTitle)."\nDate Completed/Graduated:\n".$this->latin($application->batch?->training_ends_at?->format('F j, Y') ?? '-'),
             6.5,
         );
         $blockY += 19;

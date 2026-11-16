@@ -12,16 +12,16 @@
             <div style="height: 5px; margin: 12px 40px 14px; background: #9c7ac3;"></div>
             <p data-tor-title style="margin: 0; text-align: center; font-size: 22px; font-weight: 700;">{{ $torTitle }}</p>
             <p style="margin: 4px 0 0; text-align: center; font-size: 28px; font-weight: 700; line-height: 1.1;">"{{ $torTrainee }}"</p>
-            <p style="margin: 2px 0 0; text-align: center; font-size: 20px; font-weight: 700;">CAREGIVING NC II</p>
-            <p style="margin: 0; text-align: center; font-size: 16px; font-style: italic; line-height: 1.15;">Course<br>({{ $organization['course_hours'] ?? 786 }} Hours)</p>
+            <p data-tor-program style="margin: 2px 0 0; text-align: center; font-size: 20px; font-weight: 700;">{{ $torProgram ?? 'CAREGIVING NC II' }}</p>
+            <p style="margin: 0; text-align: center; font-size: 16px; font-style: italic; line-height: 1.15;">Course<br>({{ $torHours ?? ($organization['course_hours'] ?? 786) }} Hours)</p>
             <div style="display: grid; min-height: 0; flex: 1; grid-template-columns: 236px 1fr; margin-top: 14px; border: 1.5px solid #111;">
                 <div style="background: #c9c9f8; padding: 8px 10px; font-size: 13px; line-height: 1.25;">
                     <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">Entrance Date:</span>September 5, 2026</p>
                     <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">Address:</span>San Isidro Poblacion, Pili, Camarines Sur</p>
                     <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">Last School Attended:</span>MCARE School<span style="display: block; margin-top: 4px; font-weight: 700;">Category:</span>Regular</p>
-                    <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">TITLE/COURSE:</span>CAREGIVING NC II<span style="display: block; margin-top: 4px; font-weight: 700; font-style: italic;">Date Completed/Graduated:</span>September 30, 2026</p>
+                    <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">TITLE/COURSE:</span><span data-tor-course>{{ $torProgram ?? 'CAREGIVING NC II' }}</span><span style="display: block; margin-top: 4px; font-weight: 700; font-style: italic;">Date Completed/Graduated:</span>September 30, 2026</p>
                     <p style="margin: 0 0 8px;"><span style="display: block; font-weight: 700;">Official Marks:</span>1.00 - 99% &nbsp; 2.00 - 87%<br>1.25 - 96% &nbsp; 2.25 - 84%<br>1.50 - 93% &nbsp; 2.50 - 81%<br>1.75 - 90% &nbsp; 2.75 - 78%<br>3.00 - 75%<br>1.00-3.00 Competent<br>4.00-5.00 Not Yet Competent</p>
-                    <p style="margin: 0;"><span style="display: block; font-weight: 700;">Remarks:</span><span style="font-style: italic;">For Records and Reference Purposes</span></p>
+                    <p style="margin: 0;"><span style="display: block; font-weight: 700;">Remarks:</span><span data-tor-remarks style="font-style: italic;">{{ $torRemarks ?? 'For Records and Reference Purposes' }}</span></p>
                 </div>
                 <div style="display: flex; flex-direction: column; background: #facbfa;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
