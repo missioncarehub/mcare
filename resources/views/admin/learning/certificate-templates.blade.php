@@ -115,47 +115,51 @@
             </div>
             <h2 class="mt-1 text-xl font-bold text-slate-950">{{ $heading }}</h2>
             <p class="mt-1 text-sm text-slate-600">{{ $templateState }}</p>
-            <div class="relative mt-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50" @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif>
-                @if ($savedBackground !== '')
-                    <img src="{{ $savedBackground }}" alt="Active {{ $label }} template" class="h-full w-full object-contain">
-                @elseif ($backgroundIsPdf)
-                    <div class="grid h-full place-items-center px-6 text-center text-sm font-semibold text-slate-600">Imported one-page PDF</div>
-                @elseif ($label === 'COTC')
-                    <img src="{{ asset('assets/cotc-official-template.png') }}" alt="Default Certificate of Training Completion" class="h-full w-full object-contain">
-                @elseif ($label === 'TOR')
-                    @include('admin.learning.partials.tor-default-preview', [
-                        'organization' => $organization,
-                        'torTitle' => $previewTitle,
-                        'torTrainee' => 'NAME OF THE STUDENT',
-                        'torProgram' => mb_strtoupper($selectedProgram?->name ?? 'CAREGIVING NC II'),
-                        'torHours' => (int) ($organization['course_hours'] ?? 786),
-                        'torRemarks' => $previewBody ?: 'For Records and Reference Purposes',
-                        'torRows' => $torRows ?? null,
-                        'torTrainer' => $field('second_signatory_name'),
-                        'torTrainerRole' => $field('second_signatory_role') ?: 'Lead Trainer',
-                        'torRegistrar' => $field('signatory_name'),
-                        'torRegistrarRole' => $field('signatory_role') ?: 'Registrar',
-                        'torLive' => false,
-                    ])
-                @else
-                    <div class="absolute inset-0 flex flex-col overflow-hidden bg-white px-4 py-3 text-center text-slate-950">
-                        <img src="{{ asset('assets/official-logo.png') }}" alt="" class="mx-auto h-8 w-8 object-contain">
-                        <p class="mt-1 text-[10px] font-bold leading-tight">{{ $organization['name'] ?? 'Mission Care Training Center' }}</p>
-                        <p class="text-[8px] text-slate-600">{{ $organization['address'] ?? '' }}</p>
-                        <p class="mt-3 font-serif text-sm font-bold leading-tight">{{ $previewTitle }}</p>
-                        <p class="mt-2 line-clamp-3 text-[9px] leading-4 text-slate-700">{{ $previewBody }}</p>
-                        <div class="mt-3 space-y-1 text-left text-[9px]">
-                            <p><span class="font-bold">Trainee</span> Name of the Student</p>
-                            <p><span class="font-bold">Program</span> {{ $selectedProgram?->name ?? 'Caregiving NC II' }}</p>
-                            <p><span class="font-bold">Payment status</span> Fully paid</p>
+            {{-- Uniform Equal-Height Preview Stage: Both COTC & TOR cards are 100% pantay pantay --}}
+            <div class="relative mt-4 flex h-[350px] sm:h-[380px] w-full items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100/70 p-3">
+                <div class="relative flex h-full max-h-full max-w-full items-center justify-center overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-transform duration-200 hover:scale-[1.01] [container-type:size]" 
+                     @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif>
+                    @if ($savedBackground !== '')
+                        <img src="{{ $savedBackground }}" alt="Active {{ $label }} template" class="h-full w-full object-contain">
+                    @elseif ($backgroundIsPdf)
+                        <div class="grid h-full place-items-center px-6 text-center text-sm font-semibold text-slate-600">Imported one-page PDF</div>
+                    @elseif ($label === 'COTC')
+                        <img src="{{ asset('assets/cotc-official-template.png') }}" alt="Default Certificate of Training Completion" class="h-full w-full object-contain">
+                    @elseif ($label === 'TOR')
+                        @include('admin.learning.partials.tor-default-preview', [
+                            'organization' => $organization,
+                            'torTitle' => $previewTitle,
+                            'torTrainee' => 'NAME OF THE STUDENT',
+                            'torProgram' => mb_strtoupper($selectedProgram?->name ?? 'CAREGIVING NC II'),
+                            'torHours' => (int) ($organization['course_hours'] ?? 786),
+                            'torRemarks' => $previewBody ?: 'For Records and Reference Purposes',
+                            'torRows' => $torRows ?? null,
+                            'torTrainer' => $field('second_signatory_name'),
+                            'torTrainerRole' => $field('second_signatory_role') ?: 'Lead Trainer',
+                            'torRegistrar' => $field('signatory_name'),
+                            'torRegistrarRole' => $field('signatory_role') ?: 'Registrar',
+                            'torLive' => false,
+                        ])
+                    @else
+                        <div class="absolute inset-0 flex flex-col overflow-hidden bg-white px-4 py-3 text-center text-slate-950">
+                            <img src="{{ asset('assets/official-logo.png') }}" alt="" class="mx-auto h-8 w-8 object-contain">
+                            <p class="mt-1 text-[10px] font-bold leading-tight">{{ $organization['name'] ?? 'Mission Care Training Center' }}</p>
+                            <p class="text-[8px] text-slate-600">{{ $organization['address'] ?? '' }}</p>
+                            <p class="mt-3 font-serif text-sm font-bold leading-tight">{{ $previewTitle }}</p>
+                            <p class="mt-2 line-clamp-3 text-[9px] leading-4 text-slate-700">{{ $previewBody }}</p>
+                            <div class="mt-3 space-y-1 text-left text-[9px]">
+                                <p><span class="font-bold">Trainee</span> Name of the Student</p>
+                                <p><span class="font-bold">Program</span> {{ $selectedProgram?->name ?? 'Caregiving NC II' }}</p>
+                                <p><span class="font-bold">Payment status</span> Fully paid</p>
+                            </div>
+                            <p class="mt-auto pt-3 text-[9px] font-bold">{{ $field('signatory_name') ?: 'Registrar' }}</p>
+                            <p class="text-[8px]">{{ $field('signatory_role') ?: 'Registrar' }}</p>
                         </div>
-                        <p class="mt-auto pt-3 text-[9px] font-bold">{{ $field('signatory_name') ?: 'Registrar' }}</p>
-                        <p class="text-[8px]">{{ $field('signatory_role') ?: 'Registrar' }}</p>
-                    </div>
-                @endif
+                    @endif
+                </div>
             </div>
             @php $pendingImport = $section['history']->first(fn ($version) => filled($version->background_path) && ! $version->is_active); @endphp
-            <div class="mt-4 flex flex-col gap-2">
+            <div class="mt-auto pt-4 flex flex-col gap-2">
                 <a href="{{ $selectedProgramId ? route('admin.learning.certificate-templates.edit', ['type' => $type, 'program_id' => $selectedProgramId]) : route('admin.learning.certificate-templates.edit', $type) }}" class="primary-action">
                     Manage template
                 </a>

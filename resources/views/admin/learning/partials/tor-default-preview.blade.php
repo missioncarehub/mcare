@@ -7,13 +7,13 @@
             background: #7c3aed;
             color: #ffffff;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 11px;
+            font-size: 16px;
             font-weight: 700;
             line-height: 1;
-            padding: 4px 8px;
+            padding: 6px 12px;
             border-radius: 9999px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-            border: 1.5px solid #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: 2px solid #ffffff;
             cursor: pointer;
             pointer-events: auto;
             white-space: nowrap;
