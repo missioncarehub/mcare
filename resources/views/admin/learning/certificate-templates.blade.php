@@ -130,6 +130,7 @@
                         'torProgram' => mb_strtoupper($selectedProgram?->name ?? 'CAREGIVING NC II'),
                         'torHours' => (int) ($organization['course_hours'] ?? 786),
                         'torRemarks' => $previewBody ?: 'For Records and Reference Purposes',
+                        'torRows' => $torRows ?? null,
                         'torTrainer' => $field('second_signatory_name'),
                         'torTrainerRole' => $field('second_signatory_role') ?: 'Lead Trainer',
                         'torRegistrar' => $field('signatory_name'),

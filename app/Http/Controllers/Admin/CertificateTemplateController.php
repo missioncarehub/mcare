@@ -10,17 +10,109 @@ use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\TrainingBatch;
+use App\Models\TrainingModule;
 use App\Models\TrainingProgram;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
 class CertificateTemplateController extends Controller
 {
+    /**
+     * Resolve competency rows for a program: [code, title, grade, remark]
+     *
+     * @return list<array{0: string, 1: string, 2: string, 3: string}>
+     */
+    public static function resolveCompetenciesForProgram(?TrainingProgram $program): array
+    {
+        $code = strtolower((string) ($program?->code ?? ''));
+        $name = strtolower((string) ($program?->name ?? ''));
+
+        // 1. Check if explicit units exist in database
+        if ($program) {
+            $dbUnits = CompetencyUnit::query()
+                ->where(function ($q) use ($code, $name) {
+                    $q->where('program_code', $code)
+                        ->orWhere('program_code', Str::slug($code, '_'))
+                        ->orWhere('program_code', Str::slug($name, '_'));
+                })
+                ->where('is_tor_included', true)
+                ->orderBy('sort_order')
+                ->get();
+
+            if ($dbUnits->isNotEmpty()) {
+                return $dbUnits->map(fn ($u) => [
+                    (string) $u->code,
+                    (string) $u->title,
+                    '1.25',
+                    'COMPETENT',
+                ])->all();
+            }
+
+            // Check if modules are attached to this program's batches
+            $modules = TrainingModule::query()
+                ->whereHas('batch', fn ($q) => $q->where('training_program_id', $program->id))
+                ->orderBy('id')
+                ->get();
+
+            if ($modules->isNotEmpty()) {
+                return $modules->map(fn ($m, $idx) => [
+                    $m->module_code ?: ($program->code.'-'.str_pad((string) ($idx + 1), 3, '0', STR_PAD_LEFT)),
+                    (string) $m->title,
+                    '1.25',
+                    'COMPETENT',
+                ])->all();
+            }
+        }
+
+        // 2. Specific standard programs
+        if (str_contains($code, 'nc-iii') || str_contains($code, 'nc3') || str_contains($name, 'nc iii') || str_contains($name, 'nc 3')) {
+            return [
+                ['HCS324301', 'Provide Specialized Care and Support to People with Special Needs', '1.25', 'COMPETENT'],
+                ['HCS324302', 'Assist with Medication Administration and Health Monitoring', '1.25', 'COMPETENT'],
+                ['HCS324303', 'Deliver Palliative Care and Chronic Illness Support', '1.50', 'COMPETENT'],
+                ['HCS324304', 'Implement Dementia and Mental Health Care Strategies', '1.25', 'COMPETENT'],
+                ['HCS324305', 'Coordinate Patient Care Plans and Multidisciplinary Records', '1.50', 'COMPETENT'],
+                ['HCS324306', 'Maintain Specialized Assistive Equipment and Mobility Aids', '1.25', 'COMPETENT'],
+                ['HCS324307', 'Respond to Acute Clinical Emergencies in Home and Community', '1.25', 'COMPETENT'],
+                ['HCS324308', 'Facilitate Rehabilitation and Physical Therapy Exercises', '1.50', 'COMPETENT'],
+            ];
+        }
+
+        // 3. For any other newly created program, generate custom tailored units matching the program's code and title
+        if ($program && ! str_contains($name, 'caregiving nc ii')) {
+            $prefix = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $program->code) ?: 'PRG');
+
+            return [
+                [$prefix.'-301', 'Foundations and Core Principles of '.$program->name, '1.25', 'COMPETENT'],
+                [$prefix.'-302', 'Applied Practical Competencies and Work Procedures', '1.25', 'COMPETENT'],
+                [$prefix.'-303', 'Workplace Safety, Quality Assurance and Compliance Standards', '1.50', 'COMPETENT'],
+                [$prefix.'-304', 'Professional Client Communication and Documentation', '1.25', 'COMPETENT'],
+                [$prefix.'-305', 'Advanced Specialized Skills in '.$program->name, '1.50', 'COMPETENT'],
+                [$prefix.'-306', 'Supervised Clinical Practicum and Institutional Assessment', '1.25', 'COMPETENT'],
+            ];
+        }
+
+        // 4. Caregiving NC II default standard curriculum
+        return [
+            ['HCS323301', 'Provide Care and Support to Infants and Toddlers', '1.25', 'COMPETENT'],
+            ['HCS323302', 'Provide Care and Support to Children', '1.25', 'COMPETENT'],
+            ['HCS323303', 'Foster Social, Intellectual, Creative and Emotional Development of Children', '1.50', 'COMPETENT'],
+            ['HCS323304', 'Foster Physical Development of Children', '1.25', 'COMPETENT'],
+            ['HCS323305', 'Provide Care and Support to Elderly', '1.25', 'COMPETENT'],
+            ['HCS323306', 'Provide Care and Support to People with Special Needs', '1.25', 'COMPETENT'],
+            ['HCS323307', 'Maintain a Healthy and Safe Environment', '1.25', 'COMPETENT'],
+            ['HCS323308', 'Respond to Emergency', '1.25', 'COMPETENT'],
+            ['HCS323309', 'Clean Living Room, Dining Room, Bedrooms, Toilet and Bathroom', '1.50', 'COMPETENT'],
+            ['HCS323310', 'Wash and Iron Clothes, Linen and Fabric', '1.25', 'COMPETENT'],
+            ['HCS323311', 'Prepare Hot and Cold Meals', '1.25', 'COMPETENT'],
+        ];
+    }
     public function index(Request $request): View
     {
         $programs = TrainingProgram::active()->orderBy('name')->get();
@@ -52,6 +144,7 @@ class CertificateTemplateController extends Controller
             'programs' => $programs,
             'selectedProgram' => $selectedProgram,
             'selectedProgramId' => $selectedProgramId,
+            'torRows' => self::resolveCompetenciesForProgram($selectedProgram),
         ]);
     }
 
@@ -74,23 +167,16 @@ class CertificateTemplateController extends Controller
             ->orderByDesc('version')
             ->get();
         $label = CertificateTemplate::label($type);
-
-        $competencyUnits = collect();
-        if ($type === OfficialDocument::TYPE_TOR) {
-            $competencyUnits = CompetencyUnit::query()
-                ->when($selectedProgram?->code, fn ($q, $code) => $q->where('program_code', $code))
-                ->where('is_tor_included', true)
-                ->orderBy('sort_order')
-                ->get();
-
-            if ($competencyUnits->isEmpty()) {
-                $competencyUnits = CompetencyUnit::query()
-                    ->where('is_tor_included', true)
-                    ->orderBy('sort_order')
-                    ->take(12)
-                    ->get();
-            }
-        }
+        $torRows = self::resolveCompetenciesForProgram($selectedProgram);
+        $competencyUnits = collect($torRows)->map(function ($r) {
+            return (object) [
+                'code' => $r[0],
+                'title' => $r[1],
+                'category' => 'Core',
+                'grade' => $r[2],
+                'remark' => $r[3],
+            ];
+        });
 
         return view('admin.learning.certificate-template-edit', [
             'type' => $type,
@@ -107,6 +193,7 @@ class CertificateTemplateController extends Controller
             'selectedProgram' => $selectedProgram,
             'selectedProgramId' => $selectedProgramId,
             'competencyUnits' => $competencyUnits,
+            'torRows' => $torRows,
         ]);
     }
 
@@ -384,18 +471,23 @@ class CertificateTemplateController extends Controller
             'training_ends_at' => '2026-07-18',
         ]);
         $application->setRelation('batch', $batch);
-        $unit = new CompetencyUnit([
-            'code' => 'HCS323301',
-            'title' => 'Provide Care and Support to Infants and Toddlers',
-            'is_tor_included' => true,
-            'sort_order' => 1,
-        ]);
-        $record = new TraineeCompetencyRecord([
-            'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
-            'tor_grade' => 1.25,
-        ]);
-        $record->setRelation('unit', $unit);
-        $application->setRelation('competencyRecords', collect([$record]));
+
+        $resolvedRows = self::resolveCompetenciesForProgram($programModel);
+        $records = collect($resolvedRows)->map(function ($row, $idx) {
+            $unit = new CompetencyUnit([
+                'code' => $row[0],
+                'title' => $row[1],
+                'is_tor_included' => true,
+                'sort_order' => $idx + 1,
+            ]);
+            $record = new TraineeCompetencyRecord([
+                'status' => TraineeCompetencyRecord::STATUS_COMPETENT,
+                'tor_grade' => (float) $row[2],
+            ]);
+            $record->setRelation('unit', $unit);
+            return $record;
+        });
+        $application->setRelation('competencyRecords', $records);
 
         $document = new OfficialDocument([
             'type' => $type,
