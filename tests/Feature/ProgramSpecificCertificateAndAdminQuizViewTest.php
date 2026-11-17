@@ -13,6 +13,8 @@ use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Services\FpdfOfficialDocumentRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProgramSpecificCertificateAndAdminQuizViewTest extends TestCase
@@ -267,6 +269,101 @@ class ProgramSpecificCertificateAndAdminQuizViewTest extends TestCase
         $this->assertTrue($this->pdfContains($pdfContent, 'Graduated with high competency honors.'));
         $this->assertTrue($this->pdfContains($pdfContent, 'AMINA DELA CRUZ'));
         $this->assertTrue($this->pdfContains($pdfContent, 'CAREGIVING ELDERLY SERVICES NC II'));
+    }
+
+    public function test_admin_can_upload_custom_certificate_artwork_and_render_program_specific_cotc(): void
+    {
+        Storage::fake('local');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $program = TrainingProgram::create([
+            'name' => 'Caregiving NC III Specialist',
+            'code' => 'CG-NC3',
+            'is_active' => true,
+        ]);
+
+        $png = tempnam(sys_get_temp_dir(), 'mcare-prog-cotc');
+        $image = imagecreatetruecolor(200, 100);
+        imagefilledrectangle($image, 0, 0, 200, 100, imagecolorallocate($image, 255, 230, 240));
+        imagepng($image, $png);
+        imagedestroy($image);
+
+        $response = $this->actingAs($admin)
+            ->post(route('admin.learning.certificate-templates.store'), [
+                'type' => OfficialDocument::TYPE_COTC,
+                'training_program_id' => $program->id,
+                'title' => 'Caregiving NC III Diploma of Excellence',
+                'body' => 'Conferred upon {{trainee_name}} on {{completion_date}}.',
+                'paper_size' => 'letter',
+                'orientation' => 'landscape',
+                'background' => new UploadedFile($png, 'nc3-custom-artwork.png', 'image/png', null, true),
+                'trainee_name_y' => 52.5,
+                'trainee_name_size' => 28,
+                'trainee_name_align' => 'C',
+                'include_cert_no' => '1',
+                'include_date' => '1',
+                'activate_immediately' => '1',
+            ]);
+
+        $response->assertRedirect(route('admin.learning.certificate-templates', ['program_id' => $program->id]));
+        $response->assertSessionHas('saved');
+
+        $activeTemplate = CertificateTemplate::activeFor(OfficialDocument::TYPE_COTC, $program->id);
+        $this->assertNotNull($activeTemplate);
+        $this->assertSame($program->id, $activeTemplate->training_program_id);
+        $this->assertTrue($activeTemplate->is_active);
+        $this->assertFalse($activeTemplate->use_official_artwork);
+        $this->assertNotNull($activeTemplate->background_path);
+
+        $layout = $activeTemplate->resolvedFieldLayout();
+        $this->assertEquals(52.5, $layout['trainee_name']['y']);
+        $this->assertEquals(28, $layout['trainee_name']['size']);
+
+        // Test preview endpoint also returns the uploaded template as a valid PDF
+        $previewResponse = $this->actingAs($admin)
+            ->get(route('admin.learning.certificate-templates.preview', [
+                'type' => OfficialDocument::TYPE_COTC,
+                'program_id' => $program->id,
+            ]));
+        $previewResponse->assertOk();
+        $previewResponse->assertHeader('content-type', 'application/pdf');
+
+        // Now test generating a real COTC document for an NC III graduate
+        $batch = new TrainingBatch([
+            'name' => 'Batch NC3-2026',
+            'training_program_id' => $program->id,
+            'year' => 2026,
+            'training_starts_at' => '2026-03-01',
+            'training_ends_at' => '2026-09-01',
+        ]);
+        $application = new EnrollmentApplication([
+            'user_id' => $admin->id,
+            'enrollment_number' => 'MCE-2026-NC3-001',
+            'email' => 'student.nc3@example.com',
+            'training_program_id' => $program->id,
+            'first_name' => 'Katalina',
+            'last_name' => 'Dimagiba',
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+        ]);
+        $application->setRelation('batch', $batch);
+        $application->setRelation('trainingProgram', $program);
+        $application->setRelation('competencyRecords', collect());
+
+        $doc = new OfficialDocument([
+            'type' => OfficialDocument::TYPE_COTC,
+            'version' => 1,
+            'document_number' => 'MCARE-COTC-NC3-001',
+            'generated_at' => now(),
+        ]);
+        $doc->setRelation('application', $application);
+
+        $pdf = app(FpdfOfficialDocumentRenderer::class)->render($doc);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertTrue($this->pdfContains($pdf, 'KATALINA DIMAGIBA'));
+        $this->assertTrue($this->pdfContains($pdf, 'Enrollment ID: MCE-2026-NC3-001'));
+        $this->assertTrue($this->pdfContains($pdf, 'MCARE-COTC-NC3-001'));
+
+        @unlink($png);
     }
 
     private function pdfContains(string $pdf, string $needle): bool

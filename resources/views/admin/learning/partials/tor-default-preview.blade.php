@@ -1,4 +1,4 @@
-<div @if($torLive ?? false) data-official-tor @endif class="absolute inset-0 overflow-hidden bg-white tor-preview-canvas" @if(($torLive ?? false) && (($savedBackground ?? '') !== '' || ($backgroundIsPdf ?? false))) hidden @endif style="container-type: size;">
+<div @if($torLive ?? false) data-official-tor @endif class="absolute inset-0 overflow-hidden bg-white tor-preview-canvas" @if(($torLive ?? false) && (($savedBackground ?? '') !== '' || ($backgroundIsPdf ?? false))) hidden @endif>
     <style>
         .tor-field-guide-badge {
             display: none;
@@ -52,7 +52,7 @@
         ];
     @endphp
 
-    <div class="bg-white text-slate-950" style="width: 740px; height: 1046px; transform: scale(calc(100cqw / 740px)); transform-origin: top left; font-family: 'Times New Roman', Times, serif;">
+    <div class="tor-scaled-content bg-white text-slate-950" style="width: 740px; height: 1046px; transform-origin: top left; transform: scale({{ ($torLive ?? false) ? '0.5675' : '0.3581' }}); font-family: 'Times New Roman', Times, serif;">
         <div style="box-sizing: border-box; display: flex; height: 100%; flex-direction: column; padding: 24px 32px 14px;">
             
             {{-- Header with Official Logo --}}
@@ -171,4 +171,28 @@
             </p>
         </div>
     </div>
+    <script>
+        (function() {
+            function fitTorCanvases() {
+                document.querySelectorAll('.tor-preview-canvas').forEach(function(canvas) {
+                    var w = canvas.clientWidth || canvas.offsetWidth;
+                    if (w > 0) {
+                        var scale = (w / 740).toFixed(4);
+                        var content = canvas.querySelector('.tor-scaled-content');
+                        if (content) {
+                            content.style.transform = 'scale(' + scale + ')';
+                        }
+                    }
+                });
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', fitTorCanvases);
+            } else {
+                fitTorCanvases();
+            }
+            window.addEventListener('resize', fitTorCanvases);
+            setTimeout(fitTorCanvases, 50);
+            setTimeout(fitTorCanvases, 250);
+        })();
+    </script>
 </div>
