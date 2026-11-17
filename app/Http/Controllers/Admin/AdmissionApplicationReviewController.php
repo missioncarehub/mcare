@@ -44,7 +44,10 @@ class AdmissionApplicationReviewController extends Controller
                     ->orWhere('email', 'like', '%'.$search.'%')
                     ->orWhere('first_name', 'like', '%'.$search.'%')
                     ->orWhere('last_name', 'like', '%'.$search.'%')
-                    ->orWhere('contact_number', 'like', '%'.$search.'%');
+                    ->orWhere('contact_number', 'like', '%'.$search.'%')
+                    ->orWhereHas('enrollment', function ($eQuery) use ($search) {
+                        $eQuery->where('enrollment_number', 'like', '%'.$search.'%');
+                    });
             });
         }
 

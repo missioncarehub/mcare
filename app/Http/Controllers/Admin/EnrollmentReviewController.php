@@ -107,10 +107,14 @@ class EnrollmentReviewController extends Controller
         if ($search !== '') {
             $applicationsQuery->where(function ($query) use ($search) {
                 $query
-                    ->where('email', 'like', "%{$search}%")
+                    ->where('enrollment_number', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('contact_number', 'like', "%{$search}%")
+                    ->orWhereHas('admissionApplication', function ($admQuery) use ($search) {
+                        $admQuery->where('application_number', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('user', function ($userQuery) use ($search) {
                         $userQuery
                             ->where('name', 'like', "%{$search}%")

@@ -160,16 +160,14 @@ class AdmissionApplicationController extends Controller
 
     public function status(Request $request): View
     {
-        $number = AdmissionApplication::normalizeNumber($request->input('application_number', $request->query('application_number')));
-        $admission = $number !== ''
-            ? AdmissionApplication::query()->with('enrollment')->where('application_number', $number)->first()
-            : null;
+        $rawNumber = (string) $request->input('application_number', $request->query('application_number', ''));
+        $admission = AdmissionApplication::findByNumber($rawNumber);
         $lookedUp = $request->isMethod('post') || $request->filled('application_number');
 
         return view('applications.status', [
             'admission' => $admission,
             'lookedUp' => $lookedUp,
-            'submittedNumber' => $request->input('application_number', $request->query('application_number', '')),
+            'submittedNumber' => $rawNumber,
         ]);
     }
 
@@ -179,8 +177,13 @@ class AdmissionApplicationController extends Controller
             'application_number' => ['required', 'string', 'max:40'],
         ]);
 
+        $raw = trim($validated['application_number']);
+        $normalized = str_starts_with(strtoupper($raw), 'MCE')
+            ? EnrollmentApplication::normalizeNumber($raw)
+            : AdmissionApplication::normalizeNumber($raw);
+
         return redirect()->route('applications.status', [
-            'application_number' => AdmissionApplication::normalizeNumber($validated['application_number']),
+            'application_number' => $normalized,
         ]);
     }
 
@@ -194,8 +197,7 @@ class AdmissionApplicationController extends Controller
             'replacement' => ['required', 'file', 'max:5120'],
         ]);
 
-        $number = AdmissionApplication::normalizeNumber($validated['application_number']);
-        $admission = AdmissionApplication::query()->with('enrollment')->where('application_number', $number)->first();
+        $admission = AdmissionApplication::findByNumber($validated['application_number']);
         $enrollment = $admission?->enrollment;
         $key = $validated['document'];
         $definition = $catalog[$key];

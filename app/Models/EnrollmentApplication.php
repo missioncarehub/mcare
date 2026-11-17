@@ -189,13 +189,27 @@ class EnrollmentApplication extends Model
 
     public static function findByNumber(?string $value): ?self
     {
-        $number = self::normalizeNumber($value);
-
-        if ($number === '') {
+        $raw = trim((string) $value);
+        if ($raw === '') {
             return null;
         }
 
-        return self::query()->where('enrollment_number', $number)->first();
+        $number = self::normalizeNumber($raw);
+        $found = self::query()->where('enrollment_number', $number)->orWhere('enrollment_number', $raw)->first();
+        if ($found) {
+            return $found;
+        }
+
+        // Also resolve if an Admission Application number was entered (e.g. MCA-2026-UNFEGV)
+        $admissionNumber = AdmissionApplication::normalizeNumber($raw);
+        if ($admissionNumber !== '') {
+            $admission = AdmissionApplication::with('enrollment')->where('application_number', $admissionNumber)->first();
+            if ($admission?->enrollment) {
+                return $admission->enrollment;
+            }
+        }
+
+        return null;
     }
 
     protected function casts(): array

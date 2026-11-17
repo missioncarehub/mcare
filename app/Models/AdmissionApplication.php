@@ -149,13 +149,60 @@ class AdmissionApplication extends Model
 
     public static function findByNumber(?string $value): ?self
     {
-        $number = self::normalizeNumber($value);
-
-        if ($number === '') {
+        $raw = trim((string) $value);
+        if ($raw === '') {
             return null;
         }
 
-        return self::query()->where('application_number', $number)->first();
+        $admissionNumber = self::normalizeNumber($raw);
+        $found = self::query()->with('enrollment')->where('application_number', $admissionNumber)->first();
+        if ($found) {
+            return $found;
+        }
+
+        // Also resolve if an Enrollment Application number was entered (e.g. MCE-2026-TYQSZ8)
+        $enrollmentNumber = EnrollmentApplication::normalizeNumber($raw);
+        $enrollment = EnrollmentApplication::query()
+            ->with(['admissionApplication', 'trainingProgram'])
+            ->where('enrollment_number', $enrollmentNumber)
+            ->orWhere('enrollment_number', $raw)
+            ->first();
+
+        if ($enrollment) {
+            if ($enrollment->admissionApplication) {
+                $admission = $enrollment->admissionApplication;
+                $admission->setRelation('enrollment', $enrollment);
+
+                return $admission;
+            }
+
+            $admission = self::query()->with('enrollment')->where('email', $enrollment->email)->latest()->first();
+            if ($admission) {
+                $enrollment->forceFill(['admission_application_id' => $admission->id])->saveQuietly();
+                $admission->setRelation('enrollment', $enrollment);
+
+                return $admission;
+            }
+
+            $admission = self::create([
+                'application_number' => self::generateNumber(),
+                'first_name' => $enrollment->first_name,
+                'middle_name' => $enrollment->middle_name,
+                'last_name' => $enrollment->last_name,
+                'email' => $enrollment->email,
+                'contact_number' => $enrollment->contact_number,
+                'training_program_id' => $enrollment->training_program_id,
+                'program' => $enrollment->trainingProgram?->name ?? 'Caregiving NC II',
+                'status' => self::STATUS_APPROVED,
+                'educational_attainment' => 'College Graduate',
+            ]);
+            $enrollment->forceFill(['admission_application_id' => $admission->id])->saveQuietly();
+            $admission->setRelation('enrollment', $enrollment);
+
+            return $admission;
+        }
+
+        return null;
     }
 
     public function trainingProgram(): BelongsTo

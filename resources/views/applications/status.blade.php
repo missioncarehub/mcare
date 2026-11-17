@@ -22,14 +22,14 @@
             <header class="enrollment-intro">
                 <p class="enrollment-kicker">Applicant self-service</p>
                 <h1>Check application status</h1>
-                <p class="enrollment-lede">Enter the application number issued after you submitted the applications page. Enrollment opens only when the status is approved.</p>
+                <p class="enrollment-lede">Enter your application number (e.g. MCA-2026-XXXXXX) or enrollment number (e.g. MCE-2026-XXXXXX) to view your application progress, enrollment status, and document review.</p>
             </header>
             <div class="enrollment-form-body space-y-6">
                 <form method="POST" action="{{ route('applications.lookup') }}" class="space-y-4">
                     @csrf
                     <div>
-                        <label class="form-label" for="application_number">Application number</label>
-                        <input class="form-field" id="application_number" name="application_number" value="{{ old('application_number', $submittedNumber) }}" placeholder="MCA-2026-XXXXXX" required>
+                        <label class="form-label" for="application_number">Application or Enrollment number</label>
+                        <input class="form-field font-mono uppercase" id="application_number" name="application_number" value="{{ old('application_number', $submittedNumber) }}" placeholder="e.g. MCA-2026-XXXXXX or MCE-2026-XXXXXX" required>
                         @error('application_number')<p class="form-error">{{ $message }}</p>@enderror
                     </div>
                     <button type="submit" class="primary-action">Look up status</button>
@@ -76,6 +76,9 @@
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Application number</p>
                                 <p class="mt-1 font-display text-2xl font-extrabold text-slate-950">{{ $admission->application_number }}</p>
+                                @if ($enrollment)
+                                    <p class="mt-1 text-xs font-semibold text-purple-700">Enrollment ID: <span class="font-mono font-bold">{{ $enrollment->enrollment_number }}</span></p>
+                                @endif
                             </div>
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Current stage</p>

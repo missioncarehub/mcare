@@ -247,6 +247,71 @@ class AdmissionApplicationTest extends TestCase
             ->assertDontSee('Upload replacement');
     }
 
+    public function test_status_lookup_and_document_replacement_works_using_enrollment_number_directly(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+
+        $admission = $this->makeApprovedAdmission(['email' => 'direct.enrollment.lookup@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+
+        $enrollment = EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'enrollment_number' => 'MCE-2026-TYQSZ8',
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'THIS IS A RECEIPT NEED REPLACMENT'],
+            ],
+        ]);
+
+        // 1. Post lookup with MCE enrollment number directly
+        $this->post(route('applications.lookup'), [
+            'application_number' => 'mce-2026-tyqsz8',
+        ])->assertRedirect(route('applications.status', [
+            'application_number' => 'MCE-2026-TYQSZ8',
+        ]));
+
+        // 2. Visit status page using the MCE enrollment number
+        $this->get(route('applications.status', ['application_number' => 'MCE-2026-TYQSZ8']))
+            ->assertOk()
+            ->assertSee($admission->application_number)
+            ->assertSee('MCE-2026-TYQSZ8')
+            ->assertSee('Needs replacement')
+            ->assertSee('THIS IS A RECEIPT NEED REPLACMENT');
+
+        // 3. Submit replacement document using the MCE number as application_number
+        $this->post(route('applications.documents.replace'), [
+            'application_number' => 'MCE-2026-TYQSZ8',
+            'verifier' => '09171234567',
+            'document' => 'birth-certificate',
+            'replacement' => UploadedFile::fake()->create('valid-birth-cert.pdf', 50, 'application/pdf'),
+        ])->assertRedirect(route('applications.status', [
+            'application_number' => $admission->application_number,
+        ]));
+
+        $enrollment->refresh();
+        $this->assertSame('unreviewed', $enrollment->document_review['birth-certificate']['status']);
+        Storage::disk('local')->assertExists($enrollment->birth_certificate_path);
+    }
+
     public function test_status_page_keeps_the_official_footer_on_the_layout(): void
     {
         $this->get(route('applications.status'))
