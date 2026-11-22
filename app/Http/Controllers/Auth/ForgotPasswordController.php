@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Mail\PasswordResetOtpMail;
 use App\Models\User;
+use App\Notifications\PasswordChangedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -139,6 +140,16 @@ class ForgotPasswordController extends Controller
 
         $user->forceFill(['password' => $validated['password']])->save();
         $request->session()->forget(['password_reset.email', self::SESSION_KEY, 'password_reset.verified']);
+
+        try {
+            $user->notify(new PasswordChangedNotification(
+                changedAt: now()->format('F j, Y \a\t g:i A T'),
+                ipAddress: $request->ip(),
+                source: 'Password Reset',
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
 
         return redirect()->route('login')->with('password_reset', 'Your password was changed successfully. You can now sign in.');
     }

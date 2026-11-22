@@ -13,7 +13,7 @@
         </td>
     </tr>
     <tr>
-        <td style="padding:20px;text-align:center;background:#f5f3ff;border:1px dashed #7c3aed;font-family:monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:#581c87;">{{ $code }}</td>
+        <td style="padding:20px;text-align:center;background:#f5f3ff;border:1px dashed #7c3aed;border-radius:8px;font-family:monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:#581c87;">{{ $code }}</td>
     </tr>
     <tr>
         <td style="padding:16px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#64748b;">

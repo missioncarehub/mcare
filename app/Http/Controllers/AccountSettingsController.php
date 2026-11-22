@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AdminActivityLog;
 use App\Models\AdminContactMessage;
 use App\Models\PublicSiteSetting;
+use App\Notifications\PasswordChangedNotification;
 use App\Services\AdminOperationsNotifier;
 use App\Services\ProfilePhotoStore;
 use App\Support\AccountPortal;
@@ -18,6 +19,7 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class AccountSettingsController extends Controller
 {
@@ -122,10 +124,21 @@ class AccountSettingsController extends Controller
             'password' => ['required', 'confirmed', 'max:255', Password::min(10)->mixedCase()->letters()->numbers()],
         ]);
 
-        $request->user()->update(['password' => $validated['password']]);
-        AdminActivityLog::record($request->user(), 'account.password.updated', $request->user(), [
-            'role' => $request->user()?->role,
+        $user = $request->user();
+        $user->update(['password' => $validated['password']]);
+        AdminActivityLog::record($user, 'account.password.updated', $user, [
+            'role' => $user?->role,
         ]);
+
+        try {
+            $user->notify(new PasswordChangedNotification(
+                changedAt: now()->format('F j, Y \a\t g:i A T'),
+                ipAddress: $request->ip(),
+                source: 'Account Settings',
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
 
         return back()->with('saved', 'Your password has been changed successfully.');
     }
