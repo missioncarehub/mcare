@@ -8,7 +8,9 @@ use App\Models\DocumentTemplate;
 use App\Models\DocumentTemplateVersion;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class DocumentStudioService
@@ -297,6 +299,16 @@ class DocumentStudioService
      */
     public function ensureDefaultTemplates(): void
     {
+        if (! Schema::hasTable('document_templates')) {
+            try {
+                Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable) {
+            }
+            if (! Schema::hasTable('document_templates')) {
+                return;
+            }
+        }
+
         // 1. COTC Default Template
         if (! DocumentTemplate::where('slug', 'default-cotc')->exists()) {
             $cotcState = [
@@ -690,6 +702,10 @@ class DocumentStudioService
      */
     public function resolveActiveVersion(string $documentKind, ?int $programId = null): ?DocumentTemplateVersion
     {
+        if (! Schema::hasTable('document_templates')) {
+            return null;
+        }
+
         // 1. Program-specific active template with an active published version
         if ($programId) {
             $specific = DocumentTemplate::query()
@@ -728,6 +744,10 @@ class DocumentStudioService
      */
     public function enforceSingleActivePerScope(): void
     {
+        if (! Schema::hasTable('document_templates')) {
+            return;
+        }
+
         $groups = DocumentTemplate::query()
             ->where('is_active', true)
             ->whereNotNull('active_version_id')
@@ -759,6 +779,10 @@ class DocumentStudioService
      */
     public function getPublishedDesignsSummary(): array
     {
+        if (! Schema::hasTable('document_templates')) {
+            return [];
+        }
+
         $kinds = [
             DocumentTemplate::KIND_COTC => 'Certificate of Training Completion (COTC)',
             DocumentTemplate::KIND_TOR => 'Official Transcript of Records (TOR)',

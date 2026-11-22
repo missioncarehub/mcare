@@ -27,8 +27,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -48,6 +50,18 @@ class DocumentStudioController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('viewAny', DocumentTemplate::class);
+
+        // Auto-migrate tables if not yet migrated on production
+        if (! Schema::hasTable('document_templates')) {
+            try {
+                Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable) {
+            }
+        }
+
+        if (! Schema::hasTable('document_templates')) {
+            return view('admin.document-studio.migration-required');
+        }
 
         // Ensure system defaults are seeded and single active per scope is enforced
         $this->studioService->ensureDefaultTemplates();

@@ -52,12 +52,15 @@ return new class extends Migration
         }
 
         if (! $this->hasForeignKey('document_templates', 'active_version_id')) {
-            Schema::table('document_templates', function (Blueprint $table): void {
-                $table->foreign('active_version_id')
-                    ->references('id')
-                    ->on('document_template_versions')
-                    ->nullOnDelete();
-            });
+            try {
+                Schema::table('document_templates', function (Blueprint $table): void {
+                    $table->foreign('active_version_id')
+                        ->references('id')
+                        ->on('document_template_versions')
+                        ->nullOnDelete();
+                });
+            } catch (\Throwable) {
+            }
         }
 
         if (! Schema::hasTable('document_assets')) {
@@ -84,15 +87,22 @@ return new class extends Migration
             });
         }
         if (! $this->hasForeignKey('official_documents', 'document_template_version_id')) {
-            Schema::table('official_documents', function (Blueprint $table): void {
-                $table->foreign('document_template_version_id')->references('id')->on('document_template_versions')->restrictOnDelete();
-            });
+            try {
+                Schema::table('official_documents', function (Blueprint $table): void {
+                    $table->foreign('document_template_version_id')->references('id')->on('document_template_versions')->restrictOnDelete();
+                });
+            } catch (\Throwable) {
+            }
         }
     }
 
     private function hasForeignKey(string $table, string $column): bool
     {
-        return collect(Schema::getForeignKeys($table))->contains(fn ($key) => $key['columns'] === [$column]);
+        try {
+            return collect(Schema::getForeignKeys($table))->contains(fn ($key) => ($key['columns'] ?? []) === [$column]);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function down(): void

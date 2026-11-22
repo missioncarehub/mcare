@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('enrollment_applications', function (Blueprint $table): void {
-            $table->decimal('owwa_deduction', 10, 2)->default(0.00)->after('total_program_fee');
-            $table->string('trainee_id_number', 50)->nullable()->after('enrollment_number');
+            if (! Schema::hasColumn('enrollment_applications', 'owwa_deduction')) {
+                $table->decimal('owwa_deduction', 10, 2)->default(0.00)->after('total_program_fee');
+            }
+            if (! Schema::hasColumn('enrollment_applications', 'trainee_id_number')) {
+                $table->string('trainee_id_number', 50)->nullable()->after('enrollment_number');
+            }
         });
     }
 
@@ -23,7 +27,16 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('enrollment_applications', function (Blueprint $table): void {
-            $table->dropColumn(['owwa_deduction', 'trainee_id_number']);
+            $columnsToDrop = [];
+            if (Schema::hasColumn('enrollment_applications', 'owwa_deduction')) {
+                $columnsToDrop[] = 'owwa_deduction';
+            }
+            if (Schema::hasColumn('enrollment_applications', 'trainee_id_number')) {
+                $columnsToDrop[] = 'trainee_id_number';
+            }
+            if (! empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 };
