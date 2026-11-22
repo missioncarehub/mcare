@@ -16,6 +16,11 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
 
     public function render(OfficialDocument $document): string
     {
+        return $this->renderOnCanvas($document);
+    }
+
+    public function renderOnCanvas(OfficialDocument $document, ?FPDF $studioCanvas = null): string
+    {
         $document->loadMissing([
             'application.batch',
             'application.trainingProgram',
@@ -25,14 +30,16 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $this->temporaryImages = [];
 
         try {
-            $imported = $this->renderImported($document);
-            if ($imported !== null) {
-                return $imported;
+            if ($studioCanvas === null) {
+                $imported = $this->renderImported($document);
+                if ($imported !== null) {
+                    return $imported;
+                }
             }
 
             $pdf = match ($document->type) {
-                OfficialDocument::TYPE_COTC => $this->renderCotc($document),
-                OfficialDocument::TYPE_TOR => $this->renderTor($document),
+                OfficialDocument::TYPE_COTC => $this->renderCotc($document, $studioCanvas),
+                OfficialDocument::TYPE_TOR => $this->renderTor($document, $studioCanvas),
                 default => throw new RuntimeException('Unsupported official document type: '.$document->type),
             };
 
@@ -75,7 +82,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         );
     }
 
-    private function renderCotc(OfficialDocument $document): FPDF
+    private function renderCotc(OfficialDocument $document, ?FPDF $studioCanvas = null): FPDF
     {
         $application = $document->application;
         $organization = config('official_documents.organization', []);
@@ -97,7 +104,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
             ));
         $documentLine = $this->verificationLine($document);
 
-        $pdf = new LandscapeLetterPdf;
+        $pdf = $studioCanvas ?? new LandscapeLetterPdf;
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();
@@ -172,7 +179,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         return $pdf;
     }
 
-    private function renderTor(OfficialDocument $document): FPDF
+    private function renderTor(OfficialDocument $document, ?FPDF $studioCanvas = null): FPDF
     {
         $application = $document->application;
         $organization = config('official_documents.organization', []);
@@ -204,7 +211,7 @@ class FpdfOfficialDocumentRenderer implements OfficialDocumentRenderer
         $registrarRole = $this->signatoryName($template?->signatory_role, 'Registrar');
         $logoPath = $template?->absoluteAsset($template->logo_path) ?? public_path('assets/official-logo.png');
 
-        $pdf = new OfficialPdf('P', 'mm', 'A4');
+        $pdf = $studioCanvas ?? new OfficialPdf('P', 'mm', 'A4');
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
         $pdf->AddPage();

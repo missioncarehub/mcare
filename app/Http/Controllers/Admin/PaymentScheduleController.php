@@ -669,6 +669,22 @@ class PaymentScheduleController extends Controller
         ];
     }
 
+    public function previewStatementOfAccount(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        \App\Services\StatementOfAccountPdfService $soaService,
+    ): \Illuminate\Http\Response {
+        return $soaService->inlineResponse($enrollmentApplication);
+    }
+
+    public function downloadStatementOfAccount(
+        Request $request,
+        EnrollmentApplication $enrollmentApplication,
+        \App\Services\StatementOfAccountPdfService $soaService,
+    ): \Illuminate\Http\Response {
+        return $soaService->downloadResponse($enrollmentApplication);
+    }
+
     private function redirectToLedger(Request $request): RedirectResponse
     {
         return redirect()->to($this->ledgerUrl());

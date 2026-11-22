@@ -15,6 +15,8 @@ use App\Http\Controllers\Admin\AdmissionApplicationReviewController;
 use App\Http\Controllers\Admin\BatchScheduleController;
 use App\Http\Controllers\Admin\CertificateTemplateController;
 use App\Http\Controllers\Admin\CertificationController;
+use App\Http\Controllers\Admin\DocumentStudioAssetController;
+use App\Http\Controllers\Admin\DocumentStudioController;
 use App\Http\Controllers\Admin\EnrollmentReviewController;
 use App\Http\Controllers\Admin\HistoricalAlumniClaimController as AdminHistoricalAlumniClaimController;
 use App\Http\Controllers\Admin\PaymentScheduleController;
@@ -27,6 +29,7 @@ use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\ClassroomCommentController;
+use App\Http\Controllers\CredentialVerificationController;
 use App\Http\Controllers\CompetencyWorkbookController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\EnrollmentDocumentRevisionController;
@@ -96,6 +99,10 @@ Route::middleware('throttle:global-web')->group(function () {
     Route::post('/login', [AccountSessionController::class, 'store'])
         ->middleware(['throttle:admin-login', 'private.response'])
         ->name('login.store');
+
+    Route::get('/verify/credential/{documentNumber}', [CredentialVerificationController::class, 'verify'])
+        ->middleware('private.response')
+        ->name('credential.verify');
 
     Route::get('/forgot-password', [ForgotPasswordController::class, 'create'])
         ->middleware('private.response')
@@ -460,6 +467,13 @@ Route::middleware('throttle:global-web')->group(function () {
                     ->middleware(['permission:payments.verify', 'throttle:document-downloads'])
                     ->name('payment-schedules.transactions.proof');
 
+                Route::get('/payment-scheduling/{enrollmentApplication}/statement-of-account', [PaymentScheduleController::class, 'downloadStatementOfAccount'])
+                    ->middleware(['permission:payments.verify', 'throttle:document-downloads'])
+                    ->name('payment-schedules.soa');
+                Route::get('/payment-scheduling/{enrollmentApplication}/statement-of-account/preview', [PaymentScheduleController::class, 'previewStatementOfAccount'])
+                    ->middleware(['permission:payments.verify', 'throttle:document-downloads'])
+                    ->name('payment-schedules.soa.preview');
+
                 Route::get('/announcements', [AdminAnnouncementController::class, 'index'])
                     ->middleware('permission:announcements.view')
                     ->name('announcements.index');
@@ -602,6 +616,52 @@ Route::middleware('throttle:global-web')->group(function () {
                 Route::delete('/learning/certificate-templates/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])
                     ->middleware(['permission:official-documents.manage', 'throttle:sensitive-mutation'])
                     ->name('learning.certificate-templates.destroy');
+
+                // Document Studio
+                Route::prefix('document-studio')->name('document-studio.')->middleware('permission:official-documents.manage')->group(function (): void {
+                    Route::get('/', [DocumentStudioController::class, 'index'])->name('index');
+                    Route::get('/create', [DocumentStudioController::class, 'create'])->name('create');
+                    Route::post('/existing-design', [DocumentStudioController::class, 'existingDesign'])->middleware('throttle:sensitive-mutation')->name('existing-design');
+                    Route::get('/upload', [DocumentStudioController::class, 'upload'])->name('upload');
+                    Route::post('/cancel-conversion', [DocumentStudioController::class, 'cancelConversion'])->middleware('throttle:sensitive-mutation')->name('cancel-conversion');
+                    Route::post('/convert-pdf', [DocumentStudioController::class, 'convertPdf'])->middleware('throttle:sensitive-mutation')->name('convert-pdf');
+                    Route::post('/', [DocumentStudioController::class, 'store'])->middleware('throttle:sensitive-mutation')->name('store');
+                    Route::post('/import', [DocumentStudioController::class, 'import'])->name('import');
+
+                    Route::get('/{template}/edit', [DocumentStudioController::class, 'edit'])->name('edit');
+                    Route::post('/{template}/start-draft', [DocumentStudioController::class, 'startDraft'])
+                        ->middleware('throttle:sensitive-mutation')->name('start-draft');
+                    Route::post('/{template}/import-docx', [DocumentStudioController::class, 'importDocx'])
+                        ->middleware('throttle:sensitive-mutation')->name('import-docx');
+                    Route::patch('/{template}/draft', [DocumentStudioController::class, 'saveDraft'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('draft.save');
+                    Route::post('/{template}/publish', [DocumentStudioController::class, 'publish'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('publish');
+                    Route::get('/{template}/versions', [DocumentStudioController::class, 'versions'])->name('versions');
+                    Route::post('/{template}/versions/{version}/activate', [DocumentStudioController::class, 'activateVersion'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('versions.activate');
+                    Route::get('/{template}/preview', [DocumentStudioController::class, 'preview'])
+                        ->middleware('throttle:document-downloads')
+                        ->name('preview');
+                    Route::get('/{template}/export', [DocumentStudioController::class, 'export'])->name('export');
+                    Route::post('/{template}/batch-generate', [DocumentStudioController::class, 'batchGenerate'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('batch-generate');
+
+                    // Asset endpoints
+                    Route::post('/assets/upload', [DocumentStudioAssetController::class, 'upload'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('assets.upload');
+                    Route::get('/assets/{asset}', [DocumentStudioAssetController::class, 'stream'])
+                        ->middleware('throttle:document-downloads')
+                        ->name('assets.stream');
+                    Route::delete('/assets/{asset}', [DocumentStudioAssetController::class, 'destroy'])
+                        ->middleware('throttle:sensitive-mutation')
+                        ->name('assets.destroy');
+                });
                 Route::get('/learning/competency-records/excel', [CompetencyWorkbookController::class, 'downloadForAdmin'])
                     ->middleware(['permission:reports.export', 'throttle:document-downloads'])
                     ->name('learning.competency-workbooks.download');
@@ -916,6 +976,12 @@ Route::middleware('throttle:global-web')->group(function () {
                     Route::post('/payments/upload-proof', [TraineeDashboardController::class, 'uploadPaymentProof'])
                         ->middleware(['permission:payments.view', 'throttle:sensitive-mutation'])
                         ->name('payments.upload-proof');
+                    Route::get('/payments/statement-of-account', [TraineeDashboardController::class, 'downloadStatementOfAccount'])
+                        ->middleware(['permission:payments.view', 'throttle:document-downloads'])
+                        ->name('payments.soa');
+                    Route::get('/payments/statement-of-account/preview', [TraineeDashboardController::class, 'previewStatementOfAccount'])
+                        ->middleware(['permission:payments.view', 'throttle:document-downloads'])
+                        ->name('payments.soa.preview');
                     Route::get('/modules/{module}', [TraineeDashboardController::class, 'viewModule'])
                         ->middleware('permission:modules.view')
                         ->name('modules.show');

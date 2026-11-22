@@ -54,6 +54,7 @@ class OfficialDocument extends Model
         'file_path',
         'sha256',
         'template_version',
+        'document_template_version_id',
         'generated_by_id',
         'released_by_id',
         'generated_at',
@@ -100,6 +101,11 @@ class OfficialDocument extends Model
     public function downloads(): HasMany
     {
         return $this->hasMany(OfficialDocumentDownload::class);
+    }
+
+    public function documentTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(DocumentTemplateVersion::class, 'document_template_version_id');
     }
 
     public function isDownloadableByTrainee(): bool

@@ -111,6 +111,8 @@ class EnrollmentApplication extends Model
         'archived_by_id',
         'payment_method',
         'total_program_fee',
+        'owwa_deduction',
+        'trainee_id_number',
         'downpayment_amount',
         'total_paid_amount',
         'payment_status',
@@ -221,6 +223,7 @@ class EnrollmentApplication extends Model
             'is_historical_record' => 'boolean',
             'review_released_at' => 'datetime',
             'total_program_fee' => 'decimal:2',
+            'owwa_deduction' => 'decimal:2',
             'downpayment_amount' => 'decimal:2',
             'total_paid_amount' => 'decimal:2',
             'payment_amount' => 'decimal:2',
@@ -420,6 +423,19 @@ class EnrollmentApplication extends Model
     public function paymentStatusLabel(): string
     {
         return self::paymentStatuses()[$this->payment_status] ?? str($this->payment_status)->headline()->toString();
+    }
+
+    public function netAmountDue(): float
+    {
+        $fee = (float) ($this->total_program_fee ?? 22000.00);
+        $owwa = (float) ($this->owwa_deduction ?? 0.00);
+
+        return max(0.0, round($fee - $owwa, 2));
+    }
+
+    public function totalVerifiedPayments(): float
+    {
+        return (float) ($this->total_paid_amount ?? 0.00);
     }
 
     public function remainingBalance(): float

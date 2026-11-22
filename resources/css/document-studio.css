@@ -1,0 +1,68 @@
+/* Document Studio Workspace Styles */
+.studio-workspace { height:calc(100dvh - 12rem - env(safe-area-inset-bottom, 0px)); min-height:400px; }
+@media (min-width:1024px) { .studio-workspace { height:calc(100dvh - 9rem); } }
+.studio-workspace button, .studio-workspace input:not([type=checkbox]), .studio-workspace select { min-height:44px; }
+.studio-workspace #tools-sidebar, .studio-workspace #properties-panel { max-width:100%; }
+.studio-canvas-container {
+    background-color: #f3f4f6;
+    background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+    background-size: 16px 16px;
+}
+
+.dark .studio-canvas-container {
+    background-color: #111827;
+    background-image: radial-gradient(#374151 1px, transparent 1px);
+}
+
+.studio-paper-shadow {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.studio-chip {
+    transition: all 0.15s ease-in-out;
+}
+
+.studio-chip:hover {
+    transform: translateY(-1px);
+}
+
+.rk-word-shell { height:100%; display:flex; flex-direction:column; min-width:0; }
+.rk-toolbar { display:flex; flex-wrap:wrap; gap:4px; padding:8px; background:var(--dashboard-surface, #f9fafb); }
+.rk-toolbar button, .rk-import { min-height:44px; min-width:44px; padding:8px; cursor:pointer; border:1px solid #9ca3af; border-radius:6px; }
+.rk-paper-scroll { flex:1; overflow:auto; padding:16px; }
+.rk-page { width:210mm; min-height:297mm; padding:19mm; box-sizing:border-box; background:white; color:#111827; box-shadow:0 2px 8px #0002; }
+.rk-page .tiptap { outline:none; font:11pt/1.5 Arial,sans-serif; min-height:250mm; }
+.rk-page p { margin:0 0 8pt; }
+.rk-page table { width:100%; border-collapse:collapse; }
+.rk-page td, .rk-page th { border:1px solid #6b7280; padding:6px; min-width:24px; }
+.rk-page ul { list-style:disc; padding-left:24px; }
+.rk-page ol { list-style:decimal; padding-left:24px; }
+.rk-page img { max-width:100%; height:auto; }
+.rk-page .selectedCell { background:#e0e7ff; }
+
+/* Shared, native-handler-independent PDF preview. */
+.studio-preview { margin:auto; padding:0; width:min(1100px,calc(100vw - 24px)); max-width:none; height:90dvh; max-height:94dvh; border:1px solid #64748b; border-radius:12px; background:#fff; color:#111827; }
+.studio-preview[open] { display:flex; flex-direction:column; }
+.studio-preview::backdrop { background:rgb(0 0 0 / .65); }
+.studio-preview header { display:flex; align-items:center; justify-content:space-between; padding:8px 16px; gap:8px; }
+.studio-preview h2 { font-weight:600; } .studio-preview small { display:block; font-weight:400; }
+.studio-preview-toolbar { display:flex; flex-wrap:wrap; gap:4px; padding:4px 12px; border-block:1px solid #cbd5e1; }
+.studio-preview button { min-width:44px; min-height:44px; padding:8px; border-radius:6px; }
+.studio-preview button:hover:not(:disabled) { background:#e2e8f0; }
+.studio-preview button:disabled { opacity:.45; }
+.studio-preview button:focus-visible { outline:2px solid #4f46e5; outline-offset:-2px; }
+.studio-preview [data-preview-status] { padding:8px 16px; min-height:36px; }
+.studio-preview [data-preview-body] { flex:1; min-height:0; overflow:auto; padding:16px; background:#cbd5e1; }
+.studio-preview canvas { display:block; background:white; margin:auto; }
+.studio-preview canvas[hidden] { display:none; }
+.dark .studio-preview { background:#111827; color:#f1f5f9; }
+.dark .studio-preview [data-preview-body] { background:#334155; }
+.studio-canvas-container:has(.studio-original:not([hidden])) { display:flex; gap:12px; }
+.studio-original:not([hidden]) { display:flex; flex-direction:column; position:relative; margin:0; width:40%; min-width:200px; height:100%; flex-shrink:0; }
+.studio-original[hidden] { display:none; }
+.studio-canvas-container:has(.studio-original:not([hidden])) #studio-editor-viewport { min-width:0; flex:1; }
+@media (max-width:767px) {
+    .studio-canvas-container:has(.studio-original:not([hidden])) { flex-direction:column; }
+    .studio-original:not([hidden]) { width:100%; height:45%; min-height:200px; min-width:0; }
+    .studio-canvas-container:has(.studio-original:not([hidden])) #studio-editor-viewport { min-height:300px; }
+}

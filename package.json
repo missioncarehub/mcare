@@ -19,6 +19,20 @@
         "vite": "^8.2.1"
     },
     "dependencies": {
-        "pdfjs-dist": "^6.2.108"
+        "@mlc-ai/web-llm": "0.2.82",
+        "@napi-rs/canvas": "1.0.7",
+        "@pdfme/common": "^6.2.4",
+        "@pdfme/generator": "^6.2.4",
+        "@pdfme/schemas": "^6.2.4",
+        "@pdfme/ui": "^6.2.4",
+        "@raazkhnl/rk-editor-core": "^4.6.0",
+        "bwip-js": "4.11.4",
+        "fabric": "^7.4.0",
+        "mammoth": "1.13.0",
+        "parse5": "7.3.0",
+        "pdf-lib": "^1.17.1",
+        "pdfjs-dist": "^6.2.108",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0"
     }
 }

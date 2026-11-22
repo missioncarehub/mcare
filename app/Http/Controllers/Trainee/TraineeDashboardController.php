@@ -180,6 +180,36 @@ class TraineeDashboardController extends Controller
         ], $application);
     }
 
+    public function previewStatementOfAccount(
+        Request $request,
+        \App\Services\StatementOfAccountPdfService $soaService,
+    ): \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your Statement of Account is available after admin approval.');
+        }
+
+        return $soaService->inlineResponse($application);
+    }
+
+    public function downloadStatementOfAccount(
+        Request $request,
+        \App\Services\StatementOfAccountPdfService $soaService,
+    ): \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse {
+        $application = $this->approvedApplicationFor($request);
+
+        if (! $application) {
+            return redirect()
+                ->route('payment.show')
+                ->with('payment_notice', 'Your Statement of Account is available after admin approval.');
+        }
+
+        return $soaService->downloadResponse($application);
+    }
+
     public function payments(Request $request): View|RedirectResponse
     {
         $application = $this->approvedApplicationFor($request);

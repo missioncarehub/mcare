@@ -708,6 +708,7 @@ document.querySelectorAll('[data-certificate-form]').forEach((form) => {
 
     paper?.addEventListener('change', fitPaper);
     orientation?.addEventListener('change', fitPaper);
+    fitPaper();
 });
 </script>
 @endsection

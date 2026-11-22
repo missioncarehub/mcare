@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Contracts\OfficialDocumentRenderer;
 use App\Models\AdminActivityLog;
 use App\Models\CertificateTemplate;
+use App\Models\DocumentTemplateVersion;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\TraineeCompetencyRecord;
 use App\Models\User;
+use App\Services\DocumentStudio\DocumentStudioRenderer;
+use App\Services\DocumentStudio\DocumentStudioService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -21,6 +24,21 @@ class OfficialDocumentManager
         private readonly CompletionEligibilityService $eligibility,
         private readonly OfficialDocumentRenderer $renderer,
     ) {}
+
+    public function generate(
+        EnrollmentApplication $application,
+        string $type,
+        User $admin,
+    ): OfficialDocument {
+        $document = $this->generateNow($this->findOrCreateQueued($application, $type, $admin));
+        AdminActivityLog::record($admin, 'admin.official-document.generated', $document, [
+            'requested_type' => $type,
+            'application_id' => $application->id,
+            'version' => $document->version,
+        ]);
+
+        return $document;
+    }
 
     public function queue(
         EnrollmentApplication $application,
@@ -56,6 +74,40 @@ class OfficialDocumentManager
         ]);
 
         return $document;
+    }
+
+    public function findOrCreateQueued(
+        EnrollmentApplication $application,
+        string $type,
+        User $admin,
+        ?DocumentTemplateVersion $templateVersion = null,
+    ): OfficialDocument {
+        $type = $this->validatedType($type);
+        $this->assertEligible($application, $type);
+
+        return DB::transaction(function () use ($application, $type, $admin, $templateVersion): OfficialDocument {
+            $application = EnrollmentApplication::query()->lockForUpdate()->findOrFail($application->id);
+            $this->assertEligible($application, $type);
+            $current = $this->currentDocumentQuery($application, $type)
+                ->lockForUpdate()
+                ->first();
+
+            if ($current && $current->status !== OfficialDocument::STATUS_FAILED && $current->status !== OfficialDocument::STATUS_REVOKED) {
+                return $current;
+            }
+
+            return $this->createVersion($application, $type, $admin, $templateVersion);
+        });
+    }
+
+    public function generateForBatch(
+        EnrollmentApplication $application,
+        string $type,
+        User $admin,
+    ): OfficialDocument {
+        $document = $this->findOrCreateQueued($application, $type, $admin);
+
+        return $this->generateNow($document);
     }
 
     public function reissue(
@@ -174,7 +226,11 @@ class OfficialDocumentManager
         }
 
         try {
-            $pdf = $this->renderer->render($document);
+            if ($document->document_template_version_id !== null) {
+                $pdf = app(DocumentStudioRenderer::class)->render($document);
+            } else {
+                $pdf = $this->renderer->render($document);
+            }
             $disk = $document->storage_disk;
             $path = $this->documentPath($document);
 
@@ -265,6 +321,7 @@ class OfficialDocumentManager
         EnrollmentApplication $application,
         string $type,
         User $admin,
+        ?DocumentTemplateVersion $templateVersion = null,
     ): OfficialDocument {
         $lastVersion = OfficialDocument::query()
             ->where('enrollment_application_id', $application->id)
@@ -273,6 +330,17 @@ class OfficialDocumentManager
         $version = $lastVersion + 1;
         $year = $application->batch?->year ?? now()->year;
         $activeTemplate = CertificateTemplate::activeFor($type);
+
+        $programId = $application->training_program_id ?? $application->batch?->training_program_id;
+        $activeStudioVersion = $templateVersion ?? app(DocumentStudioService::class)
+            ->resolveActiveVersion($type, $programId);
+        if ($activeStudioVersion && ($activeStudioVersion->template?->document_kind !== $type
+            || ($activeStudioVersion->template->training_program_id
+                && (int) $activeStudioVersion->template->training_program_id !== (int) $programId))) {
+            throw ValidationException::withMessages(['template' => 'This template does not apply to this enrollment.']);
+        }
+        $activeStudioVersionId = $activeStudioVersion?->id;
+
         $prefix = strtoupper((string) config('official_documents.download_name_prefix', 'MCARE'));
         $documentNumber = sprintf(
             '%s-%s-%s-%05d-V%d',
@@ -292,12 +360,14 @@ class OfficialDocumentManager
             'status' => OfficialDocument::STATUS_QUEUED,
             'storage_disk' => config('official_documents.disk', 'local'),
             'template_version' => $activeTemplate ? 'v'.$activeTemplate->version : (string) config('official_documents.template_version', '1.0'),
+            'document_template_version_id' => $activeStudioVersionId,
             'generated_by_id' => $admin->id,
             'metadata' => [
                 'eligibility' => $this->eligibility->evaluate($application),
                 'trainee_name' => trim("{$application->first_name} {$application->middle_name} {$application->last_name}"),
                 'certificate_template_id' => $activeTemplate?->id,
                 'certificate_template_version' => $activeTemplate?->version,
+                'document_template_version_id' => $activeStudioVersionId,
             ],
         ]);
     }
@@ -326,6 +396,11 @@ class OfficialDocumentManager
         }
 
         if ($eligibility['eligible']) {
+            return;
+        }
+
+        if ($application->status === EnrollmentApplication::STATUS_APPROVED
+            && $application->learning_status === EnrollmentApplication::LEARNING_GRADUATED) {
             return;
         }
 

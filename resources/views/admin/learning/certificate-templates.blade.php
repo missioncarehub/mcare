@@ -13,6 +13,23 @@
         <a href="{{ route('admin.learning.certificates') }}" class="secondary-action">Back to Training Records</a>
     </header>
 
+    {{-- PDFme Document Studio Banner --}}
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50 via-indigo-50 to-white p-4 sm:p-5 shadow-sm">
+        <div class="flex items-start gap-3.5">
+            <div class="rounded-xl bg-purple-600 p-2.5 text-white shadow-sm shrink-0">
+                <x-dashboard-icon name="fa-award" class="w-5 h-5" />
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-slate-900">Interactive Document Studio (PDFme Powered)</h3>
+                <p class="mt-0.5 text-xs text-slate-600">Visually drag, drop, resize, and align logos, signatures, dynamic text placeholders, and tables directly onto the certificate canvas.</p>
+            </div>
+        </div>
+        <a href="{{ route('admin.document-studio.index') }}" class="primary-action inline-flex items-center gap-2 shrink-0">
+            <span>Open Document Studio</span>
+            <x-dashboard-icon name="fa-arrow-right" class="w-4 h-4" />
+        </a>
+    </div>
+
     @if (session('saved'))
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('saved') }}</div>
     @endif
