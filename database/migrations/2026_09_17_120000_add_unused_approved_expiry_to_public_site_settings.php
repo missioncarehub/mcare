@@ -9,20 +9,30 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('public_site_settings', function (Blueprint $table): void {
-            $table->string('unused_approved_expiry_mode', 20)->default('off')->after('registrar_signature_path');
-            $table->unsignedSmallInteger('unused_approved_expiry_amount')->nullable()->after('unused_approved_expiry_mode');
-            $table->date('unused_approved_expiry_date')->nullable()->after('unused_approved_expiry_amount');
+            if (! Schema::hasColumn('public_site_settings', 'unused_approved_expiry_mode')) {
+                $table->string('unused_approved_expiry_mode', 20)->default('off')->after('registrar_signature_path');
+            }
+            if (! Schema::hasColumn('public_site_settings', 'unused_approved_expiry_amount')) {
+                $table->unsignedSmallInteger('unused_approved_expiry_amount')->nullable()->after('unused_approved_expiry_mode');
+            }
+            if (! Schema::hasColumn('public_site_settings', 'unused_approved_expiry_date')) {
+                $table->date('unused_approved_expiry_date')->nullable()->after('unused_approved_expiry_amount');
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('public_site_settings', function (Blueprint $table): void {
-            $table->dropColumn([
-                'unused_approved_expiry_mode',
-                'unused_approved_expiry_amount',
-                'unused_approved_expiry_date',
-            ]);
+            $drop = [];
+            foreach (['unused_approved_expiry_mode', 'unused_approved_expiry_amount', 'unused_approved_expiry_date'] as $col) {
+                if (Schema::hasColumn('public_site_settings', $col)) {
+                    $drop[] = $col;
+                }
+            }
+            if (! empty($drop)) {
+                $table->dropColumn($drop);
+            }
         });
     }
 };

@@ -9,7 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('training_modules', function (Blueprint $table) {
-            $table->boolean('lock_until_previous')->default(true)->after('is_published');
+            if (! Schema::hasColumn('training_modules', 'lock_until_previous')) {
+                $table->boolean('lock_until_previous')->default(true)->after('is_published');
+            }
         });
     }
 

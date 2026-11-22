@@ -9,8 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('enrollment_applications', function (Blueprint $table) {
-            $table->timestamp('archived_at')->nullable()->after('learning_status_changed_by_id');
-            $table->foreignId('archived_by_id')->nullable()->after('archived_at')->constrained('users')->nullOnDelete();
+            if (! Schema::hasColumn('enrollment_applications', 'archived_at')) {
+                $table->timestamp('archived_at')->nullable()->after('learning_status_changed_by_id');
+            }
+            if (! Schema::hasColumn('enrollment_applications', 'archived_by_id')) {
+                $table->foreignId('archived_by_id')->nullable()->after('archived_at')->constrained('users')->nullOnDelete();
+            }
         });
     }
 

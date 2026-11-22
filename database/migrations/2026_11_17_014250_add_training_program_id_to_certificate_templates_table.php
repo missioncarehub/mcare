@@ -9,13 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('certificate_templates', function (Blueprint $table) {
-            $table->foreignId('training_program_id')
-                ->nullable()
-                ->after('type')
-                ->constrained('training_programs')
-                ->nullOnDelete();
+            if (! Schema::hasColumn('certificate_templates', 'training_program_id')) {
+                $table->foreignId('training_program_id')
+                    ->nullable()
+                    ->after('type')
+                    ->constrained('training_programs')
+                    ->nullOnDelete();
 
-            $table->index(['type', 'training_program_id', 'is_active']);
+                $table->index(['type', 'training_program_id', 'is_active']);
+            }
         });
     }
 

@@ -9,8 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('certificate_templates', function (Blueprint $table) {
-            $table->string('background_path')->nullable()->after('use_official_artwork');
-            $table->json('field_layout')->nullable()->after('background_path');
+            if (! Schema::hasColumn('certificate_templates', 'background_path')) {
+                $table->string('background_path')->nullable()->after('use_official_artwork');
+            }
+            if (! Schema::hasColumn('certificate_templates', 'field_layout')) {
+                $table->json('field_layout')->nullable()->after('background_path');
+            }
         });
     }
 

@@ -8,12 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('deleted_account_email_blocks', function (Blueprint $table) {
-            $table->id();
-            $table->char('email_hash', 64)->unique();
-            $table->string('deleted_role', 30);
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('deleted_account_email_blocks')) {
+            Schema::create('deleted_account_email_blocks', function (Blueprint $table) {
+                $table->id();
+                $table->char('email_hash', 64)->unique();
+                $table->string('deleted_role', 30);
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void
