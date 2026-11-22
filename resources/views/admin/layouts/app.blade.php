@@ -16,6 +16,7 @@
         }
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('styles')
 </head>
 <body class="dashboard-shell universal-dashboard" data-dashboard-role="admin">
     <div class="dashboard-navigation-progress" aria-hidden="true"></div>
@@ -263,5 +264,6 @@
         </form>
     </dialog>
     <x-dashboard-toasts />
+    @stack('scripts')
 </body>
 </html>

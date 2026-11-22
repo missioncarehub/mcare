@@ -56,6 +56,8 @@ export class StudioPreview {
         const epoch = this.epoch;
         this.page = 1; this.zoom = 1;
         this.status.textContent = 'Loading preview…';
+        const directLink = document.getElementById('preview-direct-link');
+        if (directLink) directLink.href = endpoint;
         if (this.inline) this.dialog.hidden = false;
         else if (!this.dialog.open) this.dialog.showModal();
         this.abort = new AbortController();

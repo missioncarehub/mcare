@@ -7,6 +7,19 @@
 @endpush
 @push('scripts')
     @vite(['resources/js/document-studio/preview.js'])
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modal = document.getElementById('preview-modal');
+            document.querySelectorAll('[data-document-preview]').forEach(function (el) {
+                el.addEventListener('click', function (e) {
+                    var url = this.getAttribute('data-document-preview') || this.getAttribute('href');
+                    if (!url || url === '#') return;
+                    var directLink = document.getElementById('preview-direct-link');
+                    if (directLink) directLink.href = url;
+                });
+            });
+        });
+    </script>
 @endpush
 
 @section('content')
@@ -24,7 +37,7 @@
                 </span>
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Document Studio</h1>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Manage dynamic COTC and TOR templates uniquely per program with drag-and-drop PDFme designer.</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Design and customize official credentials (COTC & TOR) uniquely per program with drag-and-drop PDFme designer.</p>
                 </div>
             </div>
         </div>
@@ -109,13 +122,19 @@
         <!-- ========================================== -->
         <!-- ACTIVE OFFICIAL CREDENTIALS (COTC & TOR)   -->
         <!-- ========================================== -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             @foreach($publishedDesigns as $kind => $info)
                 @php
                     $isCotc = ($kind === 'cotc');
                     $effective = $info['effective'];
                     $hasOverride = $info['is_program_override'];
                     $ver = $effective?->activeVersion;
+
+                    $previewTemplate = $effective ?? $info['global'];
+                    $previewVersionId = $ver?->id ?? $info['global']?->active_version_id;
+                    $previewUrl = $previewTemplate
+                        ? route('admin.document-studio.preview', array_filter(['template' => $previewTemplate, 'version_id' => $previewVersionId]))
+                        : '#';
                 @endphp
                 <div class="bg-white dark:bg-gray-850 rounded-2xl border {{ $isCotc ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-blue-200 dark:border-blue-900/50' }} shadow-xs flex flex-col justify-between overflow-hidden">
                     <div class="p-6 space-y-4">
@@ -158,6 +177,79 @@
                                 <p class="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">
                                     Program: {{ $selectedProgram->name }}
                                 </p>
+                            @endif
+                        </div>
+
+                        <!-- LIVE CERTIFICATE / TRANSCRIPT DIRECT PREVIEW FRAME -->
+                        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-stone-100/80 dark:bg-gray-900/60 p-3 sm:p-4">
+                            @if($isCotc)
+                                {{-- COTC Landscape Preview Frame --}}
+                                <div class="mx-auto w-full flex items-center justify-center max-w-[460px]">
+                                    <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
+                                       class="group relative w-full overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
+                                       style="aspect-ratio: 11 / 8.5"
+                                       title="Click to preview Certificate PDF">
+                                        <img src="{{ asset('assets/cotc-official-template.png') }}"
+                                             alt="Certificate of Training Completion Template Preview"
+                                             class="h-full w-full object-contain">
+
+                                        {{-- Realistic dynamic placeholder overlay text --}}
+                                        <div class="absolute inset-0 pointer-events-none flex flex-col justify-between py-5 px-6 text-center select-none" style="font-family: 'Times New Roman', Times, serif;">
+                                            <div class="h-6"></div>
+                                            <div class="space-y-1">
+                                                <p class="text-[13px] sm:text-[15px] font-bold text-gray-900 tracking-wide">JUAN DELA CRUZ</p>
+                                                <p class="text-[9px] sm:text-[10px] text-gray-700 font-sans">for having successfully completed the training program in</p>
+                                                <p class="text-[11px] sm:text-[12px] font-bold text-gray-900 uppercase font-sans tracking-wide">
+                                                    {{ $selectedProgram?->name ?? 'CAREGIVING NC II' }}
+                                                </p>
+                                            </div>
+                                            <div class="flex justify-between items-end text-[7px] sm:text-[8px] text-gray-600 font-sans px-2">
+                                                <span>No. CERT-2026-0001</span>
+                                                <span>Given this {{ now()->format('jS \o\f F, Y') }}</span>
+                                                <span>Authorized Registrar</span>
+                                            </div>
+                                        </div>
+
+                                        {{-- Hover Overlay --}}
+                                        <div class="absolute inset-0 bg-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-900/95 text-xs font-bold text-gray-900 dark:text-white shadow-md">
+                                                <x-dashboard-icon name="eye" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                <span>Click to preview full PDF</span>
+                                            </span>
+                                        </div>
+                                    </a>
+                                </div>
+                            @else
+                                {{-- TOR Portrait Preview Frame --}}
+                                <div class="mx-auto w-full flex items-center justify-center max-w-[268px]">
+                                    <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
+                                       class="group relative w-full min-h-[350px] sm:min-h-[380px] overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
+                                       style="aspect-ratio: 210 / 297"
+                                       title="Click to preview Official Transcript PDF">
+                                        @include('admin.learning.partials.tor-default-preview', [
+                                            'organization' => config('official_documents.organization', []),
+                                            'torTitle' => 'OFFICIAL TRANSCRIPT OF RECORDS',
+                                            'torTrainee' => 'NAME OF THE STUDENT',
+                                            'torProgram' => mb_strtoupper($selectedProgram?->name ?? 'CAREGIVING NC II'),
+                                            'torHours' => 786,
+                                            'torRemarks' => 'For Records and Reference Purposes',
+                                            'torRows' => null,
+                                            'torTrainer' => 'Lead Trainer',
+                                            'torTrainerRole' => 'Lead Trainer',
+                                            'torRegistrar' => 'Registrar',
+                                            'torRegistrarRole' => 'Registrar',
+                                            'torLive' => false,
+                                        ])
+
+                                        {{-- Hover Overlay --}}
+                                        <div class="absolute inset-0 bg-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-30">
+                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-900/95 text-xs font-bold text-gray-900 dark:text-white shadow-md">
+                                                <x-dashboard-icon name="eye" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                <span>Click to preview full PDF</span>
+                                            </span>
+                                        </div>
+                                    </a>
+                                </div>
                             @endif
                         </div>
 
@@ -222,18 +314,21 @@
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     @foreach($info['program_overrides'] as $override)
+                                        @php
+                                            $overridePreviewUrl = route('admin.document-studio.preview', ['template' => $override, 'version_id' => $override->active_version_id]);
+                                        @endphp
                                         <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/40 p-2.5 text-xs flex items-center justify-between gap-2">
                                             <div class="min-w-0">
                                                 <p class="font-bold text-gray-900 dark:text-white truncate">{{ $override->trainingProgram?->name }}</p>
                                                 <p class="text-[10px] text-gray-500">v{{ $override->activeVersion?->version_number }}</p>
                                             </div>
                                             <div class="flex items-center gap-1 shrink-0">
-                                                <button type="button"
-                                                        data-document-preview="{{ route('admin.document-studio.preview', ['template' => $override, 'version_id' => $override->active_version_id]) }}"
-                                                        class="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white"
-                                                        title="Preview">
+                                                <a href="{{ $overridePreviewUrl }}" target="_blank"
+                                                   data-document-preview="{{ $overridePreviewUrl }}"
+                                                   class="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white cursor-pointer"
+                                                   title="Preview">
                                                     <x-dashboard-icon name="eye" class="w-4 h-4" />
-                                                </button>
+                                                </a>
                                                 <a href="{{ route('admin.document-studio.edit', $override) }}"
                                                    class="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white"
                                                    title="Edit in PDFme">
@@ -261,22 +356,22 @@
                                     <span>Customize {{ strtoupper($kind) }} for {{ $selectedProgram->code ?? $selectedProgram->name }}</span>
                                 </button>
                             </form>
-                            @if($info['global'] && $info['global']->activeVersion)
-                                <button type="button"
-                                        data-document-preview="{{ route('admin.document-studio.preview', ['template' => $info['global'], 'version_id' => $info['global']->activeVersion->id]) }}"
-                                        class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 min-h-[44px]">
+                            @if($previewUrl !== '#')
+                                <a href="{{ $previewUrl }}" target="_blank"
+                                   data-document-preview="{{ $previewUrl }}"
+                                   class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 min-h-[44px] cursor-pointer">
                                     <x-dashboard-icon name="eye" class="w-4 h-4 text-gray-500" />
                                     <span>Preview Default</span>
-                                </button>
+                                </a>
                             @endif
                         @elseif($effective && $ver)
                             <div class="flex items-center gap-2 w-full sm:w-auto flex-1">
-                                <button type="button"
-                                        data-document-preview="{{ route('admin.document-studio.preview', ['template' => $effective, 'version_id' => $ver->id]) }}"
-                                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors min-h-[44px]">
+                                <a href="{{ $previewUrl }}" target="_blank"
+                                   data-document-preview="{{ $previewUrl }}"
+                                   class="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors min-h-[44px] cursor-pointer">
                                     <x-dashboard-icon name="eye" class="w-4 h-4 text-gray-500" />
                                     <span>Preview PDF</span>
-                                </button>
+                                </a>
 
                                 <form action="{{ route('admin.document-studio.start-draft', $effective) }}" method="POST" class="flex-1">
                                     @csrf
@@ -386,6 +481,9 @@
             @else
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($templates as $tmpl)
+                        @php
+                            $draftPreviewUrl = route('admin.document-studio.preview', ['template' => $tmpl, 'mode' => 'draft']);
+                        @endphp
                         <div class="bg-white dark:bg-gray-850 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col justify-between overflow-hidden">
                             <div class="p-5">
                                 <div class="flex items-start justify-between gap-2 mb-3">
@@ -429,11 +527,12 @@
 
                             <div class="bg-gray-50 dark:bg-gray-900/60 px-5 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-1">
-                                    <button type="button" data-document-preview="{{ route('admin.document-studio.preview', ['template' => $tmpl, 'mode' => 'draft']) }}"
-                                       class="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                                       aria-label="Preview draft" title="Preview draft" style="min-width:44px;min-height:44px">
+                                    <a href="{{ $draftPreviewUrl }}" target="_blank"
+                                       data-document-preview="{{ $draftPreviewUrl }}"
+                                       class="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                       aria-label="Preview draft" title="Preview draft" style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">
                                         <x-dashboard-icon name="eye" class="w-4 h-4" />
-                                    </button>
+                                    </a>
                                     <a href="{{ route('admin.document-studio.export', $tmpl) }}"
                                        class="p-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
                                        title="Export JSON" style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">
