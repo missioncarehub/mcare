@@ -117,8 +117,8 @@
             <p class="mt-1 text-sm text-slate-600">{{ $templateState }}</p>
             {{-- Preview Frame Container: Balanced width and height so COTC and TOR cards are 100% pantay pantay --}}
             <div class="mt-4 rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
-                <div class="mx-auto w-full" @if($previewLandscape) style="max-width: 460px;" @else style="max-width: 265px;" @endif>
-                    <div class="relative w-full overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10" 
+                <div class="mx-auto w-full flex items-center justify-center" @if($previewLandscape) style="max-width: 460px;" @else style="max-width: 268px;" @endif>
+                    <div class="relative w-full min-h-[350px] sm:min-h-[380px] overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10" 
                          @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif>
                         @if ($savedBackground !== '')
                             <img src="{{ $savedBackground }}" alt="Active {{ $label }} template" class="h-full w-full object-contain">

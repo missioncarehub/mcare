@@ -179,7 +179,6 @@
             <div class="hidden items-center gap-6 lg:flex">
                 <a href="#programs" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Programs</a>
                 <a href="#admissions" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Admissions</a>
-                <a href="{{ route('applications.status') }}" class="inline-flex items-center gap-1.5 text-sm font-bold text-purple-700 hover:text-purple-900"><x-dashboard-icon name="magnifying-glass" class="w-3.5 h-3.5" /> Check status</a>
                 <a href="#why" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Why MCARE</a>
                 <a href="#discover" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Discover</a>
                 <a href="#contact" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Contact</a>
@@ -375,26 +374,6 @@
                             <span>Check status</span>
                         </a>
                         <a href="#programs" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">View Programs</a>
-                    </div>
-
-                    <!-- Path: resources/views/landing/home.blade.php | Label: Hero Quick Status Verification Card -->
-                    <div class="mt-7 max-w-xl rounded-2xl border border-purple-200/90 bg-white/95 p-4 sm:p-5 shadow-lg shadow-purple-900/5 backdrop-blur-sm">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                            <span class="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
-                                <x-dashboard-icon name="magnifying-glass" class="w-3.5 h-3.5 text-purple-700" />
-                                Track Application &amp; Document Status
-                            </span>
-                            <span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">Self-Service</span>
-                        </div>
-                        <p class="text-xs text-slate-600 mb-3">Already applied or enrolled? Enter your application or enrollment number to verify review status, payment, and replacement requirements.</p>
-                        <form method="POST" action="{{ route('applications.lookup') }}" class="flex flex-col sm:flex-row gap-2">
-                            @csrf
-                            <input type="text" name="application_number" class="form-field flex-1 font-mono uppercase text-xs sm:text-sm bg-slate-50/70 focus:bg-white" placeholder="e.g. MCA-2026-XXXXXX or MCE-2026-XXXXXX" required>
-                            <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-700 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-purple-800 transition shrink-0">
-                                <span>Verify status</span>
-                                <x-dashboard-icon name="arrow-right" class="w-3.5 h-3.5" />
-                            </button>
-                        </form>
                     </div>
 
                     <div class="mt-7 grid max-w-xl grid-cols-3 gap-3 border-t border-slate-200 pt-5 text-left sm:mt-10 sm:gap-5 sm:pt-8">

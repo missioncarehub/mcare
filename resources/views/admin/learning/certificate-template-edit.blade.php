@@ -446,8 +446,9 @@
                 <div class="mt-4 rounded-xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
                     @if($isTor)
                         {{-- High-Fidelity Official TOR Preview Canvas (Proportionately Sized & Centered) --}}
-                        <div class="mx-auto w-full" style="max-width: 420px;">
-                            <div id="tor-preview-wrapper" class="relative w-full overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-900/10 transition-all" style="aspect-ratio: 210 / 297;" data-import-frame>
+                        <div class="mx-auto w-full flex items-center justify-center" style="max-width: 420px;">
+                            <div id="tor-preview-wrapper" class="relative w-full min-h-[580px] overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-900/10 transition-all" 
+                                 style="aspect-ratio: 210 / 297" data-import-frame>
                                 @include('admin.learning.partials.tor-default-preview', [
                                     'organization' => $organization,
                                     'torTitle' => $field('title') ?: 'OFFICIAL TRANSCRIPT OF RECORDS',
@@ -473,8 +474,8 @@
 
                     @else
                         {{-- COTC Certificate Preview Frame (Proportionately Sized & Centered) --}}
-                        <div class="mx-auto w-full" style="max-width: 540px;">
-                            <div class="relative w-full overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-100 shadow-inner" 
+                        <div class="mx-auto w-full flex items-center justify-center" style="max-width: 540px;">
+                            <div class="relative w-full min-h-[380px] sm:min-h-[400px] overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-100 shadow-inner" 
                                  @if($previewLandscape) style="aspect-ratio: 11 / 8.5" @else style="aspect-ratio: 210 / 297" @endif 
                                  data-import-frame>
                                 <img src="{{ $savedBackground }}" alt="Imported {{ $label }} template" class="absolute inset-0 h-full w-full object-fill pointer-events-none" data-import-image @unless($savedBackground !== '') hidden @endunless>
@@ -696,6 +697,13 @@ document.querySelectorAll('[data-certificate-form]').forEach((form) => {
         const pair = ratios[paper.value] || ratios.a4;
         const landscape = orientation.value === 'landscape';
         frame.style.aspectRatio = landscape ? `${Math.max(...pair)} / ${Math.min(...pair)}` : `${pair[0]} / ${pair[1]}`;
+        if (landscape) {
+            frame.style.width = '518px';
+            frame.style.height = '400px';
+        } else {
+            frame.style.width = '416px';
+            frame.style.height = '588px';
+        }
     };
 
     paper?.addEventListener('change', fitPaper);

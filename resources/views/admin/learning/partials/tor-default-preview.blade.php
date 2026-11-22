@@ -52,7 +52,7 @@
         ];
     @endphp
 
-    <div class="tor-scaled-content bg-white text-slate-950" style="width: 740px; height: 1046px; transform-origin: top left; transform: scale({{ ($torLive ?? false) ? '0.5675' : '0.3581' }}); font-family: 'Times New Roman', Times, serif;">
+    <div class="tor-scaled-content bg-white text-slate-950" style="width: 740px; height: 1046px; transform-origin: top left; transform: scale({{ ($torLive ?? false) ? '0.5622' : '0.3622' }}); font-family: 'Times New Roman', Times, serif;">
         <div style="box-sizing: border-box; display: flex; height: 100%; flex-direction: column; padding: 24px 32px 14px;">
             
             {{-- Header with Official Logo --}}

@@ -104,9 +104,7 @@ class LandingPageTest extends TestCase
             ->assertOk()
             ->assertSee(route('applications.status'), false)
             ->assertSee('Check status')
-            ->assertSee('Check application status')
-            ->assertSee('Track Application &amp; Document Status', false)
-            ->assertSee(route('applications.lookup'), false);
+            ->assertSee('Check application status');
 
         $lookupResponse = $this->post(route('applications.lookup'), [
             'application_number' => 'MCA-2026-ABC123',
