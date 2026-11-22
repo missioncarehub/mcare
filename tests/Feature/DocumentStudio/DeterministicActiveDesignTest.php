@@ -224,10 +224,10 @@ class DeterministicActiveDesignTest extends TestCase
     {
         $summary = $this->service->getPublishedDesignsSummary();
 
-        // Must include all three official document kinds
+        // Must include official credential document kinds (COTC and TOR), omitting unissued SOA for safety
         $this->assertArrayHasKey(DocumentTemplate::KIND_COTC, $summary);
         $this->assertArrayHasKey(DocumentTemplate::KIND_TOR, $summary);
-        $this->assertArrayHasKey(DocumentTemplate::KIND_SOA, $summary);
+        $this->assertArrayNotHasKey(DocumentTemplate::KIND_SOA, $summary);
 
         // Publish a global TOR design
         $tor = DocumentTemplate::create([

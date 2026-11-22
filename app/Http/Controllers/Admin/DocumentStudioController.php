@@ -66,10 +66,12 @@ class DocumentStudioController extends Controller
         // Ensure system defaults are seeded and single active per scope is enforced
         $this->studioService->ensureDefaultTemplates();
 
-        $publishedDesigns = $this->studioService->getPublishedDesignsSummary();
+        $selectedProgramId = $request->filled('program_id') ? (int) $request->query('program_id') : null;
+        $publishedDesigns = $this->studioService->getPublishedDesignsSummary($selectedProgramId);
 
         $query = DocumentTemplate::query()
             ->with(['activeVersion', 'trainingProgram', 'createdBy'])
+            ->whereIn('document_kind', [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR])
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
 
@@ -91,12 +93,17 @@ class DocumentStudioController extends Controller
 
         $templates = $query->paginate(12)->withQueryString();
         $programs = TrainingProgram::query()->orderBy('name')->get();
-        $draftCount = DocumentTemplate::query()->count();
+        $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
+        $draftCount = DocumentTemplate::query()
+            ->whereIn('document_kind', [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR])
+            ->count();
 
         return view('admin.document-studio.index', [
             'templates' => $templates,
             'programs' => $programs,
-            'kinds' => DocumentTemplate::supportedKinds(),
+            'selectedProgram' => $selectedProgram,
+            'selectedProgramId' => $selectedProgramId,
+            'kinds' => [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR],
             'publishedDesigns' => $publishedDesigns,
             'draftCount' => $draftCount,
             'activeView' => $request->query('view', 'published'),
@@ -111,8 +118,12 @@ class DocumentStudioController extends Controller
             'training_program_id' => ['nullable', 'integer', 'exists:training_programs,id'],
         ]);
         $program = isset($data['training_program_id']) ? TrainingProgram::findOrFail($data['training_program_id']) : null;
+        $name = null;
+        if ($program) {
+            $name = strtoupper($data['kind']).' — '.$program->name;
+        }
         try {
-            $template = $designs->createCurrent($data['kind'], $program, $request->user());
+            $template = $designs->createCurrent($data['kind'], $program, $request->user(), $name);
         } catch (\RuntimeException $exception) {
             report($exception);
             throw ValidationException::withMessages(['kind' => 'The existing design is unavailable for this program. Check its configured document artwork before retrying.']);

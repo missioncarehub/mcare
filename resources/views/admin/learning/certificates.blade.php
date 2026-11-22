@@ -16,7 +16,13 @@
 @endphp
 <section class="space-y-6">
     <header class="flex flex-wrap items-center justify-between gap-3">
-        <a href="{{ route('admin.learning.certificate-templates') }}" class="secondary-action">Certificate templates</a>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.document-studio.index') }}" class="primary-action inline-flex items-center gap-2">
+                <x-dashboard-icon name="award" class="w-4 h-4" />
+                <span>Document Studio</span>
+            </a>
+            <a href="{{ route('admin.learning.certificate-templates') }}" class="secondary-action">Classic templates</a>
+        </div>
         <div class="flex flex-wrap gap-2">
             <button type="button" data-dashboard-dialog-open="competency-excel-dialog" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="file-excel" class="h-4 w-4" />Export competency Excel</button>
             <button type="button" data-dashboard-dialog-open="batch-tor-dialog" class="primary-action inline-flex items-center gap-2"><x-dashboard-icon name="folder-open" class="h-4 w-4" />Prepare batch TOR ZIP</button>

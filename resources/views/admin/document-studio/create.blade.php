@@ -27,16 +27,16 @@
             </label>
             <label class="text-sm font-medium">Document
                 <select name="document_kind" class="form-field mt-1 block min-h-[44px] dark:bg-gray-900 dark:border-gray-700">
-                    @foreach(['cotc' => 'COTC', 'tor' => 'TOR', 'soa' => 'Statement of Account', 'general' => 'General'] as $value => $label)
-                        <option value="{{ $value }}" @selected(old('document_kind', 'cotc') === $value)>{{ $label }}</option>
+                    @foreach(['cotc' => 'Certificate of Training Completion (COTC)', 'tor' => 'Official Transcript of Records (TOR)'] as $value => $label)
+                        <option value="{{ $value }}" @selected(old('document_kind', request('kind', 'cotc')) === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
             </label>
-            <label class="text-sm font-medium">Program
+            <label class="text-sm font-medium">Program Scope
                 <select name="training_program_id" class="form-field mt-1 block min-h-[44px] dark:bg-gray-900 dark:border-gray-700">
-                    <option value="">All programs</option>
+                    <option value="">All programs (Global Default)</option>
                     @foreach($programs as $program)
-                        <option value="{{ $program->id }}" @selected((string) old('training_program_id') === (string) $program->id)>{{ $program->name }}</option>
+                        <option value="{{ $program->id }}" @selected((string) old('training_program_id', request('program_id')) === (string) $program->id)>{{ $program->name }}</option>
                     @endforeach
                 </select>
             </label>

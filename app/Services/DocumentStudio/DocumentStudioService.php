@@ -775,9 +775,9 @@ class DocumentStudioService
     }
 
     /**
-     * Get summary of currently published designs for COTC, TOR, and SOA.
+     * Get summary of currently published designs for COTC and TOR (with optional program filter).
      */
-    public function getPublishedDesignsSummary(): array
+    public function getPublishedDesignsSummary(?int $programId = null): array
     {
         if (! Schema::hasTable('document_templates')) {
             return [];
@@ -786,7 +786,6 @@ class DocumentStudioService
         $kinds = [
             DocumentTemplate::KIND_COTC => 'Certificate of Training Completion (COTC)',
             DocumentTemplate::KIND_TOR => 'Official Transcript of Records (TOR)',
-            DocumentTemplate::KIND_SOA => 'Statement of Account (SOA)',
         ];
 
         $summary = [];
@@ -812,11 +811,28 @@ class DocumentStudioService
                 ->unique('training_program_id')
                 ->values();
 
+            $selectedProgramTemplate = null;
+            if ($programId) {
+                $selectedProgramTemplate = DocumentTemplate::query()
+                    ->where('document_kind', $kind)
+                    ->where('training_program_id', $programId)
+                    ->where('is_active', true)
+                    ->whereNotNull('active_version_id')
+                    ->with(['activeVersion', 'trainingProgram', 'createdBy'])
+                    ->orderByDesc('id')
+                    ->first();
+            }
+
+            $effectiveTemplate = $selectedProgramTemplate ?? $globalTemplate;
+
             $summary[$kind] = [
                 'label' => $label,
                 'kind' => $kind,
                 'global' => $globalTemplate,
                 'program_overrides' => $programOverrides,
+                'program_specific' => $selectedProgramTemplate,
+                'effective' => $effectiveTemplate,
+                'is_program_override' => $selectedProgramTemplate !== null,
             ];
         }
 

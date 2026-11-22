@@ -14,7 +14,7 @@
         <div class="grid sm:grid-cols-2 gap-4">
             <label>Template name<input name="name" value="{{ old('name') }}" maxlength="150" required class="block w-full rounded-lg min-h-[44px]" /></label>
             <label>Document kind<select name="document_kind" class="block w-full rounded-lg min-h-[44px]">
-                @foreach(['general' => 'General', 'soa' => 'Statement of Account', 'cotc' => 'COTC', 'tor' => 'TOR'] as $value => $label)<option value="{{ $value }}" @selected(old('document_kind') === $value)>{{ $label }}</option>@endforeach
+                @foreach(['cotc' => 'Certificate of Training Completion (COTC)', 'tor' => 'Official Transcript of Records (TOR)', 'general' => 'General Document'] as $value => $label)<option value="{{ $value }}" @selected(old('document_kind', request('kind', 'cotc')) === $value)>{{ $label }}</option>@endforeach
             </select></label>
             <label>Program<select name="training_program_id" class="block w-full rounded-lg min-h-[44px]"><option value="">All programs</option>@foreach($programs as $program)<option value="{{ $program->id }}">{{ $program->name }}</option>@endforeach</select></label>
             <label>PDF (up to 15 MB, 20 pages)<input id="conversion-file" name="file" type="file" accept=".pdf,application/pdf" required class="block w-full min-h-[44px]" /></label>
