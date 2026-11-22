@@ -179,6 +179,7 @@
             <div class="hidden items-center gap-6 lg:flex">
                 <a href="#programs" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Programs</a>
                 <a href="#admissions" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Admissions</a>
+                <a href="{{ route('applications.status') }}" class="inline-flex items-center gap-1.5 text-sm font-bold text-purple-700 hover:text-purple-900"><x-dashboard-icon name="magnifying-glass" class="w-3.5 h-3.5" /> Check status</a>
                 <a href="#why" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Why MCARE</a>
                 <a href="#discover" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Discover</a>
                 <a href="#contact" class="text-sm font-semibold text-slate-600 hover:text-purple-700">Contact</a>
@@ -187,6 +188,7 @@
 
             <div class="flex shrink-0 items-center gap-2">
                 @auth
+                    <a href="{{ route('applications.status') }}" class="hidden rounded-lg border border-purple-200 bg-purple-50/70 px-3.5 py-2 text-sm font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 md:inline-flex items-center gap-1.5"><x-dashboard-icon name="magnifying-glass" class="w-3.5 h-3.5" /> Check status</a>
                     <!-- Path: resources/views/landing/home.blade.php | Label: Compact active account menu -->
                     <details class="relative hidden lg:block">
                         <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left hover:bg-slate-50">
@@ -215,7 +217,7 @@
                 @else
                     <a href="{{ route('login') }}" class="hidden rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:inline-flex">Sign in</a>
                     <a href="{{ route('alumni.claim.create') }}" class="hidden rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100 xl:inline-flex">Alumni claim</a>
-                    <a href="{{ route('applications.status') }}" class="hidden rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 lg:inline-flex">Check status</a>
+                    <a href="{{ route('applications.status') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/80 px-3.5 py-2 text-sm font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition">Check status</a>
                     <a href="{{ route('applications.create') }}" class="hidden rounded-lg bg-purple-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-800 lg:inline-flex">Apply now</a>
                 @endauth
 
@@ -246,6 +248,15 @@
             </div>
 
             <nav class="flex-1 space-y-1.5 overflow-y-auto px-4 py-4" aria-label="Mobile navigation">
+                <!-- Path: resources/views/landing/home.blade.php | Label: Prominent mobile status check link -->
+                <a href="{{ route('applications.status') }}" class="mobile-sidebar-link mb-3 flex items-center justify-between rounded-xl border border-purple-200 bg-purple-50/90 px-4 py-3 text-sm font-bold text-purple-800 shadow-xs">
+                    <span class="flex items-center gap-2.5">
+                        <x-dashboard-icon name="magnifying-glass" class="h-4 w-4 text-purple-700" />
+                        <span>Check application status</span>
+                    </span>
+                    <span class="rounded-full bg-purple-200 px-2 py-0.5 text-[11px] font-black text-purple-900">Track</span>
+                </a>
+
                 @auth
                     <!-- Path: resources/views/landing/home.blade.php | Label: Mobile active account identity -->
                     <div class="mb-3 rounded-2xl border border-purple-100 bg-purple-50/80 p-4">
@@ -359,8 +370,31 @@
                             <a href="{{ route('login') }}" class="inline-flex h-11 items-center justify-center rounded-full border border-purple-200 bg-purple-50 px-6 text-sm font-bold text-purple-700 hover:bg-purple-100 sm:h-auto sm:px-7 sm:py-3.5">Sign In</a>
                             <a href="{{ route('applications.create') }}" class="inline-flex h-11 items-center justify-center rounded-full bg-purple-600 px-6 text-sm font-semibold text-white shadow-lg shadow-purple-100 hover:bg-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Apply now</a>
                         @endauth
-                        <a href="{{ route('applications.status') }}" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">Check status</a>
+                        <a href="{{ route('applications.status') }}" class="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-purple-300 bg-purple-50/90 px-6 text-sm font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-400 sm:h-auto sm:px-7 sm:py-3.5 transition">
+                            <x-dashboard-icon name="magnifying-glass" class="w-4 h-4" />
+                            <span>Check status</span>
+                        </a>
                         <a href="#programs" class="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-purple-200 hover:text-purple-700 sm:h-auto sm:px-7 sm:py-3.5">View Programs</a>
+                    </div>
+
+                    <!-- Path: resources/views/landing/home.blade.php | Label: Hero Quick Status Verification Card -->
+                    <div class="mt-7 max-w-xl rounded-2xl border border-purple-200/90 bg-white/95 p-4 sm:p-5 shadow-lg shadow-purple-900/5 backdrop-blur-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                            <span class="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                                <x-dashboard-icon name="magnifying-glass" class="w-3.5 h-3.5 text-purple-700" />
+                                Track Application &amp; Document Status
+                            </span>
+                            <span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">Self-Service</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">Already applied or enrolled? Enter your application or enrollment number to verify review status, payment, and replacement requirements.</p>
+                        <form method="POST" action="{{ route('applications.lookup') }}" class="flex flex-col sm:flex-row gap-2">
+                            @csrf
+                            <input type="text" name="application_number" class="form-field flex-1 font-mono uppercase text-xs sm:text-sm bg-slate-50/70 focus:bg-white" placeholder="e.g. MCA-2026-XXXXXX or MCE-2026-XXXXXX" required>
+                            <button type="submit" class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-700 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-purple-800 transition shrink-0">
+                                <span>Verify status</span>
+                                <x-dashboard-icon name="arrow-right" class="w-3.5 h-3.5" />
+                            </button>
+                        </form>
                     </div>
 
                     <div class="mt-7 grid max-w-xl grid-cols-3 gap-3 border-t border-slate-200 pt-5 text-left sm:mt-10 sm:gap-5 sm:pt-8">

@@ -97,4 +97,23 @@ class LandingPageTest extends TestCase
         $this->assertStringNotContainsString('https://www.facebook.com/facebook/videos/10153231379946729/', $html);
         $this->assertStringContainsString('No public updates yet', $html);
     }
+
+    public function test_landing_page_displays_prominent_status_checking_options(): void
+    {
+        $response = $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee(route('applications.status'), false)
+            ->assertSee('Check status')
+            ->assertSee('Check application status')
+            ->assertSee('Track Application &amp; Document Status', false)
+            ->assertSee(route('applications.lookup'), false);
+
+        $lookupResponse = $this->post(route('applications.lookup'), [
+            'application_number' => 'MCA-2026-ABC123',
+        ]);
+
+        $lookupResponse->assertRedirect(route('applications.status', [
+            'application_number' => 'MCA-2026-ABC123',
+        ]));
+    }
 }

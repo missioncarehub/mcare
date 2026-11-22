@@ -7,12 +7,14 @@ use App\Models\AdminActivityLog;
 use App\Models\AdmissionApplication;
 use App\Models\EnrollmentApplication;
 use App\Models\TrainingProgram;
+use App\Notifications\ReplacementDocumentSubmittedNotification;
 use App\Services\AdminOperationsNotifier;
 use App\Services\ProfilePhotoStore;
 use App\Services\SemaphoreSmsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -288,9 +290,23 @@ class AdmissionApplicationController extends Controller
             ['enrollment_application_id' => $enrollment->id, 'document' => $key],
         );
 
+        // Notify the applicant that their replacement document was received
+        try {
+            $applicantTarget = $enrollment->user ?? (filled($enrollment->email) ? Notification::route('mail', $enrollment->email) : null);
+            if ($applicantTarget) {
+                $applicantTarget->notify(new ReplacementDocumentSubmittedNotification(
+                    $enrollment->fresh(),
+                    $definition['label'],
+                    $admission->application_number,
+                ));
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
         return redirect()
             ->route('applications.status', ['application_number' => $admission->application_number])
-            ->with('saved', 'Replacement submitted. The document is pending review.');
+            ->with('saved', 'Replacement for '.$definition['label'].' uploaded successfully! It is now pending registrar review.');
     }
 
     private function verifierMatches(EnrollmentApplication $enrollment, string $verifier): bool

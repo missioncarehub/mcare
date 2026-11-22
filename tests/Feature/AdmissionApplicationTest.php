@@ -9,6 +9,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Notifications\AdminOperationsNotification;
+use App\Notifications\ReplacementDocumentSubmittedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
@@ -240,6 +241,7 @@ class AdmissionApplicationTest extends TestCase
         Storage::disk('local')->assertExists('enrollment-documents/test/birth-certificate.pdf');
         Storage::disk('local')->assertExists($enrollment->birth_certificate_path);
         Notification::assertSentTo($admin, AdminOperationsNotification::class);
+        Notification::assertSentTo($applicant, ReplacementDocumentSubmittedNotification::class);
 
         $this->get(route('applications.status', ['application_number' => $admission->application_number]))
             ->assertOk()

@@ -16,6 +16,7 @@ use App\Services\TesdaRegistrationPdfService;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -517,15 +518,24 @@ class EnrollmentReviewController extends Controller
         ])->save();
 
         $enrollee = $enrollmentApplication->user;
+        $target = $enrollee ?? (filled($enrollmentApplication->email) ? Notification::route('mail', $enrollmentApplication->email) : null);
 
         $sent = false;
-        if ($enrollee) {
+        if ($target) {
             try {
-                $enrollee->notifyNow(new EnrollmentDocumentsReviseRequestedNotification(
-                    $enrollmentApplication->fresh(),
-                    $labels,
-                    trim((string) ($validated['remark'] ?? '')) ?: null,
-                ));
+                if ($enrollee) {
+                    $enrollee->notifyNow(new EnrollmentDocumentsReviseRequestedNotification(
+                        $enrollmentApplication->fresh(),
+                        $labels,
+                        trim((string) ($validated['remark'] ?? '')) ?: null,
+                    ));
+                } else {
+                    $target->notify(new EnrollmentDocumentsReviseRequestedNotification(
+                        $enrollmentApplication->fresh(),
+                        $labels,
+                        trim((string) ($validated['remark'] ?? '')) ?: null,
+                    ));
+                }
                 $sent = true;
             } catch (Throwable $exception) {
                 // A mail outage must not undo the admin's revision request.

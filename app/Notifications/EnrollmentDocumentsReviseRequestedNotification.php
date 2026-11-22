@@ -41,9 +41,12 @@ class EnrollmentDocumentsReviseRequestedNotification extends Notification implem
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return filled($notifiable->email)
-            ? ['database', 'mail']
-            : ['database'];
+        $channels = ['mail'];
+        if ($notifiable instanceof \App\Models\User) {
+            $channels[] = 'database';
+        }
+
+        return $channels;
     }
 
     /** @return array<string, mixed> */
@@ -63,7 +66,9 @@ class EnrollmentDocumentsReviseRequestedNotification extends Notification implem
 
     public function toMail(object $notifiable): MailMessage
     {
-        $recipientName = $notifiable->name ?: 'Applicant';
+        $recipientName = ($notifiable instanceof \App\Models\User ? $notifiable->name : null)
+            ?: trim(($this->application->first_name ?? '').' '.($this->application->last_name ?? ''))
+            ?: 'Applicant';
         $listLine = $this->documentsNeedingRevision === []
             ? 'One or more of your submitted enrollment documents need to be revised.'
             : 'The following documents need to be re-uploaded: '.implode(', ', $this->documentsNeedingRevision).'.';
