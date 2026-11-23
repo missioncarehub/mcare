@@ -255,47 +255,78 @@ class AdmissionApplication extends Model
 
         // Stage 3: documents review.
         $docState = 'pending';
+        $docDescription = 'Upload birth certificate, education document, good-moral, and ID photo.';
         if ($enrollment) {
             $documentsUploaded = filled($enrollment->birth_certificate_path)
                 || filled($enrollment->education_document_path)
                 || filled($enrollment->good_moral_certificate_path)
                 || filled($enrollment->id_photo_path);
-            $reviewedAt = $enrollment->documents_reviewed_at;
-            if ($reviewedAt) {
+
+            $documentStatuses = $enrollment->documentStatuses();
+            $flaggedCount = collect($documentStatuses)->filter(function ($doc) {
+                return in_array($doc['status'] ?? '', ['replace', 'missing'], true);
+            })->count();
+
+            if ($flaggedCount > 0) {
+                $docState = 'blocked';
+                $docDescription = $flaggedCount === 1
+                    ? '1 document requires replacement. Please upload an updated copy below.'
+                    : "{$flaggedCount} documents require replacement. Please upload updated copies below.";
+            } elseif ($enrollment->documents_reviewed_at) {
                 $docState = 'complete';
+                $docDescription = 'All submitted document requirements have been verified by the registrar.';
             } elseif ($documentsUploaded) {
                 $docState = 'in_progress';
+                $docDescription = 'Submitted documents are under review by the registrar.';
             }
         }
 
         // Stage 4: payment.
         $paymentState = 'pending';
+        $paymentDescription = 'Pay the required downpayment (online or on-site) and wait for verification.';
         if ($enrollment) {
             $paymentStatus = $enrollment->payment_status;
-            if ($paymentStatus === \App\Models\EnrollmentApplication::PAYMENT_PAID
-                && $enrollment->payment_verified_at) {
+            $hasPaymentClearance = $enrollment->hasEnrollmentPaymentClearance();
+            $isPaidOrVerified = $hasPaymentClearance
+                || ($paymentStatus === \App\Models\EnrollmentApplication::PAYMENT_PAID && $enrollment->payment_verified_at)
+                || ($enrollment->payment_verified_at !== null && (float) $enrollment->total_paid_amount > 0)
+                || ($enrollment->isDownpaymentSatisfied() && $enrollment->payment_verified_at !== null);
+
+            if ($isPaidOrVerified) {
                 $paymentState = 'complete';
+                $paymentDescription = (float) $enrollment->total_paid_amount >= (float) ($enrollment->total_program_fee ?? 22000.00)
+                    ? 'Tuition fully paid and verified (₱'.number_format((float) $enrollment->total_paid_amount, 2).').'
+                    : 'Downpayment verified (₱'.number_format((float) ($enrollment->total_paid_amount ?: $enrollment->downpayment_amount ?: 2000), 2).'). Payment clearance satisfied.';
+            } elseif ($paymentStatus === \App\Models\EnrollmentApplication::PAYMENT_EXPIRED) {
+                $paymentState = 'blocked';
+                $paymentDescription = 'Payment reference has expired. Please select a payment option to generate a new slip.';
             } elseif (in_array($paymentStatus, [
                 \App\Models\EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
                 \App\Models\EnrollmentApplication::PAYMENT_ONLINE_PENDING,
                 \App\Models\EnrollmentApplication::PAYMENT_ONSITE_PENDING,
                 \App\Models\EnrollmentApplication::PAYMENT_PAID,
-            ], true)) {
+            ], true) || filled($enrollment->payment_receipt_path) || filled($enrollment->payment_reference)) {
                 $paymentState = 'in_progress';
-            } elseif ($paymentStatus === \App\Models\EnrollmentApplication::PAYMENT_EXPIRED) {
-                $paymentState = 'blocked';
+                $paymentDescription = 'Payment recorded ('.$enrollment->paymentStatusLabel().'); awaiting cashier verification.';
+            } elseif ($this->status === self::STATUS_APPROVED) {
+                $paymentState = 'in_progress';
+                $paymentDescription = 'Settle your required downpayment (₱'.number_format((float) ($enrollment->downpayment_amount ?? 2000), 2).') online or on-site.';
             }
         }
 
         // Stage 5: final admin review of the enrollment.
         $reviewState = 'pending';
+        $reviewDescription = 'MCARE reviews the completed enrollment and unlocks the LMS.';
         if ($enrollment) {
             if ($enrollment->status === \App\Models\EnrollmentApplication::STATUS_APPROVED) {
                 $reviewState = 'complete';
+                $reviewDescription = 'Enrollment cleared and official trainee access is active!';
             } elseif ($enrollment->status === \App\Models\EnrollmentApplication::STATUS_DENIED) {
                 $reviewState = 'blocked';
-            } elseif ($enrollment->review_released_at) {
+                $reviewDescription = 'Enrollment was not approved.';
+            } elseif ($enrollment->review_released_at || ($enrollment->hasEnrollmentPaymentClearance() && $enrollment->documents_reviewed_at)) {
                 $reviewState = 'in_progress';
+                $reviewDescription = 'Payment and documents completed; awaiting final registrar sign-off.';
             }
         }
 
@@ -315,19 +346,19 @@ class AdmissionApplication extends Model
             [
                 'key' => 'documents',
                 'label' => 'Documents',
-                'description' => 'Upload birth certificate, education document, good-moral, and ID photo.',
+                'description' => $docDescription,
                 'state' => $docState,
             ],
             [
                 'key' => 'payment',
                 'label' => 'Payment',
-                'description' => 'Pay the required downpayment (online or on-site) and wait for verification.',
+                'description' => $paymentDescription,
                 'state' => $paymentState,
             ],
             [
                 'key' => 'admin_review',
                 'label' => 'Admin review',
-                'description' => 'MCARE reviews the completed enrollment and unlocks the LMS.',
+                'description' => $reviewDescription,
                 'state' => $reviewState,
             ],
         ];

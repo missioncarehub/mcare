@@ -398,6 +398,70 @@ class AdmissionApplicationTest extends TestCase
         $this->assertSame('unreviewed', $enrollment->document_review['birth-certificate']['status']);
     }
 
+    public function test_status_stages_and_details_adjust_dynamically_for_documents_and_payments(): void
+    {
+        $admission = $this->makeApprovedAdmission(['email' => 'dynamic.status@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+        $enrollment = EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'enrollment_number' => 'MCE-2026-DYNAM1',
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'payment_status' => EnrollmentApplication::PAYMENT_PARTIALLY_PAID,
+            'downpayment_amount' => 2000.00,
+            'total_paid_amount' => 2000.00,
+            'payment_verified_at' => now(),
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'Please provide a clearer copy.'],
+            ],
+        ]);
+
+        // When payment is verified and a document needs replacement:
+        // - Stage 3 (Documents) should be "Need changes"
+        // - Stage 4 (Payment) should be "Complete"
+        // - Payment row should show verified amount
+        // - Document status should indicate 1 document needs changes
+        $this->get(route('applications.status', ['application_number' => 'MCE-2026-DYNAM1']))
+            ->assertOk()
+            ->assertSee('Need changes')
+            ->assertSee('1 document requires replacement')
+            ->assertSee('Downpayment verified (₱2,000.00)')
+            ->assertSee('Verified ₱2,000.00')
+            ->assertSee('1 document need changes');
+
+        // When the registrar approves the replacement and clears documents:
+        $enrollment->update([
+            'document_review' => [
+                'birth-certificate' => ['status' => 'accepted', 'note' => null],
+            ],
+            'documents_reviewed_at' => now(),
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+        ]);
+
+        $this->get(route('applications.status', ['application_number' => 'MCE-2026-DYNAM1']))
+            ->assertOk()
+            ->assertSee('All submitted document requirements have been verified by the registrar.')
+            ->assertSee('All Verified')
+            ->assertSee('Enrollment cleared and official trainee access is active!');
+    }
+
     public function test_status_page_keeps_the_official_footer_on_the_layout(): void
     {
         $this->get(route('applications.status'))

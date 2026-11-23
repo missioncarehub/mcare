@@ -53,13 +53,13 @@
                             'complete' => 'bg-emerald-50 text-emerald-700 ring-emerald-100',
                             'in_progress' => 'bg-amber-50 text-amber-700 ring-amber-100',
                             'pending' => 'bg-slate-50 text-slate-500 ring-slate-100',
-                            'blocked' => 'bg-red-50 text-red-700 ring-red-100',
+                            'blocked' => 'bg-amber-100 text-amber-900 ring-amber-300',
                         ];
                         $stateLabels = [
                             'complete' => 'Complete',
                             'in_progress' => 'In progress',
                             'pending' => 'Pending',
-                            'blocked' => 'Blocked',
+                            'blocked' => 'Need changes',
                         ];
                         $documentStatuses = $enrollment?->documentStatuses() ?? [];
                         $canReplaceDocuments = $enrollment && $enrollment->status !== \App\Models\EnrollmentApplication::STATUS_APPROVED;
@@ -84,7 +84,9 @@
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Current stage</p>
                                 <p class="mt-1 font-display text-lg font-bold text-slate-950">{{ $currentStage['label'] }}</p>
-                                <span class="mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 {{ $badgeToneByState[$currentStage['state']] ?? 'bg-slate-50 text-slate-600 ring-slate-100' }}">{{ $stateLabels[$currentStage['state']] ?? ucfirst($currentStage['state']) }}</span>
+                                <span class="mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 {{ $badgeToneByState[$currentStage['state']] ?? 'bg-slate-50 text-slate-600 ring-slate-100' }}">
+                                    {{ $currentStage['state'] === 'blocked' && ($currentStage['key'] ?? '') === 'documents' ? 'Need changes' : ($stateLabels[$currentStage['state']] ?? ucfirst($currentStage['state'])) }}
+                                </span>
                             </div>
                         </div>
 
@@ -96,7 +98,33 @@
                             @if ($enrollment)
                                 <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Enrollment number</span><br>{{ $enrollment->enrollment_number }}</p>
                                 <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Batch</span><br>{{ $enrollment->batch ? $enrollment->batch->name.' '.$enrollment->batch->year : 'Awaiting assignment' }}</p>
-                                <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Payment</span><br>{{ $enrollment->paymentStatusLabel() }}</p>
+                                <p>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Payment</span><br>
+                                    @if ($enrollment->hasEnrollmentPaymentClearance() || ($enrollment->payment_verified_at && (float) $enrollment->total_paid_amount > 0))
+                                        <span class="font-bold text-emerald-700">✓ {{ $enrollment->paymentStatusLabel() }} (Verified ₱{{ number_format((float) ($enrollment->total_paid_amount ?: $enrollment->downpayment_amount ?: 2000), 2) }})</span>
+                                    @elseif (in_array($enrollment->payment_status, [\App\Models\EnrollmentApplication::PAYMENT_ONLINE_PENDING, \App\Models\EnrollmentApplication::PAYMENT_ONSITE_PENDING], true))
+                                        <span class="font-bold text-amber-700">⏳ {{ $enrollment->paymentStatusLabel() }} (Awaiting verification)</span>
+                                    @elseif ($enrollment->payment_status === \App\Models\EnrollmentApplication::PAYMENT_EXPIRED)
+                                        <span class="font-bold text-red-700">✕ {{ $enrollment->paymentStatusLabel() }}</span>
+                                    @else
+                                        {{ $enrollment->paymentStatusLabel() }}
+                                    @endif
+                                </p>
+                                <p>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Document status</span><br>
+                                    @php
+                                        $flaggedCount = collect($documentStatuses)->filter(fn($doc) => in_array($doc['status'] ?? '', ['replace', 'missing'], true))->count();
+                                    @endphp
+                                    @if ($enrollment->documents_reviewed_at && $flaggedCount === 0)
+                                        <span class="font-bold text-emerald-700">✓ All Verified</span>
+                                    @elseif ($flaggedCount > 0)
+                                        <span class="font-bold text-amber-800">⚠️ {{ $flaggedCount }} {{ Str::plural('document', $flaggedCount) }} need changes</span>
+                                    @elseif (filled($enrollment->birth_certificate_path) || filled($enrollment->education_document_path))
+                                        <span class="text-slate-700 font-semibold">⏳ In review queue</span>
+                                    @else
+                                        <span class="text-slate-500">Pending submission</span>
+                                    @endif
+                                </p>
                                 @if ($enrollment->batch?->enrollment_ends_at && ! $enrollment->batch->is_continuous_enrollment)
                                     <p><span class="text-xs font-bold uppercase tracking-wider text-slate-500">Enrollment deadline</span><br>{{ $enrollment->batch->enrollment_ends_at->format('M d, Y g:i A') }}</p>
                                 @endif
@@ -111,7 +139,9 @@
                                         <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black ring-1 {{ $badgeToneByState[$stage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">{{ $index + 1 }}</span>
                                         <div class="min-w-0">
                                             <p class="font-bold text-slate-900">{{ $stage['label'] }}
-                                                <span class="ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 {{ $badgeToneByState[$stage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">{{ $stateLabels[$stage['state']] ?? ucfirst($stage['state']) }}</span>
+                                                <span class="ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 {{ $badgeToneByState[$stage['state']] ?? 'bg-slate-50 text-slate-500 ring-slate-100' }}">
+                                                    {{ $stage['state'] === 'blocked' && $stage['key'] === 'documents' ? 'Need changes' : ($stateLabels[$stage['state']] ?? ucfirst($stage['state'])) }}
+                                                </span>
                                             </p>
                                             <p class="mt-1 text-xs text-slate-600">{{ $stage['description'] }}</p>
                                         </div>
