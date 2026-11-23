@@ -9,6 +9,7 @@ use App\Models\EnrollmentApplication;
 use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Notifications\AdminOperationsNotification;
+use App\Notifications\ApplicantDocumentOtpNotification;
 use App\Notifications\ReplacementDocumentSubmittedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -312,6 +313,89 @@ class AdmissionApplicationTest extends TestCase
         $enrollment->refresh();
         $this->assertSame('unreviewed', $enrollment->document_review['birth-certificate']['status']);
         Storage::disk('local')->assertExists($enrollment->birth_certificate_path);
+    }
+
+    public function test_applicant_can_request_otp_and_verify_to_upload_replacement_without_verifier(): void
+    {
+        Storage::fake('local');
+        Notification::fake();
+
+        $admission = $this->makeApprovedAdmission(['email' => 'otp.applicant@gmail.com']);
+        $applicant = User::factory()->create(['role' => 'applicant', 'email' => $admission->email]);
+        $enrollment = EnrollmentApplication::query()->create([
+            'user_id' => $applicant->id,
+            'admission_application_id' => $admission->id,
+            'email' => $admission->email,
+            'program' => 'Caregiving NC II',
+            'first_name' => $admission->first_name,
+            'last_name' => $admission->last_name,
+            'birth_date' => '2000-01-01',
+            'gender' => 'Female',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => '1 Training Street',
+            'barangay' => 'Central',
+            'city' => 'Iriga City',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4431',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_PRE_ENLISTMENT,
+            'birth_certificate_path' => 'enrollment-documents/test/birth-certificate.pdf',
+            'document_review' => [
+                'birth-certificate' => ['status' => 'replace', 'note' => 'Upload a clearer complete copy.'],
+            ],
+        ]);
+
+        // 1. Send OTP
+        $response = $this->postJson(route('applications.status.otp.send'), [
+            'application_number' => $admission->application_number,
+        ]);
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+            ])
+            ->assertJsonStructure(['masked_email', 'cooldown_seconds']);
+
+        $capturedOtp = null;
+        Notification::assertSentTo($applicant, ApplicantDocumentOtpNotification::class, function ($notification) use (&$capturedOtp) {
+            $capturedOtp = $notification->otpCode;
+
+            return strlen($capturedOtp) === 6;
+        });
+
+        // 2. Cooldown enforced on immediate resend
+        $this->postJson(route('applications.status.otp.send'), [
+            'application_number' => $admission->application_number,
+        ])->assertStatus(429)
+            ->assertJson(['cooldown' => true]);
+
+        // 3. Invalid OTP rejected
+        $this->postJson(route('applications.status.otp.verify'), [
+            'application_number' => $admission->application_number,
+            'otp_code' => '000000',
+        ])->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        // 4. Correct OTP verified
+        $this->postJson(route('applications.status.otp.verify'), [
+            'application_number' => $admission->application_number,
+            'otp_code' => $capturedOtp,
+        ])->assertOk()
+            ->assertJson(['success' => true]);
+
+        // 5. Replace document without verifier field (authorized via session)
+        $this->post(route('applications.documents.replace'), [
+            'application_number' => $admission->application_number,
+            'document' => 'birth-certificate',
+            'replacement' => UploadedFile::fake()->create('clear-birth.pdf', 40, 'application/pdf'),
+        ])->assertRedirect(route('applications.status', [
+            'application_number' => $admission->application_number,
+        ]))->assertSessionHas('saved');
+
+        $enrollment->refresh();
+        $this->assertSame('unreviewed', $enrollment->document_review['birth-certificate']['status']);
     }
 
     public function test_status_page_keeps_the_official_footer_on_the_layout(): void

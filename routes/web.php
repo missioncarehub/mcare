@@ -222,6 +222,12 @@ Route::middleware('throttle:global-web')->group(function () {
         Route::post('/applications/status', [AdmissionApplicationController::class, 'lookup'])
             ->middleware('throttle:search')
             ->name('applications.lookup');
+        Route::post('/applications/status/otp/send', [AdmissionApplicationController::class, 'sendDocumentOtp'])
+            ->middleware('throttle:10,1')
+            ->name('applications.status.otp.send');
+        Route::post('/applications/status/otp/verify', [AdmissionApplicationController::class, 'verifyDocumentOtp'])
+            ->middleware('throttle:15,1')
+            ->name('applications.status.otp.verify');
         Route::post('/applications/status/documents', [AdmissionApplicationController::class, 'replaceDocument'])
             ->middleware('throttle:6,1')
             ->name('applications.documents.replace');
