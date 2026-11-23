@@ -37,6 +37,17 @@ export class PdfmeAdapter {
             if (!response.ok) throw new Error('Could not load the base PDF.');
             basePdf = new Uint8Array(await response.arrayBuffer());
         }
+        if (!basePdf && (this.template.base_pdf_url || this.template.basePdfUrl)) {
+            try {
+                const url = this.template.base_pdf_url || this.template.basePdfUrl;
+                const response = await fetch(url, { credentials: 'same-origin' });
+                if (response.ok) {
+                    basePdf = new Uint8Array(await response.arrayBuffer());
+                }
+            } catch (err) {
+                console.warn('Could not load base_pdf_url, falling back to dimensions', err);
+            }
+        }
         if (!basePdf) {
             const page = this.template.page || { width_mm: 210, height_mm: 297 };
             basePdf = {
@@ -50,7 +61,7 @@ export class PdfmeAdapter {
         if (!schemas && this.template.elements) {
             schemas = [this.template.elements.map((el, idx) => ({
                 name: el.id || el.binding || `field_${idx}`,
-                type: el.type || 'text',
+                type: el.type === 'qr' ? 'qrcode' : (el.type || 'text'),
                 position: { x: el.x || 10, y: el.y || 10 },
                 width: el.width || 60,
                 height: el.height || 10,

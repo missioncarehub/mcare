@@ -101,6 +101,11 @@ async function renderPdfme(payload) {
     };
 
     let basePdf = payload.basePdfVerifiedPath ? new Uint8Array(await fs.readFile(payload.basePdfVerifiedPath)) : payload.basePdf;
+    if (!basePdf && payload.base_pdf_path) {
+        try {
+            basePdf = new Uint8Array(await fs.readFile(payload.base_pdf_path));
+        } catch (e) {}
+    }
     if (!basePdf) {
         if (payload.basePdfVerifiedPath) {
             const buf = await fs.readFile(payload.basePdfVerifiedPath);
@@ -121,7 +126,7 @@ async function renderPdfme(payload) {
         for (const el of payload.elements) {
             pageSchema.push({
                 name: el.id || el.binding || `field_${pageSchema.length}`,
-                type: el.type || 'text',
+                type: el.type === 'qr' ? 'qrcode' : (el.type || 'text'),
                 position: { x: el.x || 0, y: el.y || 0 },
                 width: el.width || 50,
                 height: el.height || 10,

@@ -90,6 +90,9 @@ class DocumentStudioRenderer implements OfficialDocumentRenderer
 
         $payload['base_pdf_asset_id'] = $state['base_pdf_asset_id'] ?? null;
         $payload['background_asset_id'] = $state['background_asset_id'] ?? null;
+        if (!empty($state['base_pdf_url']) && file_exists(public_path(ltrim($state['base_pdf_url'], '/')))) {
+            $payload['base_pdf_path'] = public_path(ltrim($state['base_pdf_url'], '/'));
+        }
 
         return $this->executeRenderProcess($this->resolveAssets($payload, $state['_asset_integrity'] ?? null));
     }
@@ -102,6 +105,9 @@ class DocumentStudioRenderer implements OfficialDocumentRenderer
         $clean = app(AssetSecurityService::class)->sanitizeEditorState($payload);
         $this->assertRenderableContent($clean);
         $clean['preview'] = true;
+        if (!empty($clean['base_pdf_url']) && file_exists(public_path(ltrim($clean['base_pdf_url'], '/')))) {
+            $clean['base_pdf_path'] = public_path(ltrim($clean['base_pdf_url'], '/'));
+        }
 
         return $this->executeRenderProcess($this->resolveAssets($clean));
     }

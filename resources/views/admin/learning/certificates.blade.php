@@ -21,7 +21,6 @@
                 <x-dashboard-icon name="award" class="w-4 h-4" />
                 <span>Document Studio</span>
             </a>
-            <a href="{{ route('admin.learning.certificate-templates') }}" class="secondary-action">Classic templates</a>
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button" data-dashboard-dialog-open="competency-excel-dialog" class="secondary-action inline-flex items-center gap-2"><x-dashboard-icon name="file-excel" class="h-4 w-4" />Export competency Excel</button>
@@ -42,7 +41,7 @@
         <a href="{{ route('admin.learning.certificates', $tabQuery('graduates')) }}" class="{{ $isGraduatesTab ? 'is-active' : '' }}" @if($isGraduatesTab) aria-current="page" @endif>Graduates ({{ $graduates->count() }})</a>
     </nav>
 
-    <p class="text-sm leading-6 text-slate-600">Generate COTC and Generate TOR use the active certificate template. Change the title, statement, logo, or signatory from <a href="{{ route('admin.learning.certificate-templates') }}" class="font-bold text-purple-700 hover:text-purple-900">Certificate templates</a>. Enrollment ID and document number stay on every file.</p>
+    <p class="text-sm leading-6 text-slate-600">Generate COTC and Generate TOR use the active certificate template for each training program. Manage Certificate templates and customize credentials, logos, and signatories in <a href="{{ route('admin.document-studio.index') }}" class="font-bold text-indigo-700 hover:text-indigo-900">Document Studio</a>. Enrollment ID and document number stay on every file.</p>
 
     @include('admin.learning.partials.training-record-table', [
         'showHeading' => false,

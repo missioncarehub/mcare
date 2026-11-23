@@ -66,7 +66,11 @@ class DocumentStudioController extends Controller
         // Ensure system defaults are seeded and single active per scope is enforced
         $this->studioService->ensureDefaultTemplates();
 
-        $selectedProgramId = $request->filled('program_id') ? (int) $request->query('program_id') : null;
+        $programs = TrainingProgram::query()->orderBy('name')->get();
+        $selectedProgramId = $request->filled('program_id')
+            ? (int) $request->query('program_id')
+            : ($programs->first()?->id);
+        $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
         $publishedDesigns = $this->studioService->getPublishedDesignsSummary($selectedProgramId);
 
         $query = DocumentTemplate::query()
@@ -79,8 +83,8 @@ class DocumentStudioController extends Controller
             $query->where('document_kind', $request->query('kind'));
         }
 
-        if ($request->filled('program_id')) {
-            $query->where('training_program_id', $request->query('program_id'));
+        if ($selectedProgramId) {
+            $query->where('training_program_id', $selectedProgramId);
         }
 
         if ($request->filled('search')) {
@@ -92,8 +96,6 @@ class DocumentStudioController extends Controller
         }
 
         $templates = $query->paginate(12)->withQueryString();
-        $programs = TrainingProgram::query()->orderBy('name')->get();
-        $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
         $draftCount = DocumentTemplate::query()
             ->whereIn('document_kind', [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR])
             ->count();

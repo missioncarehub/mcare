@@ -1,40 +1,42 @@
 {
-  "resources/css/app.css": {
-    "file": "assets/app-C4khj_4g.css",
-    "name": "app",
-    "names": [
-      "app.css"
-    ],
-    "src": "resources/css/app.css",
-    "isEntry": true
-  },
-  "resources/js/app.js": {
-    "file": "assets/app-CgZ0kQmv.js",
-    "name": "app",
-    "src": "resources/js/app.js",
-    "isEntry": true
-  },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/@mlc-ai/web-llm/lib/index.js": {
-    "file": "assets/lib-DpnQzpjp.js",
-    "name": "lib",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/@mlc-ai/web-llm/lib/index.js",
+  "__vite-browser-external": {
+    "file": "assets/__vite-browser-external-Mqjr6PLo.js",
+    "name": "__vite-browser-external",
+    "src": "__vite-browser-external",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-C0FnF6B9.js"
+      "_pdf-DKsKPeEk.js"
     ]
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D_kpMSvl.js": {
-    "file": "assets/clawpdf-worker-D_kpMSvl-fJO4sC8x.js",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D_kpMSvl.js"
+  "_base64-js-C3K5tRKj.js": {
+    "file": "assets/base64-js-C3K5tRKj.js",
+    "name": "base64-js",
+    "imports": [
+      "_pdf-DKsKPeEk.js"
+    ]
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/clawpdf/dist/browser.js": {
-    "file": "assets/browser-DvDwMkEg.js",
+  "_pdf-DKsKPeEk.js": {
+    "file": "assets/pdf-DKsKPeEk.js",
+    "name": "pdf"
+  },
+  "_pdf-loader-BBprxQxg.js": {
+    "file": "assets/pdf-loader-BBprxQxg.js",
+    "name": "pdf-loader",
+    "imports": [
+      "_pdf-DKsKPeEk.js"
+    ]
+  },
+  "node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D8--gwJc.js": {
+    "file": "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js",
+    "src": "node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D8--gwJc.js"
+  },
+  "node_modules/clawpdf/dist/browser.js": {
+    "file": "assets/browser-BXZ-j5Qb.js",
     "name": "browser",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/clawpdf/dist/browser.js",
+    "src": "node_modules/clawpdf/dist/browser.js",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-C0FnF6B9.js",
-      "_pdf-loader-C7XEWZ1G.js"
+      "_pdf-DKsKPeEk.js"
     ],
     "dynamicImports": [
       "__vite-browser-external"
@@ -43,112 +45,70 @@
       "assets/pdfium.esm-DrdX3q7Q.wasm"
     ]
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/clawpdf/dist/vendor/pdfium.esm.wasm": {
+  "node_modules/clawpdf/dist/vendor/pdfium.esm.wasm": {
     "file": "assets/pdfium.esm-DrdX3q7Q.wasm",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/clawpdf/dist/vendor/pdfium.esm.wasm"
+    "src": "node_modules/clawpdf/dist/vendor/pdfium.esm.wasm"
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/mammoth/lib/index.js": {
-    "file": "assets/lib-FyNRCadv.js",
+  "node_modules/mammoth/lib/index.js": {
+    "file": "assets/lib-_tT8Q9Hr.js",
     "name": "lib",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/mammoth/lib/index.js",
+    "src": "node_modules/mammoth/lib/index.js",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-C0FnF6B9.js",
-      "_base64-js-e_ScUrle.js"
+      "_pdf-DKsKPeEk.js",
+      "_base64-js-C3K5tRKj.js"
     ]
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/marked/lib/marked.esm.js": {
+  "node_modules/marked/lib/marked.esm.js": {
     "file": "assets/marked.esm-BgZhHi-3.js",
     "name": "marked.esm",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/marked/lib/marked.esm.js",
+    "src": "node_modules/marked/lib/marked.esm.js",
     "isDynamicEntry": true
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdf-lib/es/index.js": {
-    "file": "assets/es-_LXZR09a.js",
-    "name": "es",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdf-lib/es/index.js",
-    "isDynamicEntry": true,
-    "imports": [
-      "_rolldown-runtime-C0FnF6B9.js",
-      "_UPNG-ff1SMRU8.js"
-    ]
-  },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdfjs-dist/build/pdf.mjs": {
-    "file": "assets/pdf-B4MG9BV1.js",
-    "name": "pdf",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdfjs-dist/build/pdf.mjs",
-    "isDynamicEntry": true,
-    "imports": [
-      "_pdf-loader-C7XEWZ1G.js"
-    ]
-  },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdfjs-dist/build/pdf.worker.min.mjs": {
-    "file": "assets/pdf.worker.min-CHFwMXne.js",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
-  },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/signature_pad/dist/signature_pad.js": {
-    "file": "assets/signature_pad-DY-BOcXe.js",
+  "node_modules/signature_pad/dist/signature_pad.js": {
+    "file": "assets/signature_pad-BjzqkwzY.js",
     "name": "signature_pad",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/signature_pad/dist/signature_pad.js",
+    "src": "node_modules/signature_pad/dist/signature_pad.js",
     "isDynamicEntry": true
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js": {
+  "node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js": {
     "file": "assets/turndown-plugin-gfm.es-D49NQYFR.js",
     "name": "turndown-plugin-gfm.es",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js",
+    "src": "node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js",
     "isDynamicEntry": true
   },
-  "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown/lib/turndown.browser.es.js": {
-    "file": "assets/turndown.browser.es-DtQC4t3u.js",
+  "node_modules/turndown/lib/turndown.browser.es.js": {
+    "file": "assets/turndown.browser.es-BifaCBC9.js",
     "name": "turndown.browser.es",
-    "src": "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown/lib/turndown.browser.es.js",
+    "src": "node_modules/turndown/lib/turndown.browser.es.js",
     "isDynamicEntry": true
   },
-  "_UPNG-ff1SMRU8.js": {
-    "file": "assets/UPNG-ff1SMRU8.js",
-    "name": "UPNG",
-    "imports": [
-      "_rolldown-runtime-C0FnF6B9.js"
-    ]
-  },
-  "__vite-browser-external": {
-    "file": "assets/__vite-browser-external-Cavc_B4G.js",
-    "name": "__vite-browser-external",
-    "src": "__vite-browser-external",
-    "isDynamicEntry": true,
-    "imports": [
-      "_rolldown-runtime-C0FnF6B9.js"
-    ]
-  },
-  "_base64-js-e_ScUrle.js": {
-    "file": "assets/base64-js-e_ScUrle.js",
-    "name": "base64-js",
-    "imports": [
-      "_rolldown-runtime-C0FnF6B9.js"
-    ]
-  },
-  "_pdf-loader-C7XEWZ1G.js": {
-    "file": "assets/pdf-loader-C7XEWZ1G.js",
-    "name": "pdf-loader",
-    "dynamicImports": [
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/pdfjs-dist/build/pdf.mjs"
+  "resources/css/app.css": {
+    "file": "assets/app-Dqbwx2A2.css",
+    "name": "app",
+    "names": [
+      "app.css"
     ],
-    "assets": [
-      "assets/pdf.worker.min-CHFwMXne.js"
-    ]
-  },
-  "_rolldown-runtime-C0FnF6B9.js": {
-    "file": "assets/rolldown-runtime-C0FnF6B9.js",
-    "name": "rolldown-runtime"
+    "src": "resources/css/app.css",
+    "isEntry": true
   },
   "resources/css/document-studio.css": {
-    "file": "assets/document-studio-CnpMJpY_.css",
+    "file": "assets/document-studio-TM-O6P11.css",
     "name": "document-studio",
     "names": [
       "document-studio.css"
     ],
     "src": "resources/css/document-studio.css",
     "isEntry": true
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-DhM_Q4iL.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "_pdf-DKsKPeEk.js"
+    ]
   },
   "resources/js/document-studio/fabric-adapter.js": {
     "file": "assets/fabric-adapter-1TKGIyau.js",
@@ -157,7 +117,7 @@
     "isDynamicEntry": true
   },
   "resources/js/document-studio/new-document.js": {
-    "file": "assets/new-document-dSoJoqwA.js",
+    "file": "assets/new-document-D2lYX5o8.js",
     "name": "new-document",
     "src": "resources/js/document-studio/new-document.js",
     "isEntry": true,
@@ -167,57 +127,54 @@
     ]
   },
   "resources/js/document-studio/pdfme-adapter.js": {
-    "file": "assets/pdfme-adapter-7k6jlYqT.js",
+    "file": "assets/pdfme-adapter-Cw8Ym8kB.js",
     "name": "pdfme-adapter",
     "src": "resources/js/document-studio/pdfme-adapter.js",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-C0FnF6B9.js",
-      "_pdf-loader-C7XEWZ1G.js",
-      "_base64-js-e_ScUrle.js",
-      "_UPNG-ff1SMRU8.js"
+      "_pdf-DKsKPeEk.js",
+      "_base64-js-C3K5tRKj.js"
     ],
     "dynamicImports": [
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/clawpdf/dist/browser.js",
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/signature_pad/dist/signature_pad.js"
+      "node_modules/clawpdf/dist/browser.js",
+      "node_modules/signature_pad/dist/signature_pad.js"
     ],
     "assets": [
-      "assets/clawpdf-worker-D_kpMSvl-fJO4sC8x.js"
+      "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js"
     ]
   },
   "resources/js/document-studio/preview.js": {
-    "file": "assets/preview-DBqpsLvS.js",
+    "file": "assets/preview-DueejEaR.js",
     "name": "preview",
     "src": "resources/js/document-studio/preview.js",
     "isEntry": true,
     "imports": [
-      "_pdf-loader-C7XEWZ1G.js"
+      "_pdf-loader-BBprxQxg.js"
     ]
   },
   "resources/js/document-studio/rkword-adapter.js": {
-    "file": "assets/rkword-adapter-C1NLsEer.js",
+    "file": "assets/rkword-adapter-B_xvjZzM.js",
     "name": "rkword-adapter",
     "src": "resources/js/document-studio/rkword-adapter.js",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-C0FnF6B9.js",
-      "_pdf-loader-C7XEWZ1G.js",
+      "_pdf-DKsKPeEk.js",
       "resources/js/document-studio/studio.js"
     ],
     "dynamicImports": [
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/mammoth/lib/index.js",
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/marked/lib/marked.esm.js",
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown/lib/turndown.browser.es.js",
-      "../../../../Documents/Capstone Project/mcare-super-admin/storage/app/portal-qa/document-studio-takeover-2026-10-08/dependencies/node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js"
+      "node_modules/mammoth/lib/index.js",
+      "node_modules/marked/lib/marked.esm.js",
+      "node_modules/turndown/lib/turndown.browser.es.js",
+      "node_modules/turndown-plugin-gfm/lib/turndown-plugin-gfm.es.js"
     ]
   },
   "resources/js/document-studio/studio.js": {
-    "file": "assets/studio-Ck4G6yLE.js",
+    "file": "assets/studio-UGteGXA_.js",
     "name": "studio",
     "src": "resources/js/document-studio/studio.js",
     "isEntry": true,
     "imports": [
-      "_pdf-loader-C7XEWZ1G.js",
+      "_pdf-DKsKPeEk.js",
       "resources/js/document-studio/preview.js",
       "resources/js/document-studio/preview.js"
     ],
@@ -228,12 +185,12 @@
     ]
   },
   "resources/js/document-studio/upload.js": {
-    "file": "assets/upload-CmaKZRqI.js",
+    "file": "assets/upload-BT2fBPFo.js",
     "name": "upload",
     "src": "resources/js/document-studio/upload.js",
     "isEntry": true,
     "imports": [
-      "_pdf-loader-C7XEWZ1G.js"
+      "_pdf-loader-BBprxQxg.js"
     ]
   }
 }

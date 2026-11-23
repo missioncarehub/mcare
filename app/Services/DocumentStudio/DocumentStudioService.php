@@ -26,19 +26,16 @@ class DocumentStudioService
     {
         return DB::transaction(function () use ($data, $user) {
             $documentKind = $data['document_kind'] ?? DocumentTemplate::KIND_GENERAL;
-            $engine = $data['engine'] ?? match ($documentKind) {
-                DocumentTemplate::KIND_COTC => DocumentTemplate::ENGINE_FABRIC,
-                default => DocumentTemplate::ENGINE_PDFME,
-            };
+            $engine = $data['engine'] ?? DocumentTemplate::ENGINE_PDFME;
 
             $initialState = $data['initial_state'] ?? [
                 'schema_version' => '1.0',
                 'engine' => $engine,
                 'page' => $data['page_settings'] ?? [
-                    'size' => 'letter',
+                    'size' => ($documentKind === 'tor' ? 'a4' : 'letter'),
                     'orientation' => ($documentKind === 'cotc' ? 'landscape' : 'portrait'),
-                    'width_mm' => ($documentKind === 'cotc' ? 279.4 : 215.9),
-                    'height_mm' => ($documentKind === 'cotc' ? 215.9 : 279.4),
+                    'width_mm' => ($documentKind === 'cotc' ? 279.4 : 210.0),
+                    'height_mm' => ($documentKind === 'cotc' ? 215.9 : 297.0),
                 ],
                 'elements' => [],
             ];
@@ -313,66 +310,112 @@ class DocumentStudioService
         if (! DocumentTemplate::where('slug', 'default-cotc')->exists()) {
             $cotcState = [
                 'schema_version' => '1.0',
-                'engine' => DocumentTemplate::ENGINE_FABRIC,
+                'engine' => DocumentTemplate::ENGINE_PDFME,
                 'page' => [
                     'size' => 'letter',
                     'orientation' => 'landscape',
                     'width_mm' => 279.4,
                     'height_mm' => 215.9,
                 ],
-                'background' => [
-                    'type' => 'image',
-                    'source' => 'assets/cotc-official-template.png',
-                ],
+                'base_pdf_url' => '/assets/cotc-base-template.pdf',
                 'elements' => [
                     [
                         'id' => 'name_text',
                         'type' => 'text',
-                        'x' => 14.0,
+                        'x' => 25.0,
                         'y' => 91.0,
-                        'width' => 178.5,
-                        'height' => 15.5,
-                        'fontFamily' => 'Times New Roman',
-                        'fontSize' => 25,
+                        'width' => 230.0,
+                        'height' => 16.0,
+                        'fontSize' => 24,
                         'fontWeight' => 'bold',
                         'textAlign' => 'center',
-                        'color' => '#111827',
                         'binding' => '{{trainee_name}}',
+                        'content' => 'MARIA REYES SANTOS',
+                    ],
+                    [
+                        'id' => 'completion_statement',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 109.0,
+                        'width' => 230.0,
+                        'height' => 7.0,
+                        'fontSize' => 11,
+                        'textAlign' => 'center',
+                        'content' => 'for having successfully completed the training program in',
+                    ],
+                    [
+                        'id' => 'program_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 118.0,
+                        'width' => 230.0,
+                        'height' => 10.0,
+                        'fontSize' => 15,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'binding' => '{{training_program}}',
+                        'content' => 'CAREGIVING NC II',
                     ],
                     [
                         'id' => 'date_text',
                         'type' => 'text',
-                        'x' => 20.0,
-                        'y' => 140.0,
-                        'width' => 240.0,
+                        'x' => 25.0,
+                        'y' => 135.0,
+                        'width' => 230.0,
                         'height' => 8.0,
-                        'fontFamily' => 'Arial',
-                        'fontSize' => 11,
+                        'fontSize' => 10,
                         'textAlign' => 'center',
-                        'color' => '#374151',
                         'binding' => 'Given this {{completion_date}} at {{organization_name}}',
+                        'content' => 'Given this August 28, 2026 at Mission Care Training Center',
+                    ],
+                    [
+                        'id' => 'release_date_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 145.0,
+                        'width' => 230.0,
+                        'height' => 6.0,
+                        'fontSize' => 8.5,
+                        'textAlign' => 'center',
+                        'binding' => 'Date of Release: {{release_date}}',
+                        'content' => 'Date of Release: ' . now()->format('F j, Y'),
                     ],
                     [
                         'id' => 'doc_number_text',
                         'type' => 'text',
-                        'x' => 15.0,
+                        'x' => 18.0,
                         'y' => 195.0,
-                        'width' => 100.0,
+                        'width' => 90.0,
                         'height' => 6.0,
-                        'fontFamily' => 'Arial',
-                        'fontSize' => 9,
+                        'fontSize' => 8,
                         'textAlign' => 'left',
-                        'color' => '#6b7280',
-                        'binding' => '{{certificate_number}}',
+                        'binding' => 'No. {{certificate_number}}',
+                        'content' => 'No. MCARE-COTC-2026-00001',
                     ],
                     [
-                        'id' => 'qr_code',
-                        'type' => 'qr',
-                        'x' => 245.0,
-                        'y' => 175.0,
-                        'width' => 22.0,
-                        'height' => 22.0,
-                        'binding' => '{{qr_code}}',
+                        'id' => 'registrar_name',
+                        'type' => 'text',
+                        'x' => 185.0,
+                        'y' => 186.0,
+                        'width' => 75.0,
+                        'height' => 6.0,
+                        'fontSize' => 9,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'binding' => '{{registrar_name}}',
+                        'content' => (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
+                    ],
+                    [
+                        'id' => 'registrar_role',
+                        'type' => 'text',
+                        'x' => 185.0,
+                        'y' => 192.0,
+                        'width' => 75.0,
+                        'height' => 5.0,
+                        'fontSize' => 8,
+                        'textAlign' => 'center',
+                        'binding' => '{{registrar_role}}',
+                        'content' => 'Authorized Registrar',
                     ],
                 ],
             ];
@@ -381,7 +424,7 @@ class DocumentStudioService
                 'name' => 'Official Certificate of Training Completion (Default)',
                 'slug' => 'default-cotc',
                 'document_kind' => DocumentTemplate::KIND_COTC,
-                'engine' => DocumentTemplate::ENGINE_FABRIC,
+                'engine' => DocumentTemplate::ENGINE_PDFME,
                 'is_active' => true,
                 'is_system_default' => true,
                 'draft_revision' => 1,
@@ -389,16 +432,6 @@ class DocumentStudioService
                 'draft_updated_at' => now(),
             ]);
 
-            if (is_file(public_path('assets/cotc-official-template.png'))) {
-                $asset = $this->assetSecurity->storeUploadedFile(
-                    new UploadedFile(public_path('assets/cotc-official-template.png'), 'cotc-official-template.png', null, null, true),
-                    DocumentAsset::TYPE_IMAGE, $cotc->id
-                );
-                $asset->update(['is_system' => true]);
-                $cotcState['background_asset_id'] = $asset->id;
-                unset($cotcState['background']['source']);
-                $cotc->update(['draft_state' => $cotcState]);
-            }
             $this->publishVersion($cotc, 'Initial system release', true);
         }
 
@@ -541,6 +574,284 @@ class DocumentStudioService
             ]);
 
             $this->publishVersion($soa, 'Initial system release', true);
+        }
+
+        // 4. Ensure Program-Specific Credentials (Caregiving NC II and NC III)
+        if (Schema::hasTable('training_programs')) {
+            $nc2 = \App\Models\TrainingProgram::firstOrCreate(
+                ['code' => 'CAREGIVING-NC-II'],
+                [
+                    'name' => 'Caregiving NC II',
+                    'description' => 'Caregiving NC II Qualification Program',
+                    'total_program_fee' => 22000.00,
+                    'downpayment_amount' => 2000.00,
+                    'is_active' => true,
+                ]
+            );
+
+            $nc3 = \App\Models\TrainingProgram::firstOrCreate(
+                ['code' => 'CAREGIVING-NC-III'],
+                [
+                    'name' => 'Caregiving NC III',
+                    'description' => 'Caregiving NC III Qualification Program',
+                    'total_program_fee' => 28000.00,
+                    'downpayment_amount' => 3000.00,
+                    'is_active' => true,
+                ]
+            );
+
+            $activePrograms = \App\Models\TrainingProgram::where('is_active', true)->get();
+            foreach ($activePrograms as $prog) {
+                $this->ensureProgramSpecificTemplates($prog);
+            }
+        }
+    }
+
+    public function ensureProgramSpecificTemplates(\App\Models\TrainingProgram $program): void
+    {
+        // 1. Program-Specific COTC Template (PDFme)
+        $cotcSlug = "cotc-program-{$program->id}";
+        $existingCotc = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_COTC)
+            ->where('training_program_id', $program->id)
+            ->first();
+
+        if (! $existingCotc && ! DocumentTemplate::where('slug', $cotcSlug)->exists()) {
+            $cotcState = [
+                'schema_version' => '1.0',
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'page' => [
+                    'size' => 'letter',
+                    'orientation' => 'landscape',
+                    'width_mm' => 279.4,
+                    'height_mm' => 215.9,
+                ],
+                'base_pdf_url' => '/assets/cotc-base-template.pdf',
+                'elements' => [
+                    [
+                        'id' => 'name_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 91.0,
+                        'width' => 230.0,
+                        'height' => 16.0,
+                        'fontSize' => 24,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'binding' => '{{trainee_name}}',
+                        'content' => 'MARIA REYES SANTOS',
+                    ],
+                    [
+                        'id' => 'completion_statement',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 109.0,
+                        'width' => 230.0,
+                        'height' => 7.0,
+                        'fontSize' => 11,
+                        'textAlign' => 'center',
+                        'content' => 'for having successfully completed the training program in',
+                    ],
+                    [
+                        'id' => 'program_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 118.0,
+                        'width' => 230.0,
+                        'height' => 10.0,
+                        'fontSize' => 15,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'binding' => '{{training_program}}',
+                        'content' => mb_strtoupper($program->name),
+                    ],
+                    [
+                        'id' => 'date_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 135.0,
+                        'width' => 230.0,
+                        'height' => 8.0,
+                        'fontSize' => 10,
+                        'textAlign' => 'center',
+                        'binding' => 'Given this {{completion_date}} at {{organization_name}}',
+                        'content' => 'Given this August 28, 2026 at Mission Care Training Center',
+                    ],
+                    [
+                        'id' => 'release_date_text',
+                        'type' => 'text',
+                        'x' => 25.0,
+                        'y' => 145.0,
+                        'width' => 230.0,
+                        'height' => 6.0,
+                        'fontSize' => 8.5,
+                        'textAlign' => 'center',
+                        'binding' => 'Date of Release: {{release_date}}',
+                        'content' => 'Date of Release: ' . now()->format('F j, Y'),
+                    ],
+                    [
+                        'id' => 'doc_number_text',
+                        'type' => 'text',
+                        'x' => 18.0,
+                        'y' => 195.0,
+                        'width' => 90.0,
+                        'height' => 6.0,
+                        'fontSize' => 8,
+                        'textAlign' => 'left',
+                        'binding' => 'No. {{certificate_number}}',
+                        'content' => 'No. MCARE-COTC-2026-00001',
+                    ],
+                    [
+                        'id' => 'registrar_name',
+                        'type' => 'text',
+                        'x' => 185.0,
+                        'y' => 186.0,
+                        'width' => 75.0,
+                        'height' => 6.0,
+                        'fontSize' => 9,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'binding' => '{{registrar_name}}',
+                        'content' => (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
+                    ],
+                    [
+                        'id' => 'registrar_role',
+                        'type' => 'text',
+                        'x' => 185.0,
+                        'y' => 192.0,
+                        'width' => 75.0,
+                        'height' => 5.0,
+                        'fontSize' => 8,
+                        'textAlign' => 'center',
+                        'binding' => '{{registrar_role}}',
+                        'content' => 'Authorized Registrar',
+                    ],
+                ],
+            ];
+
+            $cotc = DocumentTemplate::create([
+                'name' => "Certificate of Training Completion - {$program->name}",
+                'slug' => $cotcSlug,
+                'document_kind' => DocumentTemplate::KIND_COTC,
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'training_program_id' => $program->id,
+                'is_active' => true,
+                'is_system_default' => false,
+                'draft_revision' => 1,
+                'draft_state' => $cotcState,
+                'draft_updated_at' => now(),
+            ]);
+            $this->publishVersion($cotc, "Initial release for {$program->name}", true);
+        }
+
+        // 2. Program-Specific TOR Template (PDFme)
+        $torSlug = "tor-program-{$program->id}";
+        $existingTor = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_TOR)
+            ->where('training_program_id', $program->id)
+            ->first();
+
+        if (! $existingTor && ! DocumentTemplate::where('slug', $torSlug)->exists()) {
+            $torState = [
+                'schema_version' => '1.0',
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'page' => [
+                    'size' => 'a4',
+                    'orientation' => 'portrait',
+                    'width_mm' => 210.0,
+                    'height_mm' => 297.0,
+                ],
+                'elements' => [
+                    [
+                        'id' => 'title',
+                        'type' => 'text',
+                        'x' => 15.0,
+                        'y' => 20.0,
+                        'width' => 180.0,
+                        'height' => 8.0,
+                        'fontSize' => 16,
+                        'fontWeight' => 'bold',
+                        'textAlign' => 'center',
+                        'content' => 'OFFICIAL TRANSCRIPT OF RECORDS',
+                    ],
+                    [
+                        'id' => 'trainee_name',
+                        'type' => 'text',
+                        'x' => 15.0,
+                        'y' => 38.0,
+                        'width' => 180.0,
+                        'height' => 7.0,
+                        'fontSize' => 12,
+                        'fontWeight' => 'bold',
+                        'binding' => 'Name: {{trainee_name}}',
+                        'content' => 'Name: MARIA REYES SANTOS',
+                    ],
+                    [
+                        'id' => 'program_name',
+                        'type' => 'text',
+                        'x' => 15.0,
+                        'y' => 46.0,
+                        'width' => 180.0,
+                        'height' => 7.0,
+                        'fontSize' => 11,
+                        'binding' => 'Course: {{training_program}}',
+                        'content' => 'Course: ' . $program->name,
+                    ],
+                    [
+                        'id' => 'release_date',
+                        'type' => 'text',
+                        'x' => 15.0,
+                        'y' => 54.0,
+                        'width' => 180.0,
+                        'height' => 6.0,
+                        'fontSize' => 9,
+                        'binding' => 'Date Released: {{release_date}}',
+                        'content' => 'Date Released: ' . now()->format('F j, Y'),
+                    ],
+                    [
+                        'id' => 'competencies_table',
+                        'type' => 'table',
+                        'x' => 15.0,
+                        'y' => 64.0,
+                        'width' => 180.0,
+                        'binding' => 'tor_competencies',
+                    ],
+                    [
+                        'id' => 'trainer_signatory',
+                        'type' => 'text',
+                        'x' => 15.0,
+                        'y' => 245.0,
+                        'width' => 80.0,
+                        'height' => 12.0,
+                        'fontSize' => 9,
+                        'binding' => 'Lead Trainer: {{trainer_name}}',
+                        'content' => 'Lead Trainer: ' . (string) config('official_documents.organization.trainer_name', 'Maricris N. Collao'),
+                    ],
+                    [
+                        'id' => 'registrar_signatory',
+                        'type' => 'text',
+                        'x' => 115.0,
+                        'y' => 245.0,
+                        'width' => 80.0,
+                        'height' => 12.0,
+                        'fontSize' => 9,
+                        'binding' => 'Registrar: {{registrar_name}}',
+                        'content' => 'Registrar: ' . (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
+                    ],
+                ],
+            ];
+
+            $tor = DocumentTemplate::create([
+                'name' => "Official Transcript of Records - {$program->name}",
+                'slug' => $torSlug,
+                'document_kind' => DocumentTemplate::KIND_TOR,
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'training_program_id' => $program->id,
+                'is_active' => true,
+                'is_system_default' => false,
+                'draft_revision' => 1,
+                'draft_state' => $torState,
+                'draft_updated_at' => now(),
+            ]);
+            $this->publishVersion($tor, "Initial release for {$program->name}", true);
         }
     }
 

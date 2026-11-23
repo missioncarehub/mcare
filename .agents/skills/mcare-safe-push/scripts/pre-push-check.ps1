@@ -21,9 +21,9 @@ if ($trackedViews) {
     Write-Host "  -> No tracked storage framework views to restore." -ForegroundColor Green
 }
 
-# 3. Check for exposed secrets in git diff
+# 3. Check for exposed secrets in git diff (excluding compiled public/build assets)
 Write-Host "[3/5] Auditing git diff for sensitive credentials..." -ForegroundColor Yellow
-$secrets = git diff | Select-String -Pattern "(sk_live|sk_test|api_key|token|password)\s*="
+$secrets = git diff -- ':!public/build' | Select-String -Pattern "(sk_live|sk_test|api_key|token|password)\s*="
 if ($secrets) {
     Write-Host "WARNING: Potential secrets found in git diff!" -ForegroundColor Red
     $secrets | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }

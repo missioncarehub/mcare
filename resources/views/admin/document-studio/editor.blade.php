@@ -299,7 +299,7 @@
                 </div>
             @else
                 <!-- pdfme / rk_word Container -->
-                <div id="studio-editor-viewport" class="w-full h-full"></div>
+                <div id="studio-editor-viewport" class="w-full h-full min-h-[850px]"></div>
             @endif
         </main>
 

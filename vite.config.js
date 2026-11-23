@@ -23,7 +23,15 @@ export default defineConfig({
     plugins: [
         copyPdfJsWorker(),
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                'resources/css/document-studio.css',
+                'resources/js/document-studio/studio.js',
+                'resources/js/document-studio/preview.js',
+                'resources/js/document-studio/new-document.js',
+                'resources/js/document-studio/upload.js',
+            ],
             refresh: true,
         }),
         tailwindcss(),

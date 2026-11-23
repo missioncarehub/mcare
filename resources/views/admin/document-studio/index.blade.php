@@ -82,38 +82,17 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <x-dashboard-icon name="graduation-cap" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                    <span class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Select Program Scope:</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">Select Training Program:</span>
                 </div>
-                @if($selectedProgram)
-                    <a href="{{ route('admin.document-studio.index', ['view' => 'published']) }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
-                        Reset to Global Default
-                    </a>
-                @endif
+                <span class="text-xs text-gray-500 dark:text-gray-400">Each qualification has its own unique certificate & transcript design</span>
             </div>
 
             <!-- Program Selector Pills -->
             <div class="flex flex-wrap gap-2">
-                <a href="{{ route('admin.document-studio.index', ['view' => 'published']) }}"
-                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all {{ is_null($selectedProgramId) ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300' }}">
-                    <span>Global Institutional Default</span>
-                </a>
-
                 @foreach($programs as $prog)
-                    @php
-                        $hasOverride = false;
-                        foreach ($publishedDesigns as $design) {
-                            if ($design['program_overrides']->contains('training_program_id', $prog->id)) {
-                                $hasOverride = true;
-                                break;
-                            }
-                        }
-                    @endphp
                     <a href="{{ route('admin.document-studio.index', ['view' => 'published', 'program_id' => $prog->id]) }}"
-                       class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all {{ $selectedProgramId === $prog->id ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300' }}">
+                       class="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all {{ $selectedProgramId === $prog->id ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-400/30' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300' }}">
                         <span>{{ $prog->name }}</span>
-                        @if($hasOverride)
-                            <span class="w-2 h-2 rounded-full {{ $selectedProgramId === $prog->id ? 'bg-white' : 'bg-emerald-500' }}" title="Has custom program template"></span>
-                        @endif
                     </a>
                 @endforeach
             </div>
@@ -150,22 +129,10 @@
                             </div>
 
                             <!-- Scope Badge -->
-                            @if($selectedProgram)
-                                @if($hasOverride)
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                        Program Override
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
-                                        Inheriting Global Default
-                                    </span>
-                                @endif
-                            @else
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800">
-                                    Global Template
-                                </span>
-                            @endif
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800">
+                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                Program: {{ $selectedProgram?->name ?? 'Caregiving NC II' }}
+                            </span>
                         </div>
 
                         <!-- Title and Scope Subtitle -->
@@ -205,7 +172,7 @@
                                             </div>
                                             <div class="flex justify-between items-end text-[7px] sm:text-[8px] text-gray-600 font-sans px-2">
                                                 <span>No. CERT-2026-0001</span>
-                                                <span>Given this {{ now()->format('jS \o\f F, Y') }}</span>
+                                                <span>Given this {{ now()->format('jS \o\f F, Y') }} &bull; Released: {{ now()->format('M j, Y') }}</span>
                                                 <span>Authorized Registrar</span>
                                             </div>
                                         </div>
@@ -288,83 +255,27 @@
                             <div class="flex flex-wrap gap-1.5">
                                 @if($isCotc)
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{trainee_name}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{program_name}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{certificate_number}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{training_program}}</span>
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{completion_date}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{qr_code}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{registrar_signature}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">@{{release_date}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{certificate_number}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{registrar_name}}</span>
                                 @else
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{trainee_name}}</span>
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-blue-50 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">@{{tor_competencies}} (table)</span>
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{training_program}}</span>
                                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{nominal_hours}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{assessment_rating}}</span>
-                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{qr_code}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">@{{release_date}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{trainer_name}}</span>
+                                    <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">@{{registrar_name}}</span>
                                 @endif
                             </div>
                         </div>
-
-                        <!-- Program Overrides list (when viewing Global Scope) -->
-                        @if(!$selectedProgram && $info['program_overrides']->isNotEmpty())
-                            <div class="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-[11px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                                        Program Overrides ({{ $info['program_overrides']->count() }})
-                                    </span>
-                                </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    @foreach($info['program_overrides'] as $override)
-                                        @php
-                                            $overridePreviewUrl = route('admin.document-studio.preview', ['template' => $override, 'version_id' => $override->active_version_id]);
-                                        @endphp
-                                        <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/40 p-2.5 text-xs flex items-center justify-between gap-2">
-                                            <div class="min-w-0">
-                                                <p class="font-bold text-gray-900 dark:text-white truncate">{{ $override->trainingProgram?->name }}</p>
-                                                <p class="text-[10px] text-gray-500">v{{ $override->activeVersion?->version_number }}</p>
-                                            </div>
-                                            <div class="flex items-center gap-1 shrink-0">
-                                                <a href="{{ $overridePreviewUrl }}" target="_blank"
-                                                   data-document-preview="{{ $overridePreviewUrl }}"
-                                                   class="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white cursor-pointer"
-                                                   title="Preview">
-                                                    <x-dashboard-icon name="eye" class="w-4 h-4" />
-                                                </a>
-                                                <a href="{{ route('admin.document-studio.edit', $override) }}"
-                                                   class="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white"
-                                                   title="Edit in PDFme">
-                                                    <x-dashboard-icon name="pencil" class="w-4 h-4" />
-                                                </a>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
                     </div>
 
                     <!-- Card Actions -->
                     <div class="bg-gray-50 dark:bg-gray-900/60 px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
-                        @if($selectedProgram && !$hasOverride)
-                            <!-- 1-Click Action to customize this program -->
-                            <form action="{{ route('admin.document-studio.existing-design') }}" method="POST" class="w-full sm:w-auto flex-1">
-                                @csrf
-                                <input type="hidden" name="kind" value="{{ $kind }}">
-                                <input type="hidden" name="training_program_id" value="{{ $selectedProgram->id }}">
-                                <button type="submit"
-                                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors min-h-[44px]">
-                                    <x-dashboard-icon name="pencil" class="w-4 h-4" />
-                                    <span>Customize {{ strtoupper($kind) }} for {{ $selectedProgram->code ?? $selectedProgram->name }}</span>
-                                </button>
-                            </form>
-                            @if($previewUrl !== '#')
-                                <a href="{{ $previewUrl }}" target="_blank"
-                                   data-document-preview="{{ $previewUrl }}"
-                                   class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 min-h-[44px] cursor-pointer">
-                                    <x-dashboard-icon name="eye" class="w-4 h-4 text-gray-500" />
-                                    <span>Preview Default</span>
-                                </a>
-                            @endif
-                        @elseif($effective && $ver)
+                        @if($effective)
                             <div class="flex items-center gap-2 w-full sm:w-auto flex-1">
                                 <a href="{{ $previewUrl }}" target="_blank"
                                    data-document-preview="{{ $previewUrl }}"
@@ -398,10 +309,11 @@
                             <form action="{{ route('admin.document-studio.existing-design') }}" method="POST" class="w-full">
                                 @csrf
                                 <input type="hidden" name="kind" value="{{ $kind }}">
+                                <input type="hidden" name="training_program_id" value="{{ $selectedProgramId }}">
                                 <button type="submit"
-                                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 transition-colors min-h-[44px]">
-                                    <x-dashboard-icon name="copy" class="w-4 h-4" />
-                                    <span>Create Draft from MCARE Baseline</span>
+                                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors min-h-[44px]">
+                                    <x-dashboard-icon name="pencil" class="w-4 h-4" />
+                                    <span>Initialize {{ strtoupper($kind) }} Template</span>
                                 </button>
                             </form>
                         @endif
