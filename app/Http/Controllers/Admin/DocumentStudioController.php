@@ -489,6 +489,7 @@ class DocumentStudioController extends Controller
             'elements' => $editorState['elements'] ?? null,
             'background' => $editorState['background'] ?? null,
             'basePdf' => $editorState['basePdf'] ?? null,
+            'base_pdf_url' => $editorState['base_pdf_url'] ?? null,
             'base_pdf_asset_id' => $editorState['base_pdf_asset_id'] ?? null,
             'background_asset_id' => $editorState['background_asset_id'] ?? null,
             'html' => $editorState['html'] ?? $editorState['content'] ?? null,
@@ -500,8 +501,10 @@ class DocumentStudioController extends Controller
         } catch (\Throwable $exception) {
             report($exception);
 
-            return response('This layout could not be previewed. Check its fonts, tables and uploaded assets, then try again.', 422, [
-                'Content-Type' => 'text/plain; charset=UTF-8', 'Cache-Control' => 'private, no-store',
+            return response()->json([
+                'message' => 'This layout could not be previewed. Check its fonts, tables and uploaded assets, then try again.',
+            ], 422, [
+                'Cache-Control' => 'private, no-store',
             ]);
         }
 

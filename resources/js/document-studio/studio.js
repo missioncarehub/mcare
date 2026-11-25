@@ -1,5 +1,6 @@
 import { previewDocument } from './preview.js';
 import { notifyStudio } from './feedback.js';
+import { CERTIFICATE_FONTS } from './fonts.js';
 class DocumentStudioApp {
     constructor() {
         this.config = window.DOCUMENT_STUDIO_CONFIG || {};
@@ -25,6 +26,7 @@ class DocumentStudioApp {
             template: this.draftState,
             onChange: (updatedState) => this.handleStateChange(updatedState),
             onSelect: (selectedProps) => this.handleObjectSelection(selectedProps),
+            onFieldsChange: (fields) => this.syncPdfmeFontEditor(fields),
             assets: this.config.assets || [],
             endpoints: this.config.endpoints,
         };
@@ -299,10 +301,13 @@ class DocumentStudioApp {
             btn.addEventListener('click', () => {
                 const preset = btn.getAttribute('data-typography-preset');
                 if (this.adapter?.applyTypographyPreset?.(preset)) {
+                    this.syncPdfmeFontEditor(this.adapter.getTextFields?.() || []);
                     notifyStudio('Certificate font pairing applied. Save or Preview to inspect the PDF.', 'success', 'Typography updated');
                 }
             });
         });
+
+        this.bindPdfmeFontEditor();
 
         // Property panel live inputs
         document.getElementById('prop-text')?.addEventListener('input', (e) => {
@@ -384,7 +389,11 @@ class DocumentStudioApp {
             const fileInput = document.getElementById('asset-file-input');
             const typeSelect = document.getElementById('asset-type-select');
             if (!fileInput?.files[0]) return;
-            const method = typeSelect.value === 'pdf_base' ? 'setBasePdf' : 'addImage';
+            const selectedType = typeSelect.value;
+            const isTemplatePicture = selectedType === 'template_picture';
+            const method = selectedType === 'pdf_base'
+                ? 'setBasePdf'
+                : (isTemplatePicture ? 'setBackgroundImage' : 'addImage');
             if (typeof this.adapter?.[method] !== 'function') {
                 notifyStudio('This editor cannot insert that file type. Use an image or a compatible document file.', 'info', 'File not supported');
                 return;
@@ -392,7 +401,7 @@ class DocumentStudioApp {
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            formData.append('type', typeSelect.value);
+            formData.append('type', isTemplatePicture ? 'image' : selectedType);
             formData.append('document_template_id', this.config.templateId);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -409,15 +418,18 @@ class DocumentStudioApp {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || 'Asset upload failed');
 
-                // If it's an image, insert into canvas directly
-                if (data.asset?.url && this.adapter?.addImage) {
-                    if (data.asset.type === 'pdf_base') {
+                if (data.asset?.url) {
+                    if (selectedType === 'pdf_base') {
                         await this.adapter.setBasePdf(data.asset);
-                    } else {
+                    } else if (isTemplatePicture) {
+                        await this.adapter.setBackgroundImage(data.asset.url, data.asset.id);
+                        notifyStudio('Template background picture applied.', 'success', 'Template Picture Updated');
+                    } else if (this.adapter?.addImage) {
                         await this.adapter.addImage(data.asset.url, data.asset.id);
                     }
                 }
                 document.getElementById('asset-modal')?.classList.add('hidden');
+                fileInput.value = '';
             } catch (err) {
                 notifyStudio('Upload failed: ' + err.message, 'error', 'Upload failed');
             }
@@ -491,6 +503,90 @@ class DocumentStudioApp {
                 ok.className = 'text-emerald-600 dark:text-emerald-400 font-medium';
                 ok.textContent = '✓ All required tokens and structural tables verified.';
                 checklist.replaceChildren(heading, ok);
+            }
+        }
+    }
+
+    bindPdfmeFontEditor() {
+        const fieldSelect = document.getElementById('pdfme-font-field');
+        const familySelect = document.getElementById('pdfme-font-family');
+        const sizeInput = document.getElementById('pdfme-font-size');
+        const colorInput = document.getElementById('pdfme-font-color');
+        if (!fieldSelect || !familySelect) return;
+
+        const groups = {
+            script: 'Calligraphy / Script',
+            serif: 'Formal / Classic Serif',
+            sans: 'Clean Sans-Serif',
+        };
+        familySelect.replaceChildren();
+        for (const [cat, label] of Object.entries(groups)) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = label;
+            CERTIFICATE_FONTS.filter(f => f.category === cat).forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.key;
+                opt.textContent = f.label;
+                optgroup.append(opt);
+            });
+            familySelect.append(optgroup);
+        }
+
+        const syncControlsFromSelected = () => {
+            const fields = this.adapter?.getTextFields?.() || [];
+            const active = fields.find(f => f.key === fieldSelect.value);
+            if (!active) return;
+            familySelect.value = active.fontName || 'NotoSans';
+            if (sizeInput) sizeInput.value = active.fontSize || 12;
+            if (colorInput && /^#[0-9a-fA-F]{6}$/.test(active.fontColor || '')) {
+                colorInput.value = active.fontColor;
+            }
+        };
+
+        fieldSelect.addEventListener('change', syncControlsFromSelected);
+        familySelect.addEventListener('change', () => {
+            this.adapter?.updateFieldStyle?.(fieldSelect.value, { fontName: familySelect.value });
+        });
+        sizeInput?.addEventListener('input', () => {
+            const val = Number(sizeInput.value);
+            if (val >= 6 && val <= 96) {
+                this.adapter?.updateFieldStyle?.(fieldSelect.value, { fontSize: val });
+            }
+        });
+        colorInput?.addEventListener('input', () => {
+            this.adapter?.updateFieldStyle?.(fieldSelect.value, { fontColor: colorInput.value });
+        });
+        document.querySelectorAll('[data-pdfme-align]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.adapter?.updateFieldStyle?.(fieldSelect.value, { alignment: btn.dataset.pdfmeAlign });
+            });
+        });
+    }
+
+    syncPdfmeFontEditor(fields) {
+        const fieldSelect = document.getElementById('pdfme-font-field');
+        const familySelect = document.getElementById('pdfme-font-family');
+        const sizeInput = document.getElementById('pdfme-font-size');
+        const colorInput = document.getElementById('pdfme-font-color');
+        if (!fieldSelect) return;
+
+        const previous = fieldSelect.value;
+        fieldSelect.replaceChildren();
+        (fields || []).forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.key;
+            opt.textContent = f.label;
+            fieldSelect.append(opt);
+        });
+        if (previous && (fields || []).some(f => f.key === previous)) {
+            fieldSelect.value = previous;
+        }
+        const active = (fields || []).find(f => f.key === fieldSelect.value);
+        if (active) {
+            if (familySelect) familySelect.value = active.fontName || 'NotoSans';
+            if (sizeInput) sizeInput.value = active.fontSize || 12;
+            if (colorInput && /^#[0-9a-fA-F]{6}$/.test(active.fontColor || '')) {
+                colorInput.value = active.fontColor;
             }
         }
     }

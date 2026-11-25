@@ -84,7 +84,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-UYlY5-zE.css",
+    "file": "assets/app-Cail7rtc.css",
     "name": "app",
     "names": [
       "app.css"
@@ -127,12 +127,13 @@
     ]
   },
   "resources/js/document-studio/pdfme-adapter.js": {
-    "file": "assets/pdfme-adapter-Db3_NkLs.js",
+    "file": "assets/pdfme-adapter-Rz2h_MGL.js",
     "name": "pdfme-adapter",
     "src": "resources/js/document-studio/pdfme-adapter.js",
     "isDynamicEntry": true,
     "imports": [
       "_pdf-DKsKPeEk.js",
+      "resources/js/document-studio/studio.js",
       "_base64-js-C3K5tRKj.js"
     ],
     "dynamicImports": [
@@ -153,7 +154,7 @@
     ]
   },
   "resources/js/document-studio/rkword-adapter.js": {
-    "file": "assets/rkword-adapter-KdCw1lLO.js",
+    "file": "assets/rkword-adapter-BaYQWHUf.js",
     "name": "rkword-adapter",
     "src": "resources/js/document-studio/rkword-adapter.js",
     "isDynamicEntry": true,
@@ -169,7 +170,7 @@
     ]
   },
   "resources/js/document-studio/studio.js": {
-    "file": "assets/studio-CCMQg9lZ.js",
+    "file": "assets/studio-523kBoWO.js",
     "name": "studio",
     "src": "resources/js/document-studio/studio.js",
     "isEntry": true,

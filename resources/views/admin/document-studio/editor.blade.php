@@ -92,6 +92,11 @@
                         @else bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 @endif">
                         {{ strtoupper($template->document_kind) }}
                     </span>
+                    @if($template->trainingProgram)
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            {{ $template->trainingProgram->name }}
+                        </span>
+                    @endif
                     <span class="text-xs text-gray-500 dark:text-gray-400">Draft</span>
                 </div>
             </div>
@@ -207,18 +212,61 @@
                             <x-dashboard-icon name="pencil" class="w-3.5 h-3.5 text-indigo-500" />
                             Text Box
                         </button>
-                        <button type="button" onclick="document.getElementById('asset-modal').classList.remove('hidden')" class="flex items-center gap-1.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 transition-colors">
+                        <button type="button" onclick="document.getElementById('asset-type-select').value='logo'; document.getElementById('asset-modal').classList.remove('hidden')" class="flex items-center gap-1.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 transition-colors">
                             <x-dashboard-icon name="file-text" class="w-3.5 h-3.5 text-emerald-500" />
                             Image / Logo
                         </button>
+                        @if($template->engine === 'pdfme')
+                        <button type="button" onclick="document.getElementById('asset-type-select').value='template_picture'; document.getElementById('asset-modal').classList.remove('hidden')" class="col-span-2 flex items-center justify-center gap-1.5 p-2 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-xs font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors">
+                            <x-dashboard-icon name="cloud-arrow-up" class="w-3.5 h-3.5" />
+                            Upload Template Picture (PNG / JPG)
+                        </button>
+                        @endif
                     </div>
                 </div>
 
                 @if($template->engine === 'pdfme')
-                <!-- Certificate Typography Presets -->
-                <div class="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-800">
+                <!-- Font & Typography Editor -->
+                <div class="space-y-2.5 pt-2 border-t border-gray-200 dark:border-gray-800">
                     <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-semibold text-gray-400 uppercase">Certificate Fonts</span>
+                        <span class="text-[11px] font-semibold text-gray-400 uppercase">Font Editor ({{ strtoupper($template->document_kind) }})</span>
+                        <span class="text-[10px] text-gray-400">Live autosave</span>
+                    </div>
+
+                    <div class="space-y-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700/80 text-xs">
+                        <div>
+                            <label for="pdfme-font-field" class="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Field to Style</label>
+                            <select id="pdfme-font-field" class="w-full text-xs rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white py-1.5 px-2"></select>
+                        </div>
+
+                        <div>
+                            <label for="pdfme-font-family" class="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Font Family</label>
+                            <select id="pdfme-font-family" class="w-full text-xs rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white py-1.5 px-2"></select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="pdfme-font-size" class="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Size (pt)</label>
+                                <input type="number" id="pdfme-font-size" min="6" max="96" step="0.5" value="12" class="w-full text-xs rounded-md border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white py-1.5 px-2" />
+                            </div>
+                            <div>
+                                <label for="pdfme-font-color" class="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Color</label>
+                                <input type="color" id="pdfme-font-color" value="#111827" class="w-full h-8 rounded-md border border-gray-300 dark:border-gray-700 cursor-pointer bg-white dark:bg-gray-900 p-0.5" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Alignment</span>
+                            <div class="grid grid-cols-3 gap-1">
+                                <button type="button" data-pdfme-align="left" class="py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-[11px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40">Left</button>
+                                <button type="button" data-pdfme-align="center" class="py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-[11px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40">Center</button>
+                                <button type="button" data-pdfme-align="right" class="py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-[11px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40">Right</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] font-semibold text-gray-400 uppercase">Quick Presets</span>
                         <span class="text-[10px] text-gray-400">One-click style</span>
                     </div>
                     <div class="grid grid-cols-1 gap-1.5">
@@ -235,7 +283,6 @@
                             <span class="text-[10px] text-gray-500 dark:text-gray-400">Libre Baskerville • Montserrat</span>
                         </button>
                     </div>
-                    <p class="text-[10px] text-gray-400 leading-snug">Or select any text box on the canvas to pick a specific font in the right panel.</p>
                 </div>
                 @endif
 
@@ -425,6 +472,7 @@
             <div>
                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Asset Type</label>
                 <select id="asset-type-select" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white py-2 px-3">
+                    <option value="template_picture">Template Background Picture (PNG / JPG)</option>
                     <option value="logo">Official Logo</option>
                     <option value="signature">Signatory Signature</option>
                     <option value="image">Decorative Image / Seal</option>

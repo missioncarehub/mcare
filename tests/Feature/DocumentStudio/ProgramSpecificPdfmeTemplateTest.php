@@ -179,5 +179,19 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
 
         $this->assertStringStartsWith('%PDF-', $pdfBinary);
         $this->assertGreaterThan(10000, strlen($pdfBinary));
+
+        // Verify preview endpoint works cleanly for both program COTC and program TOR
+        $cotcPreview = $this->actingAs($this->admin)->get(route('admin.document-studio.preview', ['template' => $nc2Cotc, 'mode' => 'draft']));
+        $cotcPreview->assertOk();
+        $cotcPreview->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $cotcPreview->getContent());
+
+        $nc2Tor = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_TOR)
+            ->where('training_program_id', $nc2->id)
+            ->firstOrFail();
+        $torPreview = $this->actingAs($this->admin)->get(route('admin.document-studio.preview', ['template' => $nc2Tor, 'mode' => 'draft']));
+        $torPreview->assertOk();
+        $torPreview->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $torPreview->getContent());
     }
 }

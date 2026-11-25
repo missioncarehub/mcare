@@ -94,8 +94,10 @@ export class PdfmeAdapter {
         });
 
         this.refreshTextFields = installTextFields(this, document.getElementById('pdfme-text-tools'));
+        this.options.onFieldsChange?.(this.getTextFields());
         this.designer.onChangeTemplate((updated) => {
             this.refreshTextFields?.();
+            this.options.onFieldsChange?.(this.getTextFields(updated));
             if (this.options.onChange) {
                 this.options.onChange(this.getState(updated));
             }
@@ -104,16 +106,29 @@ export class PdfmeAdapter {
 
     getState(currentTemplate = null) {
         const tmpl = currentTemplate || (this.designer ? this.designer.getTemplate() : this.template);
+        const hasExternalBase = Boolean(this.template.base_pdf_asset_id || this.template.base_pdf_url);
+        const isBinaryBase = tmpl.basePdf instanceof Uint8Array || ArrayBuffer.isView(tmpl.basePdf);
+        const cleanBasePdf = hasExternalBase || isBinaryBase
+            ? undefined
+            : (tmpl.basePdf && typeof tmpl.basePdf === 'object' && typeof tmpl.basePdf.width === 'number'
+                ? tmpl.basePdf
+                : {
+                    width: this.template.page?.width_mm || 210,
+                    height: this.template.page?.height_mm || 297,
+                    padding: [10, 10, 10, 10],
+                });
+
         return {
             ...this.template,
             schema_version: '1.0',
             engine: 'pdfme',
             page: {
-                width_mm: tmpl.basePdf?.width || this.template.page?.width_mm || 210,
-                height_mm: tmpl.basePdf?.height || this.template.page?.height_mm || 297,
+                width_mm: (!isBinaryBase && tmpl.basePdf?.width) || this.template.page?.width_mm || 210,
+                height_mm: (!isBinaryBase && tmpl.basePdf?.height) || this.template.page?.height_mm || 297,
             },
-            basePdf: this.template.base_pdf_asset_id ? undefined : tmpl.basePdf,
-            base_pdf_asset_id: this.template.base_pdf_asset_id,
+            basePdf: cleanBasePdf,
+            base_pdf_asset_id: this.template.base_pdf_asset_id || undefined,
+            base_pdf_url: this.template.base_pdf_asset_id ? undefined : (this.template.base_pdf_url || undefined),
             schemas: tmpl.schemas,
         };
     }
@@ -145,8 +160,97 @@ export class PdfmeAdapter {
         const response = await fetch(asset.url, { credentials: 'same-origin' });
         if (!response.ok) throw new Error('Could not load the base PDF.');
         this.template.base_pdf_asset_id = asset.id;
+        this.template.base_pdf_url = undefined;
         this.designer.updateTemplate({ ...this.designer.getTemplate(), basePdf: new Uint8Array(await response.arrayBuffer()) });
         this.options.onChange?.(this.getState());
+    }
+
+    async setBackgroundImage(url, assetId) {
+        if (!this.designer) return;
+        const current = structuredClone(this.designer.getTemplate());
+        const width = this.template.page?.width_mm || (this.template.document_kind === 'cotc' ? 279.4 : 210);
+        const height = this.template.page?.height_mm || (this.template.document_kind === 'cotc' ? 215.9 : 297);
+
+        this.template.base_pdf_asset_id = undefined;
+        this.template.base_pdf_url = undefined;
+
+        const cleanBasePdf = { width, height, padding: [0, 0, 0, 0] };
+        const schemas = current.schemas && current.schemas.length > 0 ? [...current.schemas] : [[]];
+        const page0 = (schemas[0] || []).filter(field => !String(field.name || '').startsWith('template_bg_'));
+
+        page0.unshift(normalizeStudioSchema({
+            name: `template_bg_${assetId}`,
+            type: 'image',
+            position: { x: 0, y: 0 },
+            width,
+            height,
+            content: url,
+            asset_id: assetId,
+            readOnly: true,
+        }, this.plugins));
+
+        schemas[0] = page0;
+        const updated = { ...current, basePdf: cleanBasePdf, schemas };
+        this.designer.updateTemplate(updated);
+        this.options.onChange?.(this.getState(updated));
+        this.options.onFieldsChange?.(this.getTextFields(updated));
+    }
+
+    getTextFields(currentTemplate = null) {
+        const tmpl = currentTemplate || (this.designer ? this.designer.getTemplate() : this.template);
+        const fields = [];
+        (tmpl.schemas || []).forEach((page, pageIndex) => {
+            (page || []).forEach((field) => {
+                if (field.type !== 'text' && field.type !== 'table') return;
+                const rawLabel = field.binding || field.content || field.name;
+                const cleanLabel = String(rawLabel).replace(/\s+/g, ' ').slice(0, 34);
+                fields.push({
+                    key: `${pageIndex}:${field.name}`,
+                    pageIndex,
+                    name: field.name,
+                    type: field.type,
+                    label: `${field.name} (${cleanLabel})`,
+                    fontName: field.fontName || field.headStyles?.fontName || 'NotoSans',
+                    fontSize: field.fontSize || field.bodyStyles?.fontSize || 12,
+                    fontColor: field.fontColor || '#111827',
+                    alignment: field.alignment || 'left',
+                });
+            });
+        });
+        return fields;
+    }
+
+    updateFieldStyle(fieldKey, style = {}) {
+        if (!this.designer || !fieldKey) return false;
+        const sep = fieldKey.indexOf(':');
+        if (sep === -1) return false;
+        const pageIndex = Number(fieldKey.slice(0, sep));
+        const fieldName = fieldKey.slice(sep + 1);
+
+        const current = structuredClone(this.designer.getTemplate());
+        const page = current.schemas?.[pageIndex];
+        if (!page) return false;
+        const field = page.find(item => item.name === fieldName);
+        if (!field) return false;
+
+        if (field.type === 'table') {
+            if (style.fontSize !== undefined) {
+                field.bodyStyles = { ...(field.bodyStyles || {}), fontSize: Number(style.fontSize) };
+                field.headStyles = { ...(field.headStyles || {}), fontSize: Number(style.fontSize) };
+            }
+            if (style.fontColor !== undefined) {
+                field.bodyStyles = { ...(field.bodyStyles || {}), fontColor: style.fontColor };
+            }
+        } else {
+            if (style.fontName !== undefined) field.fontName = style.fontName;
+            if (style.fontSize !== undefined) field.fontSize = Number(style.fontSize);
+            if (style.fontColor !== undefined) field.fontColor = style.fontColor;
+            if (style.alignment !== undefined) field.alignment = style.alignment;
+        }
+
+        this.designer.updateTemplate(current);
+        this.options.onChange?.(this.getState(current));
+        return true;
     }
 
     addImage(url, assetId) {
