@@ -257,4 +257,63 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $fallbackPreview->assertHeader('x-mcare-preview-fallback', 'fpdf');
         $this->assertStringStartsWith('%PDF-', $fallbackPreview->getContent());
     }
+
+    public function test_outside_library_preview_matches_latest_edited_program_draft(): void
+    {
+        $program = TrainingProgram::firstOrCreate(
+            ['code' => 'CAREGIVING-NC-II'],
+            [
+                'name' => 'Caregiving NC II',
+                'description' => 'Caregiving NC II Program',
+                'total_program_fee' => 25000,
+                'downpayment_amount' => 3000,
+                'is_active' => true,
+            ]
+        );
+
+        $this->service->ensureDefaultTemplates();
+
+        $publishedCotc = DocumentTemplate::query()
+            ->where('document_kind', DocumentTemplate::KIND_COTC)
+            ->where('training_program_id', $program->id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        // Simulate clicking "Open PDFme Designer" and editing font in draft copy
+        $this->actingAs($this->admin)
+            ->post(route('admin.document-studio.start-draft', $publishedCotc))
+            ->assertRedirect();
+
+        $workingDraft = DocumentTemplate::query()
+            ->where('document_kind', DocumentTemplate::KIND_COTC)
+            ->where('training_program_id', $program->id)
+            ->where('is_active', false)
+            ->latest('id')
+            ->firstOrFail();
+
+        $editedState = $workingDraft->draft_state;
+        $editedState['schemas'][0][0]['fontName'] = 'GreatVibes';
+
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.document-studio.draft.save', $workingDraft), [
+                'draft_state' => $editedState,
+                'draft_revision' => $workingDraft->draft_revision,
+            ])
+            ->assertOk();
+
+        // Editor page keeps training_program_id on Back link and includes field labels button
+        $this->actingAs($this->admin)
+            ->get(route('admin.document-studio.edit', $workingDraft))
+            ->assertOk()
+            ->assertSee('btn-toggle-field-labels', false)
+            ->assertSee('training_program_id='.$program->id, false);
+
+        // Library index must now preview the edited draft (mode=draft) instead of stale published v1
+        $expectedDraftPreviewUrl = route('admin.document-studio.preview', ['template' => $workingDraft, 'mode' => 'draft'], false);
+        $this->actingAs($this->admin)
+            ->get(route('admin.document-studio.index', ['training_program_id' => $program->id]))
+            ->assertOk()
+            ->assertSee('Previewing Edited Draft')
+            ->assertSee($expectedDraftPreviewUrl, false);
+    }
 }

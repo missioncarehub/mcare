@@ -84,7 +84,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-q7j4diTL.css",
+    "file": "assets/app-CB7NU6Xd.css",
     "name": "app",
     "names": [
       "app.css"
@@ -93,7 +93,7 @@
     "isEntry": true
   },
   "resources/css/document-studio.css": {
-    "file": "assets/document-studio-TM-O6P11.css",
+    "file": "assets/document-studio-Cb9mvmgW.css",
     "name": "document-studio",
     "names": [
       "document-studio.css"
@@ -111,7 +111,7 @@
     ]
   },
   "resources/js/document-studio/fabric-adapter.js": {
-    "file": "assets/fabric-adapter-nmKkYOHd.js",
+    "file": "assets/fabric-adapter-CZHdpPRo.js",
     "name": "fabric-adapter",
     "src": "resources/js/document-studio/fabric-adapter.js",
     "isDynamicEntry": true,
@@ -130,7 +130,7 @@
     ]
   },
   "resources/js/document-studio/pdfme-adapter.js": {
-    "file": "assets/pdfme-adapter-CY-tJqhz.js",
+    "file": "assets/pdfme-adapter-qGvMeXSH.js",
     "name": "pdfme-adapter",
     "src": "resources/js/document-studio/pdfme-adapter.js",
     "isDynamicEntry": true,
@@ -148,7 +148,7 @@
     ]
   },
   "resources/js/document-studio/preview.js": {
-    "file": "assets/preview-DxAURzBy.js",
+    "file": "assets/preview-DNKcI714.js",
     "name": "preview",
     "src": "resources/js/document-studio/preview.js",
     "isEntry": true,
@@ -157,7 +157,7 @@
     ]
   },
   "resources/js/document-studio/rkword-adapter.js": {
-    "file": "assets/rkword-adapter-BG0mO8CY.js",
+    "file": "assets/rkword-adapter-AHkJY8tq.js",
     "name": "rkword-adapter",
     "src": "resources/js/document-studio/rkword-adapter.js",
     "isDynamicEntry": true,
@@ -173,7 +173,7 @@
     ]
   },
   "resources/js/document-studio/studio.js": {
-    "file": "assets/studio-BYxFk5Om.js",
+    "file": "assets/studio-Dtow7IaO.js",
     "name": "studio",
     "src": "resources/js/document-studio/studio.js",
     "isEntry": true,

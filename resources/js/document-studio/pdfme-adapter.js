@@ -95,14 +95,74 @@ export class PdfmeAdapter {
         });
 
         this.refreshTextFields = installTextFields(this, document.getElementById('pdfme-text-tools'));
+        this.installFieldLabels();
         this.options.onFieldsChange?.(this.getTextFields());
         this.designer.onChangeTemplate((updated) => {
             this.refreshTextFields?.();
+            this.syncFieldLabels();
             this.options.onFieldsChange?.(this.getTextFields(updated));
             if (this.options.onChange) {
                 this.options.onChange(this.getState(updated));
             }
         });
+    }
+
+    formatFieldLabel(name = '') {
+        const trimmed = String(name || '').trim();
+        if (!trimmed) return '';
+        if (trimmed.startsWith('template_bg_')) return 'Background Artwork';
+        return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    }
+
+    syncFieldLabels() {
+        if (!this.container) return;
+        const boxes = this.container.querySelectorAll('.selectable[title]');
+        boxes.forEach((box) => {
+            const rawName = box.getAttribute('title') || '';
+            const label = this.formatFieldLabel(rawName);
+            if (!label) {
+                box.removeAttribute('data-studio-label');
+                box.removeAttribute('data-label-inside');
+                return;
+            }
+            if (box.dataset.studioLabel !== label) {
+                box.dataset.studioLabel = label;
+            }
+            const topPx = Number.parseFloat(box.style.top || '999');
+            const isFullBg = rawName.startsWith('template_bg_');
+            if (isFullBg || topPx < 20) {
+                box.dataset.labelInside = 'true';
+            } else {
+                box.removeAttribute('data-label-inside');
+            }
+        });
+    }
+
+    installFieldLabels() {
+        const scheduleSync = () => {
+            window.requestAnimationFrame(() => this.syncFieldLabels());
+        };
+        scheduleSync();
+        setTimeout(scheduleSync, 150);
+        setTimeout(scheduleSync, 500);
+
+        this.labelObserver?.disconnect();
+        this.labelObserver = new MutationObserver(() => scheduleSync());
+        this.labelObserver.observe(this.container, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['title', 'style'],
+        });
+
+        const toggleBtn = document.getElementById('btn-toggle-field-labels');
+        if (toggleBtn && !toggleBtn.dataset.boundLabelToggle) {
+            toggleBtn.dataset.boundLabelToggle = '1';
+            toggleBtn.addEventListener('click', () => {
+                const enabled = this.container.classList.toggle('show-field-labels');
+                toggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+            });
+        }
     }
 
     getState(currentTemplate = null) {
@@ -417,6 +477,8 @@ export class PdfmeAdapter {
     }
 
     destroy() {
+        this.labelObserver?.disconnect();
+        this.labelObserver = null;
         if (this.designer) {
             this.designer.destroy();
             this.designer = null;

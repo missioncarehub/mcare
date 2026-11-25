@@ -74,7 +74,7 @@
     <header class="min-h-14 bg-white dark:bg-gray-850 border-b border-gray-200 dark:border-gray-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
         <!-- Left: Back & Title -->
         <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-            <a href="{{ route('admin.document-studio.index') }}"
+            <a href="{{ route('admin.document-studio.index', array_filter(['training_program_id' => $template->training_program_id])) }}"
                class="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                title="Back to Template Library">
                 <x-dashboard-icon name="arrow-left" class="w-5 h-5" />
@@ -138,6 +138,21 @@
                 <x-dashboard-icon name="check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Save</span>
             </button>
+
+            <!-- Field Labels Overlay Toggle -->
+            @if($template->engine === 'pdfme')
+            <button type="button"
+                    id="btn-toggle-field-labels"
+                    aria-pressed="true"
+                    class="min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-200 dark:border-indigo-800 transition-colors shadow-xs"
+                    title="Show or hide field name labels on canvas boxes">
+                <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                    <path d="M7 7h.01" />
+                </svg>
+                <span class="hidden sm:inline">Labels</span>
+            </button>
+            @endif
 
             <!-- Preview Button -->
             @if($sourcePdf)
@@ -371,7 +386,7 @@
                 </div>
             @else
                 <!-- pdfme / rk_word Container -->
-                <div id="studio-editor-viewport" class="w-full h-full min-h-[850px]"></div>
+                <div id="studio-editor-viewport" class="show-field-labels w-full h-full min-h-[850px]"></div>
             @endif
         </main>
 

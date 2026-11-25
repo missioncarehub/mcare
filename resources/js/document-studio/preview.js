@@ -143,12 +143,17 @@ export class StudioPreview {
             if (epoch !== this.epoch || serial !== this.renderSerial) return;
             const unit = page.getViewport({ scale: 1 });
             const scale = Math.max(.1, (this.body.clientWidth - 32) / unit.width) * this.zoom;
+            const ratio = Math.min(Math.max(devicePixelRatio || 1, 2), 3, Math.sqrt(16000000 / Math.max(1, unit.width * scale * unit.height * scale)));
             const viewport = page.getViewport({ scale });
-            const ratio = Math.min(devicePixelRatio || 1, 2, Math.sqrt(12000000 / (viewport.width * viewport.height)));
             this.canvas.width = Math.ceil(viewport.width * ratio); this.canvas.height = Math.ceil(viewport.height * ratio);
             this.canvas.style.width = `${viewport.width}px`; this.canvas.style.height = `${viewport.height}px`;
             this.canvas.hidden = false;
-            this.task = page.render({ canvasContext: this.canvas.getContext('2d'), viewport, transform: [ratio, 0, 0, ratio, 0, 0] });
+            const ctx = this.canvas.getContext('2d');
+            if (ctx) {
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+            }
+            this.task = page.render({ canvasContext: ctx, viewport, transform: [ratio, 0, 0, ratio, 0, 0] });
             await this.task.promise;
             if (epoch !== this.epoch || serial !== this.renderSerial) return;
             this.status.textContent = `Page ${this.page} of ${pdf.numPages} · ${Math.round(this.zoom * 100)}%`;
@@ -211,13 +216,19 @@ async function renderLiveThumbnails() {
             const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
             const pdf = await task.promise;
             const page = await pdf.getPage(1);
-            const targetWidth = Math.max(container?.clientWidth || 380, 320);
+            const targetWidth = Math.max(container?.clientWidth || 460, 760);
             const unit = page.getViewport({ scale: 1 });
-            const scale = (targetWidth / unit.width) * Math.min(window.devicePixelRatio || 1, 2);
+            const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+            const scale = (targetWidth / unit.width) * pixelRatio;
             const viewport = page.getViewport({ scale });
             canvas.width = Math.ceil(viewport.width);
             canvas.height = Math.ceil(viewport.height);
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+            }
+            await page.render({ canvasContext: ctx, viewport }).promise;
             loader?.remove();
             await task.destroy();
         } catch {

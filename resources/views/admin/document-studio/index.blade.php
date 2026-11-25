@@ -106,14 +106,17 @@
                 @php
                     $isCotc = ($kind === 'cotc');
                     $effective = $info['effective'];
+                    $latestDraft = $info['latest_draft'] ?? null;
                     $hasOverride = $info['is_program_override'];
                     $ver = $effective?->activeVersion;
 
-                    $previewTemplate = $effective ?? $info['global'];
+                    $previewTemplate = $latestDraft ?? $effective ?? $info['global'];
                     $previewVersionId = $ver?->id ?? $info['global']?->active_version_id;
-                    $previewUrl = $previewTemplate
-                        ? route('admin.document-studio.preview', array_filter(['template' => $previewTemplate, 'version_id' => $previewVersionId]), false)
-                        : '#';
+                    $previewUrl = $latestDraft
+                        ? route('admin.document-studio.preview', ['template' => $latestDraft, 'mode' => 'draft'], false)
+                        : ($previewTemplate
+                            ? route('admin.document-studio.preview', array_filter(['template' => $previewTemplate, 'version_id' => $previewVersionId]), false)
+                            : '#');
                 @endphp
                 <div class="bg-white dark:bg-gray-850 rounded-2xl border {{ $isCotc ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-blue-200 dark:border-blue-900/50' }} shadow-xs flex flex-col justify-between overflow-hidden">
                     <div class="p-6 space-y-4">
@@ -128,11 +131,18 @@
                                 </span>
                             </div>
 
-                            <!-- Scope Badge -->
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800">
-                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                                Program: {{ $selectedProgram?->name ?? 'Caregiving NC II' }}
-                            </span>
+                            <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                @if($latestDraft)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/70 dark:text-amber-200 dark:border-amber-800">
+                                        Previewing Edited Draft
+                                    </span>
+                                @endif
+                                <!-- Scope Badge -->
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                    Program: {{ $selectedProgram?->name ?? 'Caregiving NC II' }}
+                                </span>
+                            </div>
                         </div>
 
                         <!-- Title and Scope Subtitle -->
@@ -181,7 +191,12 @@
                                 </div>
                                 <div class="flex justify-between items-center">
                                     <span class="text-gray-500 dark:text-gray-400">Active Version:</span>
-                                    <span class="font-extrabold text-indigo-600 dark:text-indigo-400">v{{ $ver->version_number }} (Published)</span>
+                                    <span class="font-extrabold text-indigo-600 dark:text-indigo-400">
+                                        v{{ $ver->version_number }} (Published)
+                                        @if($latestDraft)
+                                            · <span class="text-amber-600 dark:text-amber-400">Draft Modified {{ ($latestDraft->draft_updated_at ?? $latestDraft->updated_at)?->diffForHumans() }}</span>
+                                        @endif
+                                    </span>
                                 </div>
                                 <div class="flex justify-between items-center">
                                     <span class="text-gray-500 dark:text-gray-400">Last Published:</span>

@@ -650,9 +650,9 @@ class DocumentStudioService
             [
                 'name' => 'organization_heading',
                 'type' => 'text',
-                'position' => ['x' => $textStartX, 'y' => 17.0],
+                'position' => ['x' => $textStartX, 'y' => 16.0],
                 'width' => $headerWidth,
-                'height' => 8.0,
+                'height' => 7.5,
                 'fontSize' => 13,
                 'fontName' => 'Cinzel-Bold',
                 'fontColor' => '#4c1d95',
@@ -662,7 +662,7 @@ class DocumentStudioService
             [
                 'name' => 'organization_subtitle',
                 'type' => 'text',
-                'position' => ['x' => $textStartX, 'y' => 25.0],
+                'position' => ['x' => $textStartX, 'y' => 26.5],
                 'width' => $headerWidth,
                 'height' => 6.0,
                 'fontSize' => 8.5,
@@ -674,7 +674,7 @@ class DocumentStudioService
             [
                 'name' => 'certificate_title',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 45.0],
+                'position' => ['x' => 15.0, 'y' => 44.0],
                 'width' => 245.0,
                 'height' => 12.0,
                 'fontSize' => 24,
@@ -686,7 +686,7 @@ class DocumentStudioService
             [
                 'name' => 'salutation',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 67.0],
+                'position' => ['x' => 15.0, 'y' => 66.0],
                 'width' => 180.0,
                 'height' => 7.0,
                 'fontSize' => 13,
@@ -698,7 +698,7 @@ class DocumentStudioService
             [
                 'name' => 'trainee_name',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 89.0],
+                'position' => ['x' => 15.0, 'y' => 88.5],
                 'width' => 178.0,
                 'height' => 16.0,
                 'fontSize' => $nameFont === 'GreatVibes' ? 34 : 28,
@@ -711,9 +711,9 @@ class DocumentStudioService
             [
                 'name' => 'completion_statement',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 111.0],
+                'position' => ['x' => 15.0, 'y' => 112.0],
                 'width' => 235.0,
-                'height' => 8.0,
+                'height' => 7.5,
                 'fontSize' => 12,
                 'fontName' => 'CormorantGaramond',
                 'fontColor' => '#374151',
@@ -723,9 +723,9 @@ class DocumentStudioService
             [
                 'name' => 'training_program',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 122.0],
+                'position' => ['x' => 15.0, 'y' => 124.0],
                 'width' => 235.0,
-                'height' => 10.0,
+                'height' => 9.5,
                 'fontSize' => 16,
                 'fontName' => 'Cinzel-Bold',
                 'fontColor' => '#5b21b6',
@@ -736,9 +736,9 @@ class DocumentStudioService
             [
                 'name' => 'completion_date',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 135.0],
+                'position' => ['x' => 15.0, 'y' => 138.0],
                 'width' => 235.0,
-                'height' => 8.0,
+                'height' => 7.5,
                 'fontSize' => 11.5,
                 'fontName' => 'CormorantGaramond',
                 'fontColor' => '#374151',
@@ -749,7 +749,7 @@ class DocumentStudioService
             [
                 'name' => 'release_date',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 145.0],
+                'position' => ['x' => 15.0, 'y' => 150.0],
                 'width' => 180.0,
                 'height' => 6.0,
                 'fontSize' => 9,
@@ -762,7 +762,7 @@ class DocumentStudioService
             [
                 'name' => 'trainer_name',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 173.0],
+                'position' => ['x' => 15.0, 'y' => 171.0],
                 'width' => 85.0,
                 'height' => 6.0,
                 'fontSize' => 10,
@@ -775,7 +775,7 @@ class DocumentStudioService
             [
                 'name' => 'trainer_role',
                 'type' => 'text',
-                'position' => ['x' => 15.0, 'y' => 180.0],
+                'position' => ['x' => 15.0, 'y' => 181.5],
                 'width' => 85.0,
                 'height' => 5.0,
                 'fontSize' => 8,
@@ -788,7 +788,7 @@ class DocumentStudioService
             [
                 'name' => 'registrar_name',
                 'type' => 'text',
-                'position' => ['x' => 115.0, 'y' => 173.0],
+                'position' => ['x' => 115.0, 'y' => 171.0],
                 'width' => 85.0,
                 'height' => 6.0,
                 'fontSize' => 10,
@@ -801,7 +801,7 @@ class DocumentStudioService
             [
                 'name' => 'registrar_role',
                 'type' => 'text',
-                'position' => ['x' => 115.0, 'y' => 180.0],
+                'position' => ['x' => 115.0, 'y' => 181.5],
                 'width' => 85.0,
                 'height' => 5.0,
                 'fontSize' => 8,
@@ -814,7 +814,7 @@ class DocumentStudioService
             [
                 'name' => 'certificate_number',
                 'type' => 'text',
-                'position' => ['x' => 205.0, 'y' => 180.0],
+                'position' => ['x' => 205.0, 'y' => 181.5],
                 'width' => 60.0,
                 'height' => 5.0,
                 'fontSize' => 8,
@@ -1341,6 +1341,44 @@ class DocumentStudioService
 
             $effectiveTemplate = $selectedProgramTemplate ?? $globalTemplate;
 
+            $latestDraft = null;
+            if ($programId) {
+                $publishedAt = $selectedProgramTemplate?->activeVersion?->published_at
+                    ?? $selectedProgramTemplate?->activeVersion?->created_at;
+                $activeStateClean = $selectedProgramTemplate?->activeVersion?->editor_state ?? [];
+                unset($activeStateClean['_asset_integrity']);
+
+                $candidateDraft = DocumentTemplate::query()
+                    ->where('document_kind', $kind)
+                    ->where('training_program_id', $programId)
+                    ->where('is_active', false)
+                    ->whereNull('active_version_id')
+                    ->with(['createdBy', 'updatedBy'])
+                    ->orderByRaw('COALESCE(draft_updated_at, updated_at) DESC')
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($candidateDraft && $this->hasActualContent(($candidateDraft->draft_state ?? []) + ['engine' => $candidateDraft->engine])) {
+                    $draftTime = $candidateDraft->draft_updated_at ?? $candidateDraft->updated_at;
+                    $isNotOlderThanPublish = ! $publishedAt || ($draftTime && $draftTime->greaterThanOrEqualTo($publishedAt));
+                    if ($isNotOlderThanPublish) {
+                        $draftClean = $candidateDraft->draft_state ?? [];
+                        unset($draftClean['_asset_integrity']);
+                        if (! empty($draftClean) && $draftClean != $activeStateClean) {
+                            $latestDraft = $candidateDraft;
+                        }
+                    }
+                }
+
+                if (! $latestDraft && $selectedProgramTemplate && $selectedProgramTemplate->activeVersion) {
+                    $ownDraftClean = $selectedProgramTemplate->draft_state ?? [];
+                    unset($ownDraftClean['_asset_integrity']);
+                    if (! empty($ownDraftClean) && $ownDraftClean != $activeStateClean) {
+                        $latestDraft = $selectedProgramTemplate;
+                    }
+                }
+            }
+
             $summary[$kind] = [
                 'label' => $label,
                 'kind' => $kind,
@@ -1348,6 +1386,8 @@ class DocumentStudioService
                 'program_overrides' => $programOverrides,
                 'program_specific' => $selectedProgramTemplate,
                 'effective' => $effectiveTemplate,
+                'latest_draft' => $latestDraft,
+                'has_unpublished_draft' => $latestDraft !== null,
                 'is_program_override' => $selectedProgramTemplate !== null,
             ];
         }
