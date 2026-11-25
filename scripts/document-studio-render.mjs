@@ -163,6 +163,7 @@ async function renderPdfme(payload) {
                 content: el.text || el.content || '',
                 ...(el.schemaOptions || {}),
                 asset_id: el.asset_id,
+                fromLegacyElements: true,
             });
         }
         schemas = [pageSchema];
@@ -194,27 +195,12 @@ async function renderPdfme(payload) {
                 val = `data:${mime};base64,${bytes.toString('base64')}`;
             }
 
-            // 1. Direct match by field.name in values
-            if (val === undefined && values[field.name] !== undefined) {
-                val = values[field.name];
-            }
+            const rawContent = field.content ?? field.text;
+            const hasInlineToken = typeof rawContent === 'string' && /\{\{\w+\}\}/.test(rawContent);
 
-            // 2. Match by binding token (e.g. {{trainee_name}} or trainee_name)
-            if (val === undefined && field.binding) {
-                const cleanKey = field.binding.replace(/[{}]/g, '').trim();
-                if (values[cleanKey] !== undefined) {
-                    val = values[cleanKey];
-                } else if (values[field.binding] !== undefined) {
-                    val = values[field.binding];
-                } else {
-                    val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
-                }
-            }
-
-            // 3. If field has static content or text with embedded tokens
-            const rawContent = field.content || field.text;
-            if (val === undefined && rawContent) {
-                let interpolated = String(rawContent);
+            // 1. If content itself contains {{tokens}} (e.g. edited directly in PDFme Designer), interpolate it verbatim
+            if (val === undefined && hasInlineToken) {
+                let interpolated = rawContent;
                 for (const [k, v] of Object.entries(values)) {
                     if (v !== undefined && v !== null && typeof v !== 'object') {
                         interpolated = interpolated.replaceAll(`{{${k}}}`, String(v));
@@ -223,9 +209,33 @@ async function renderPdfme(payload) {
                 val = interpolated;
             }
 
-            // 4. Default to static content if no input value provided (never blank out static text)
+            // 2. For table fields or empty/legacy-bound fields, resolve via field.name or field.binding
+            if (val === undefined && (field.type === 'table' || !rawContent || field.fromLegacyElements)) {
+                if (values[field.name] !== undefined) {
+                    val = values[field.name];
+                } else if (field.binding) {
+                    const cleanKey = field.binding.replace(/[{}]/g, '').trim();
+                    if (values[cleanKey] !== undefined) {
+                        val = values[cleanKey];
+                    } else if (values[field.binding] !== undefined) {
+                        val = values[field.binding];
+                    } else {
+                        val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
+                    }
+                }
+            }
+
+            // 3. Static text typed by user (preserve exact text, never clobber user edits with values[field.name])
+            if (val === undefined && typeof rawContent === 'string' && rawContent !== '') {
+                val = rawContent;
+            }
+
+            // 4. Final fallback to values[field.name] or binding
+            if (val === undefined && values[field.name] !== undefined) {
+                val = values[field.name];
+            }
             if (val === undefined) {
-                val = field.content || field.text || '';
+                val = '';
             }
 
             // Tables in pdfme need JSON string of 2D array or structured data

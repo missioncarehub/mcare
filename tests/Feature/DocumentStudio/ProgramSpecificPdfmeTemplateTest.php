@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\DocumentStudio\DocumentStudioService;
 use App\Support\RolePermissionMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProgramSpecificPdfmeTemplateTest extends TestCase
@@ -20,6 +21,7 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Storage::fake('local');
         RolePermissionMatrix::ensureConfigured();
 
         $this->admin = User::factory()->create(['role' => 'admin']);
@@ -46,12 +48,14 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->assertSame(DocumentTemplate::ENGINE_PDFME, $nc2Cotc->engine);
         $this->assertNotNull($nc2Cotc->activeVersion);
 
-        // Verify elements on NC II COTC: has release_date and does not have qr_code
+        // Verify native PDFme schemas on NC II COTC: clean border + dynamic fields + logo, no qr_code
         $state = $nc2Cotc->draft_state;
-        $elements = $state['elements'] ?? [];
-        $elementIds = array_column($elements, 'id');
-        $this->assertContains('release_date_text', $elementIds);
-        $this->assertNotContains('qr_code', $elementIds, 'COTC default must omit QR code');
+        $schemas = $state['schemas'][0] ?? [];
+        $schemaNames = array_column($schemas, 'name');
+        $this->assertContains('release_date', $schemaNames);
+        $this->assertContains('certificate_title', $schemaNames);
+        $this->assertContains('trainee_name', $schemaNames);
+        $this->assertNotContains('qr_code', $schemaNames, 'COTC default must omit QR code');
 
         // Check NC III COTC
         $nc3Cotc = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_COTC)
@@ -111,12 +115,12 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
             ->where('training_program_id', $nc3->id)
             ->firstOrFail();
 
-        $nc2Fonts = collect($nc2Cotc->draft_state['elements'] ?? [])->pluck('fontName', 'id');
-        $nc3Fonts = collect($nc3Cotc->draft_state['elements'] ?? [])->pluck('fontName', 'id');
+        $nc2Fonts = collect($nc2Cotc->draft_state['schemas'][0] ?? [])->pluck('fontName', 'name');
+        $nc3Fonts = collect($nc3Cotc->draft_state['schemas'][0] ?? [])->pluck('fontName', 'name');
 
-        $this->assertSame('PlayfairDisplay-Bold', $nc2Fonts->get('name_text'));
-        $this->assertSame('Cinzel-Bold', $nc2Fonts->get('program_text'));
-        $this->assertSame('GreatVibes', $nc3Fonts->get('name_text'));
+        $this->assertSame('PlayfairDisplay-Bold', $nc2Fonts->get('trainee_name'));
+        $this->assertSame('Cinzel-Bold', $nc2Fonts->get('training_program'));
+        $this->assertSame('GreatVibes', $nc3Fonts->get('trainee_name'));
 
         // Save custom pdfme schemas with certificate fontName and verify persistence
         $customState = [
@@ -228,7 +232,7 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->service->ensureDefaultTemplates();
         $legacyCotc->refresh();
         $this->assertSame(DocumentTemplate::ENGINE_PDFME, $legacyCotc->engine);
-        $this->assertSame('PlayfairDisplay-Bold', collect($legacyCotc->draft_state['elements'] ?? [])->pluck('fontName', 'id')->get('name_text'));
+        $this->assertSame('PlayfairDisplay-Bold', collect($legacyCotc->draft_state['schemas'][0] ?? [])->pluck('fontName', 'name')->get('trainee_name'));
 
         // Verify POST save fallback works in addition to PATCH
         $this->actingAs($this->admin)

@@ -623,30 +623,263 @@ class DocumentStudioService
         ];
     }
 
+    /**
+     * Build a 100% dynamic native PDFme schema page for COTC on the clean border base PDF.
+     */
+    private function defaultCotcSchemas(string $programName, string $nameFont = 'PlayfairDisplay-Bold', ?DocumentAsset $logoAsset = null): array
+    {
+        $schemas = [];
+
+        if ($logoAsset) {
+            $schemas[] = [
+                'name' => 'logo_image',
+                'type' => 'image',
+                'position' => ['x' => 16.0, 'y' => 14.0],
+                'width' => 22.0,
+                'height' => 22.0,
+                'asset_id' => $logoAsset->id,
+                'content' => route('admin.document-studio.assets.stream', $logoAsset->id, false),
+            ];
+        }
+
+        $textStartX = $logoAsset ? 42.0 : 15.0;
+        $headerWidth = $logoAsset ? 218.0 : 245.0;
+
+        array_push(
+            $schemas,
+            [
+                'name' => 'organization_heading',
+                'type' => 'text',
+                'position' => ['x' => $textStartX, 'y' => 17.0],
+                'width' => $headerWidth,
+                'height' => 8.0,
+                'fontSize' => 13,
+                'fontName' => 'Cinzel-Bold',
+                'fontColor' => '#4c1d95',
+                'alignment' => 'left',
+                'content' => 'MISSION CARE TRAINING AND ASSESSMENT CENTER',
+            ],
+            [
+                'name' => 'organization_subtitle',
+                'type' => 'text',
+                'position' => ['x' => $textStartX, 'y' => 25.0],
+                'width' => $headerWidth,
+                'height' => 6.0,
+                'fontSize' => 8.5,
+                'fontName' => 'Montserrat',
+                'fontColor' => '#6b7280',
+                'alignment' => 'left',
+                'content' => 'TESDA-Accredited Caregiving Training & Assessment Institution',
+            ],
+            [
+                'name' => 'certificate_title',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 45.0],
+                'width' => 245.0,
+                'height' => 12.0,
+                'fontSize' => 24,
+                'fontName' => 'PlayfairDisplay-Bold',
+                'fontColor' => '#1e1b4b',
+                'alignment' => 'left',
+                'content' => 'CERTIFICATE OF TRAINING COMPLETION',
+            ],
+            [
+                'name' => 'salutation',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 67.0],
+                'width' => 180.0,
+                'height' => 7.0,
+                'fontSize' => 13,
+                'fontName' => 'CormorantGaramond',
+                'fontColor' => '#374151',
+                'alignment' => 'left',
+                'content' => 'This certificate is proudly presented to',
+            ],
+            [
+                'name' => 'trainee_name',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 89.0],
+                'width' => 178.0,
+                'height' => 16.0,
+                'fontSize' => $nameFont === 'GreatVibes' ? 34 : 28,
+                'fontName' => $nameFont,
+                'fontColor' => '#111827',
+                'alignment' => 'left',
+                'binding' => '{{trainee_name}}',
+                'content' => '{{trainee_name}}',
+            ],
+            [
+                'name' => 'completion_statement',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 111.0],
+                'width' => 235.0,
+                'height' => 8.0,
+                'fontSize' => 12,
+                'fontName' => 'CormorantGaramond',
+                'fontColor' => '#374151',
+                'alignment' => 'left',
+                'content' => 'for having successfully completed the competency-based training requirements in',
+            ],
+            [
+                'name' => 'training_program',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 122.0],
+                'width' => 235.0,
+                'height' => 10.0,
+                'fontSize' => 16,
+                'fontName' => 'Cinzel-Bold',
+                'fontColor' => '#5b21b6',
+                'alignment' => 'left',
+                'binding' => '{{training_program}}',
+                'content' => '{{training_program}}',
+            ],
+            [
+                'name' => 'completion_date',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 135.0],
+                'width' => 235.0,
+                'height' => 8.0,
+                'fontSize' => 11.5,
+                'fontName' => 'CormorantGaramond',
+                'fontColor' => '#374151',
+                'alignment' => 'left',
+                'binding' => 'Given this {{completion_date}} at {{organization_name}}',
+                'content' => 'Given this {{completion_date}} at {{organization_name}}',
+            ],
+            [
+                'name' => 'release_date',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 145.0],
+                'width' => 180.0,
+                'height' => 6.0,
+                'fontSize' => 9,
+                'fontName' => 'Montserrat',
+                'fontColor' => '#4b5563',
+                'alignment' => 'left',
+                'binding' => 'Date of Release: {{release_date}}',
+                'content' => 'Date of Release: {{release_date}}',
+            ],
+            [
+                'name' => 'trainer_name',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 173.0],
+                'width' => 85.0,
+                'height' => 6.0,
+                'fontSize' => 10,
+                'fontName' => 'Cinzel-Bold',
+                'fontColor' => '#111827',
+                'alignment' => 'left',
+                'binding' => '{{trainer_name}}',
+                'content' => '{{trainer_name}}',
+            ],
+            [
+                'name' => 'trainer_role',
+                'type' => 'text',
+                'position' => ['x' => 15.0, 'y' => 180.0],
+                'width' => 85.0,
+                'height' => 5.0,
+                'fontSize' => 8,
+                'fontName' => 'Montserrat',
+                'fontColor' => '#6b7280',
+                'alignment' => 'left',
+                'binding' => '{{trainer_role}}',
+                'content' => '{{trainer_role}}',
+            ],
+            [
+                'name' => 'registrar_name',
+                'type' => 'text',
+                'position' => ['x' => 115.0, 'y' => 173.0],
+                'width' => 85.0,
+                'height' => 6.0,
+                'fontSize' => 10,
+                'fontName' => 'Cinzel-Bold',
+                'fontColor' => '#111827',
+                'alignment' => 'left',
+                'binding' => '{{registrar_name}}',
+                'content' => '{{registrar_name}}',
+            ],
+            [
+                'name' => 'registrar_role',
+                'type' => 'text',
+                'position' => ['x' => 115.0, 'y' => 180.0],
+                'width' => 85.0,
+                'height' => 5.0,
+                'fontSize' => 8,
+                'fontName' => 'Montserrat',
+                'fontColor' => '#6b7280',
+                'alignment' => 'left',
+                'binding' => '{{registrar_role}}',
+                'content' => '{{registrar_role}}',
+            ],
+            [
+                'name' => 'certificate_number',
+                'type' => 'text',
+                'position' => ['x' => 205.0, 'y' => 180.0],
+                'width' => 60.0,
+                'height' => 5.0,
+                'fontSize' => 8,
+                'fontName' => 'Montserrat',
+                'fontColor' => '#6b7280',
+                'alignment' => 'right',
+                'binding' => 'No. {{certificate_number}}',
+                'content' => 'No. {{certificate_number}}',
+            ],
+        );
+
+        return $schemas;
+    }
+
+    private function seedDefaultLogoAsset(DocumentTemplate $template): ?DocumentAsset
+    {
+        $existing = $template->assets()->where('type', DocumentAsset::TYPE_LOGO)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $logoPath = public_path('assets/official-logo.png');
+        if (! is_file($logoPath)) {
+            return null;
+        }
+
+        try {
+            return $this->assetSecurity->storeUploadedFile(
+                new UploadedFile($logoPath, 'official-logo.png', 'image/png', null, true),
+                DocumentAsset::TYPE_LOGO,
+                $template->id,
+                null
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public function ensureProgramSpecificTemplates(\App\Models\TrainingProgram $program): void
     {
-        // 1. Program-Specific COTC Template (PDFme)
+        $programUpper = mb_strtoupper($program->name);
+        $nameFont = str_contains($programUpper, 'NC III') ? 'GreatVibes' : 'PlayfairDisplay-Bold';
+
+        // 1. Program-Specific COTC Template (100% Dynamic PDFme)
         $cotcSlug = "cotc-program-{$program->id}";
         $existingCotc = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_COTC)
             ->where('training_program_id', $program->id)
             ->first();
 
-        $cotcElements = $this->defaultCotcElements(
-            mb_strtoupper($program->name),
-            str_contains(mb_strtoupper($program->name), 'NC III') ? 'GreatVibes' : 'PlayfairDisplay-Bold'
-        );
-        $cotcState = [
-            'schema_version' => '1.0',
-            'engine' => DocumentTemplate::ENGINE_PDFME,
-            'page' => [
-                'size' => 'letter',
-                'orientation' => 'landscape',
-                'width_mm' => 279.4,
-                'height_mm' => 215.9,
-            ],
-            'base_pdf_url' => '/assets/cotc-base-template.pdf',
-            'elements' => $cotcElements,
-        ];
+        $buildCotcState = function (DocumentTemplate $template) use ($programUpper, $nameFont): array {
+            $logoAsset = $this->seedDefaultLogoAsset($template);
+
+            return [
+                'schema_version' => '1.0',
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'page' => [
+                    'size' => 'letter',
+                    'orientation' => 'landscape',
+                    'width_mm' => 279.4,
+                    'height_mm' => 215.9,
+                ],
+                'base_pdf_url' => '/assets/cotc-base-template.pdf',
+                'schemas' => [$this->defaultCotcSchemas($programUpper, $nameFont, $logoAsset)],
+            ];
+        };
 
         if (! $existingCotc && ! DocumentTemplate::where('slug', $cotcSlug)->exists()) {
             $cotc = DocumentTemplate::create([
@@ -658,15 +891,23 @@ class DocumentStudioService
                 'is_active' => true,
                 'is_system_default' => false,
                 'draft_revision' => 1,
-                'draft_state' => $cotcState,
+                'draft_state' => [
+                    'schema_version' => '1.0',
+                    'engine' => DocumentTemplate::ENGINE_PDFME,
+                    'page' => ['size' => 'letter', 'orientation' => 'landscape', 'width_mm' => 279.4, 'height_mm' => 215.9],
+                    'base_pdf_url' => '/assets/cotc-base-template.pdf',
+                    'schemas' => [[]],
+                ],
                 'draft_updated_at' => now(),
             ]);
-            $this->publishVersion($cotc, "Initial release for {$program->name}", true);
+            $cotcState = $buildCotcState($cotc);
+            $cotc->update(['draft_state' => $cotcState]);
+            $this->publishVersion($cotc->fresh(), "Initial release for {$program->name}", true);
         } elseif ($existingCotc && $this->shouldUpgradeBaselineTemplate($existingCotc, $cotcSlug)) {
-            $this->upgradeBaselineTemplate($existingCotc, $cotcState, "Updated PDFme certificate layout for {$program->name}");
+            $this->upgradeBaselineTemplate($existingCotc, $buildCotcState($existingCotc), "Clean blank-border dynamic PDFme layout for {$program->name}");
         }
 
-        // 2. Program-Specific TOR Template (PDFme)
+        // 2. Program-Specific TOR Template (Native PDFme Schemas)
         $torSlug = "tor-program-{$program->id}";
         $existingTor = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_TOR)
             ->where('training_program_id', $program->id)
@@ -681,90 +922,94 @@ class DocumentStudioService
                 'width_mm' => 210.0,
                 'height_mm' => 297.0,
             ],
-            'elements' => [
+            'schemas' => [[
                 [
-                    'id' => 'title',
+                    'name' => 'title',
                     'type' => 'text',
-                    'x' => 15.0,
-                    'y' => 20.0,
+                    'position' => ['x' => 15.0, 'y' => 20.0],
                     'width' => 180.0,
                     'height' => 8.0,
                     'fontSize' => 16,
                     'fontName' => 'Cinzel-Bold',
-                    'fontWeight' => 'bold',
-                    'textAlign' => 'center',
+                    'fontColor' => '#1e1b4b',
+                    'alignment' => 'center',
                     'content' => 'OFFICIAL TRANSCRIPT OF RECORDS',
                 ],
                 [
-                    'id' => 'trainee_name',
+                    'name' => 'trainee_name',
                     'type' => 'text',
-                    'x' => 15.0,
-                    'y' => 38.0,
+                    'position' => ['x' => 15.0, 'y' => 38.0],
                     'width' => 180.0,
                     'height' => 7.0,
                     'fontSize' => 12,
                     'fontName' => 'PlayfairDisplay-Bold',
-                    'fontWeight' => 'bold',
+                    'fontColor' => '#111827',
+                    'alignment' => 'left',
                     'binding' => 'Name: {{trainee_name}}',
-                    'content' => 'Name: MARIA REYES SANTOS',
+                    'content' => 'Name: {{trainee_name}}',
                 ],
                 [
-                    'id' => 'program_name',
+                    'name' => 'program_name',
                     'type' => 'text',
-                    'x' => 15.0,
-                    'y' => 46.0,
+                    'position' => ['x' => 15.0, 'y' => 46.0],
                     'width' => 180.0,
                     'height' => 7.0,
                     'fontSize' => 11,
                     'fontName' => 'Montserrat',
+                    'fontColor' => '#374151',
+                    'alignment' => 'left',
                     'binding' => 'Course: {{training_program}}',
-                    'content' => 'Course: ' . $program->name,
+                    'content' => 'Course: {{training_program}}',
                 ],
                 [
-                    'id' => 'release_date',
+                    'name' => 'release_date',
                     'type' => 'text',
-                    'x' => 15.0,
-                    'y' => 54.0,
+                    'position' => ['x' => 15.0, 'y' => 54.0],
                     'width' => 180.0,
                     'height' => 6.0,
                     'fontSize' => 9,
                     'fontName' => 'Montserrat',
+                    'fontColor' => '#4b5563',
+                    'alignment' => 'left',
                     'binding' => 'Date Released: {{release_date}}',
-                    'content' => 'Date Released: ' . now()->format('F j, Y'),
+                    'content' => 'Date Released: {{release_date}}',
                 ],
                 [
-                    'id' => 'competencies_table',
+                    'name' => 'competencies_table',
                     'type' => 'table',
-                    'x' => 15.0,
-                    'y' => 64.0,
+                    'position' => ['x' => 15.0, 'y' => 64.0],
                     'width' => 180.0,
+                    'height' => 150.0,
                     'binding' => 'tor_competencies',
+                    'content' => '[]',
                 ],
                 [
-                    'id' => 'trainer_signatory',
+                    'name' => 'trainer_signatory',
                     'type' => 'text',
-                    'x' => 15.0,
-                    'y' => 245.0,
+                    'position' => ['x' => 15.0, 'y' => 245.0],
                     'width' => 80.0,
                     'height' => 12.0,
                     'fontSize' => 9,
                     'fontName' => 'Montserrat',
+                    'fontColor' => '#111827',
+                    'alignment' => 'left',
                     'binding' => 'Lead Trainer: {{trainer_name}}',
-                    'content' => 'Lead Trainer: ' . (string) config('official_documents.organization.trainer_name', 'Maricris N. Collao'),
+                    'content' => 'Lead Trainer: {{trainer_name}}',
                 ],
                 [
-                    'id' => 'registrar_signatory',
+                    'name' => 'registrar_signatory',
                     'type' => 'text',
-                    'x' => 115.0,
-                    'y' => 245.0,
+                    'position' => ['x' => 115.0, 'y' => 245.0],
                     'width' => 80.0,
                     'height' => 12.0,
                     'fontSize' => 9,
                     'fontName' => 'Montserrat',
+                    'fontColor' => '#111827',
+                    'alignment' => 'left',
                     'binding' => 'Registrar: {{registrar_name}}',
-                    'content' => 'Registrar: ' . (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
+                    'content' => 'Registrar: {{registrar_name}}',
                 ],
-            ],
+            ]],
         ];
 
         if (! $existingTor && ! DocumentTemplate::where('slug', $torSlug)->exists()) {
@@ -782,7 +1027,7 @@ class DocumentStudioService
             ]);
             $this->publishVersion($tor, "Initial release for {$program->name}", true);
         } elseif ($existingTor && $this->shouldUpgradeBaselineTemplate($existingTor, $torSlug)) {
-            $this->upgradeBaselineTemplate($existingTor, $torState, "Updated PDFme transcript layout for {$program->name}");
+            $this->upgradeBaselineTemplate($existingTor, $torState, "Native PDFme transcript layout for {$program->name}");
         }
     }
 

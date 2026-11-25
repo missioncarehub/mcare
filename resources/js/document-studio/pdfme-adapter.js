@@ -343,18 +343,11 @@ export class PdfmeAdapter {
                         val = src;
                     }
                 }
-                if (val === undefined && values[field.name] !== undefined) {
-                    val = values[field.name];
-                }
-                if (val === undefined && field.binding) {
-                    const cleanKey = field.binding.replace(/[{}]/g, '').trim();
-                    if (values[cleanKey] !== undefined) val = values[cleanKey];
-                    else if (values[field.binding] !== undefined) val = values[field.binding];
-                    else val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
-                }
-                const rawContent = field.content || field.text;
-                if (val === undefined && rawContent) {
-                    let interpolated = String(rawContent);
+                const rawContent = field.content ?? field.text;
+                const hasInlineToken = typeof rawContent === 'string' && /\{\{\w+\}\}/.test(rawContent);
+
+                if (val === undefined && hasInlineToken) {
+                    let interpolated = rawContent;
                     for (const [k, v] of Object.entries(values)) {
                         if (v !== undefined && v !== null && typeof v !== 'object') {
                             interpolated = interpolated.replaceAll(`{{${k}}}`, String(v));
@@ -362,7 +355,22 @@ export class PdfmeAdapter {
                     }
                     val = interpolated;
                 }
-                if (val === undefined) val = field.content || field.text || '';
+                if (val === undefined && (field.type === 'table' || !rawContent)) {
+                    if (values[field.name] !== undefined) val = values[field.name];
+                    else if (field.binding) {
+                        const cleanKey = field.binding.replace(/[{}]/g, '').trim();
+                        if (values[cleanKey] !== undefined) val = values[cleanKey];
+                        else if (values[field.binding] !== undefined) val = values[field.binding];
+                        else val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
+                    }
+                }
+                if (val === undefined && typeof rawContent === 'string' && rawContent !== '') {
+                    val = rawContent;
+                }
+                if (val === undefined && values[field.name] !== undefined) {
+                    val = values[field.name];
+                }
+                if (val === undefined) val = '';
 
                 if (field.type === 'table' && Array.isArray(val)) {
                     if (val.length > 0 && typeof val[0] === 'object' && !Array.isArray(val[0])) {

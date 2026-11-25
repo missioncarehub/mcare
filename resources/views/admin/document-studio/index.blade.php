@@ -149,75 +149,27 @@
 
                         <!-- LIVE CERTIFICATE / TRANSCRIPT DIRECT PREVIEW FRAME -->
                         <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-stone-100/80 dark:bg-gray-900/60 p-3 sm:p-4">
-                            @if($isCotc)
-                                {{-- COTC Landscape Preview Frame --}}
-                                <div class="mx-auto w-full flex items-center justify-center max-w-[460px]">
-                                    <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
-                                       class="group relative w-full overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
-                                       style="aspect-ratio: 11 / 8.5"
-                                       title="Click to preview Certificate PDF">
-                                        <img src="{{ asset('assets/cotc-official-template.png') }}"
-                                             alt="Certificate of Training Completion Template Preview"
-                                             class="h-full w-full object-contain">
+                            <div class="mx-auto w-full flex items-center justify-center {{ $isCotc ? 'max-w-[460px]' : 'max-w-[268px]' }}">
+                                <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
+                                   class="group relative w-full {{ $isCotc ? '' : 'min-h-[350px] sm:min-h-[380px]' }} overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
+                                   style="aspect-ratio: {{ $isCotc ? '11 / 8.5' : '210 / 297' }}"
+                                   title="Click to preview {{ strtoupper($kind) }} PDF">
+                                    <canvas data-live-pdf-thumbnail="{{ $previewUrl }}" class="w-full h-full block bg-white"></canvas>
 
-                                        {{-- Realistic dynamic placeholder overlay text --}}
-                                        <div class="absolute inset-0 pointer-events-none flex flex-col justify-between py-5 px-6 text-center select-none" style="font-family: 'Times New Roman', Times, serif;">
-                                            <div class="h-6"></div>
-                                            <div class="space-y-1">
-                                                <p class="text-[13px] sm:text-[15px] font-bold text-gray-900 tracking-wide">JUAN DELA CRUZ</p>
-                                                <p class="text-[9px] sm:text-[10px] text-gray-700 font-sans">for having successfully completed the training program in</p>
-                                                <p class="text-[11px] sm:text-[12px] font-bold text-gray-900 uppercase font-sans tracking-wide">
-                                                    {{ $selectedProgram?->name ?? 'CAREGIVING NC II' }}
-                                                </p>
-                                            </div>
-                                            <div class="flex justify-between items-end text-[7px] sm:text-[8px] text-gray-600 font-sans px-2">
-                                                <span>No. CERT-2026-0001</span>
-                                                <span>Given this {{ now()->format('jS \o\f F, Y') }} &bull; Released: {{ now()->format('M j, Y') }}</span>
-                                                <span>Authorized Registrar</span>
-                                            </div>
-                                        </div>
+                                    <div data-live-pdf-loading class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-stone-50/90 dark:bg-gray-900/85 text-xs text-gray-500 dark:text-gray-400">
+                                        <span class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></span>
+                                        <span>Rendering live PDF preview...</span>
+                                    </div>
 
-                                        {{-- Hover Overlay --}}
-                                        <div class="absolute inset-0 bg-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-900/95 text-xs font-bold text-gray-900 dark:text-white shadow-md">
-                                                <x-dashboard-icon name="eye" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                                <span>Click to preview full PDF</span>
-                                            </span>
-                                        </div>
-                                    </a>
-                                </div>
-                            @else
-                                {{-- TOR Portrait Preview Frame --}}
-                                <div class="mx-auto w-full flex items-center justify-center max-w-[268px]">
-                                    <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
-                                       class="group relative w-full min-h-[350px] sm:min-h-[380px] overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
-                                       style="aspect-ratio: 210 / 297"
-                                       title="Click to preview Official Transcript PDF">
-                                        @include('admin.learning.partials.tor-default-preview', [
-                                            'organization' => config('official_documents.organization', []),
-                                            'torTitle' => 'OFFICIAL TRANSCRIPT OF RECORDS',
-                                            'torTrainee' => 'NAME OF THE STUDENT',
-                                            'torProgram' => mb_strtoupper($selectedProgram?->name ?? 'CAREGIVING NC II'),
-                                            'torHours' => 786,
-                                            'torRemarks' => 'For Records and Reference Purposes',
-                                            'torRows' => null,
-                                            'torTrainer' => 'Lead Trainer',
-                                            'torTrainerRole' => 'Lead Trainer',
-                                            'torRegistrar' => 'Registrar',
-                                            'torRegistrarRole' => 'Registrar',
-                                            'torLive' => false,
-                                        ])
-
-                                        {{-- Hover Overlay --}}
-                                        <div class="absolute inset-0 bg-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-30">
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-900/95 text-xs font-bold text-gray-900 dark:text-white shadow-md">
-                                                <x-dashboard-icon name="eye" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                                <span>Click to preview full PDF</span>
-                                            </span>
-                                        </div>
-                                    </a>
-                                </div>
-                            @endif
+                                    {{-- Hover Overlay --}}
+                                    <div class="absolute inset-0 bg-indigo-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-900/95 text-xs font-bold text-gray-900 dark:text-white shadow-md">
+                                            <x-dashboard-icon name="eye" class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            <span>Click to preview full PDF</span>
+                                        </span>
+                                    </div>
+                                </a>
+                            </div>
                         </div>
 
                         <!-- Template Status Meta -->

@@ -431,9 +431,11 @@ class DocumentStudioController extends Controller
             $editorState = $template->draft_state ?? $template->activeVersion?->editor_state ?? [];
         }
 
-        // When previewing the active/published initial unedited system default version,
-        // preview the effective issuance baseline (FPDF for COTC/TOR, SOA generator for SOA)
-        $isInitialUneditedDefault = ! $isDraftPreview && $template->is_system_default && (! $version || $version->version_number === 1);
+        // Never override PDFme templates with legacy FPDF baseline during preview.
+        $isInitialUneditedDefault = ! $isDraftPreview
+            && $template->engine !== DocumentTemplate::ENGINE_PDFME
+            && $template->is_system_default
+            && (! $version || $version->version_number === 1);
         if ($isInitialUneditedDefault) {
             try {
                 if ($template->document_kind === DocumentTemplate::KIND_SOA) {

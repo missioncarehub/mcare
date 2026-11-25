@@ -181,3 +181,55 @@ if (original) {
     document.getElementById('btn-compare-original')?.addEventListener('click', () => comparison.open(original.dataset.endpoint));
     window.addEventListener('pagehide', () => comparison.release(), { once: true });
 }
+
+async function renderLiveThumbnails() {
+    const canvases = document.querySelectorAll('canvas[data-live-pdf-thumbnail]');
+    if (!canvases.length) return;
+    let pdfjs = null;
+    try {
+        pdfjs = await loadPdfJs();
+    } catch {
+        return;
+    }
+
+    for (const canvas of canvases) {
+        const endpoint = canvas.dataset.livePdfThumbnail;
+        const container = canvas.parentElement;
+        const loader = container?.querySelector('[data-live-pdf-loading]');
+        if (!endpoint || endpoint === '#') {
+            if (loader) loader.textContent = 'No template preview available';
+            continue;
+        }
+        try {
+            const url = new URL(endpoint, location.href);
+            if (url.origin !== location.origin) continue;
+            const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
+            if (!res.ok || !res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
+                throw new Error('Unavailable');
+            }
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
+            const pdf = await task.promise;
+            const page = await pdf.getPage(1);
+            const targetWidth = Math.max(container?.clientWidth || 380, 320);
+            const unit = page.getViewport({ scale: 1 });
+            const scale = (targetWidth / unit.width) * Math.min(window.devicePixelRatio || 1, 2);
+            const viewport = page.getViewport({ scale });
+            canvas.width = Math.ceil(viewport.width);
+            canvas.height = Math.ceil(viewport.height);
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            loader?.remove();
+            await task.destroy();
+        } catch {
+            if (loader) {
+                loader.innerHTML = '<span class="px-3 text-center">Click to open full PDF preview</span>';
+            }
+        }
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { renderLiveThumbnails(); });
+} else {
+    renderLiveThumbnails();
+}
