@@ -2,6 +2,7 @@ import { installTextFields } from './text-fields.js';
 import { Designer } from '@pdfme/ui';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
 import { normalizeStudioSchema } from './tables.js';
+import { getBrowserPdfmeFonts, CERTIFICATE_STYLE_PRESETS } from './fonts.js';
 
 export class PdfmeAdapter {
     constructor(container, options = {}) {
@@ -66,6 +67,8 @@ export class PdfmeAdapter {
                 width: el.width || 60,
                 height: el.height || 10,
                 fontSize: el.fontSize || 12,
+                ...(el.fontName ? { fontName: el.fontName } : {}),
+                ...(el.fontColor ? { fontColor: el.fontColor } : {}),
                 alignment: el.textAlign || 'left',
                 content: el.text || el.content || el.binding || '',
                 binding: el.binding || '',
@@ -84,7 +87,10 @@ export class PdfmeAdapter {
             domContainer: this.container,
             template: pdfmeTemplate,
             plugins: this.plugins,
-            options: { sidebarOpen: false },
+            options: {
+                sidebarOpen: true,
+                font: getBrowserPdfmeFonts(),
+            },
         });
 
         this.refreshTextFields = installTextFields(this, document.getElementById('pdfme-text-tools'));
@@ -149,6 +155,41 @@ export class PdfmeAdapter {
         current.schemas[0].at(-1).asset_id = assetId;
         this.designer.updateTemplate(current);
         this.options.onChange?.(this.getState());
+    }
+
+    applyTypographyPreset(presetKey) {
+        if (!this.designer) return false;
+        const preset = CERTIFICATE_STYLE_PRESETS[presetKey];
+        if (!preset) return false;
+
+        const current = structuredClone(this.designer.getTemplate());
+        const roles = preset.roles;
+
+        current.schemas = (current.schemas || []).map((page) =>
+            page.map((field) => {
+                if (field.type !== 'text') return field;
+                const key = `${field.name || ''} ${field.binding || ''}`.toLowerCase();
+                let fontName = roles.default;
+                if (key.includes('trainee_name') || key.includes('name_text')) {
+                    fontName = roles.name;
+                } else if (key.includes('training_program') || key.includes('program_text')) {
+                    fontName = roles.program;
+                } else if (key.includes('statement')) {
+                    fontName = roles.statement;
+                } else if (key.includes('release_date') || key.includes('certificate_number') || key.includes('doc_number') || key.includes('role')) {
+                    fontName = roles.meta;
+                } else if (key.includes('date')) {
+                    fontName = roles.date;
+                } else if (key.includes('registrar') || key.includes('trainer') || key.includes('signatory')) {
+                    fontName = roles.signatory;
+                }
+                return { ...field, fontName };
+            })
+        );
+
+        this.designer.updateTemplate(current);
+        this.options.onChange?.(this.getState(current));
+        return true;
     }
 
     destroy() {

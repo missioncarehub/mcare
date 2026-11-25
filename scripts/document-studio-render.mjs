@@ -2,7 +2,9 @@
 import { paginateSourceLayout } from './document-studio-source-layout.mjs';
 
 import fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { normalizeStudioSchema, studioTables, tableBinding } from '../resources/js/document-studio/tables.js';
+import { CERTIFICATE_FONTS } from '../resources/js/document-studio/fonts.js';
 import path from 'node:path';
 import { generate } from '@pdfme/generator';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
@@ -82,7 +84,30 @@ async function main() {
     process.exit(0);
 }
 
+let cachedNodeFonts = null;
+async function getNodePdfmeFonts() {
+    if (cachedNodeFonts) return cachedNodeFonts;
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const fontsDir = path.resolve(__dirname, '../public/fonts/certificate');
+    const fontMap = {};
+    for (const font of CERTIFICATE_FONTS) {
+        const fontPath = path.join(fontsDir, font.file);
+        try {
+            const buf = await fs.readFile(fontPath);
+            fontMap[font.key] = {
+                data: new Uint8Array(buf),
+                ...(font.fallback ? { fallback: true } : {}),
+            };
+        } catch (err) {
+            // Skip missing optional font file cleanly
+        }
+    }
+    cachedNodeFonts = fontMap;
+    return fontMap;
+}
+
 async function renderPdfme(payload) {
+    const nodeFonts = await getNodePdfmeFonts();
     const plugins = {
         text,
         image,
@@ -131,6 +156,8 @@ async function renderPdfme(payload) {
                 width: el.width || 50,
                 height: el.height || 10,
                 fontSize: el.fontSize || 12,
+                ...(el.fontName ? { fontName: el.fontName } : {}),
+                ...(el.fontColor ? { fontColor: el.fontColor } : {}),
                 alignment: el.textAlign || 'left',
                 binding: el.binding || '',
                 content: el.text || el.content || '',
@@ -143,7 +170,13 @@ async function renderPdfme(payload) {
 
     let template = {
         basePdf,
-        schemas: (schemas || [[]]).map(page => page.map(field => normalizeStudioSchema(field, plugins))),
+        schemas: (schemas || [[]]).map(page => page.map(field => {
+            const normalized = normalizeStudioSchema(field, plugins);
+            if (normalized.fontName && !nodeFonts[normalized.fontName]) {
+                normalized.fontName = 'NotoSans';
+            }
+            return normalized;
+        })),
     };
 
     // Prepare inputs matching the schema names and bindings
@@ -226,6 +259,7 @@ async function renderPdfme(payload) {
         template,
         inputs: [inputRow],
         plugins,
+        options: Object.keys(nodeFonts).length > 0 ? { font: nodeFonts } : undefined,
     });
 
     return generated;

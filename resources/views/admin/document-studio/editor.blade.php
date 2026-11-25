@@ -214,6 +214,31 @@
                     </div>
                 </div>
 
+                @if($template->engine === 'pdfme')
+                <!-- Certificate Typography Presets -->
+                <div class="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-800">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-gray-400 uppercase">Certificate Fonts</span>
+                        <span class="text-[10px] text-gray-400">One-click style</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-1.5">
+                        <button type="button" data-typography-preset="classic_formal" class="btn-typography-preset w-full text-left px-2.5 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200 dark:border-gray-700/80 hover:border-indigo-300 text-xs transition-colors">
+                            <span class="font-semibold text-gray-800 dark:text-gray-100 block">Classic Formal</span>
+                            <span class="text-[10px] text-gray-500 dark:text-gray-400">Playfair Display • Cinzel • Cormorant</span>
+                        </button>
+                        <button type="button" data-typography-preset="calligraphy_honor" class="btn-typography-preset w-full text-left px-2.5 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200 dark:border-gray-700/80 hover:border-indigo-300 text-xs transition-colors">
+                            <span class="font-semibold text-gray-800 dark:text-gray-100 block">Calligraphy Honor</span>
+                            <span class="text-[10px] text-gray-500 dark:text-gray-400">Great Vibes Script • Cinzel • Montserrat</span>
+                        </button>
+                        <button type="button" data-typography-preset="modern_executive" class="btn-typography-preset w-full text-left px-2.5 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-gray-200 dark:border-gray-700/80 hover:border-indigo-300 text-xs transition-colors">
+                            <span class="font-semibold text-gray-800 dark:text-gray-100 block">Modern Executive</span>
+                            <span class="text-[10px] text-gray-500 dark:text-gray-400">Libre Baskerville • Montserrat</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 leading-snug">Or select any text box on the canvas to pick a specific font in the right panel.</p>
+                </div>
+                @endif
+
                 <!-- Dynamic Placeholders List -->
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">

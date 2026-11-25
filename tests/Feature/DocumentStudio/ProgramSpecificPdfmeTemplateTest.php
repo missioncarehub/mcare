@@ -94,5 +94,90 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $editResponse->assertOk();
         $editResponse->assertSee('studio-editor-viewport');
         $editResponse->assertSee('"engine":"pdfme"', false);
+        $editResponse->assertSee('btn-typography-preset');
+    }
+
+    public function test_certificate_fonts_are_provisioned_preserved_and_rendered_to_pdf(): void
+    {
+        $this->service->ensureDefaultTemplates();
+
+        $nc2 = TrainingProgram::where('code', 'CAREGIVING-NC-II')->firstOrFail();
+        $nc3 = TrainingProgram::where('code', 'CAREGIVING-NC-III')->firstOrFail();
+
+        $nc2Cotc = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_COTC)
+            ->where('training_program_id', $nc2->id)
+            ->firstOrFail();
+        $nc3Cotc = DocumentTemplate::where('document_kind', DocumentTemplate::KIND_COTC)
+            ->where('training_program_id', $nc3->id)
+            ->firstOrFail();
+
+        $nc2Fonts = collect($nc2Cotc->draft_state['elements'] ?? [])->pluck('fontName', 'id');
+        $nc3Fonts = collect($nc3Cotc->draft_state['elements'] ?? [])->pluck('fontName', 'id');
+
+        $this->assertSame('PlayfairDisplay-Bold', $nc2Fonts->get('name_text'));
+        $this->assertSame('Cinzel-Bold', $nc2Fonts->get('program_text'));
+        $this->assertSame('GreatVibes', $nc3Fonts->get('name_text'));
+
+        // Save custom pdfme schemas with certificate fontName and verify persistence
+        $customState = [
+            'schema_version' => '1.0',
+            'engine' => DocumentTemplate::ENGINE_PDFME,
+            'page' => ['size' => 'letter', 'orientation' => 'landscape', 'width_mm' => 279.4, 'height_mm' => 215.9],
+            'base_pdf_url' => '/assets/cotc-base-template.pdf',
+            'schemas' => [[
+                [
+                    'name' => 'name_text',
+                    'type' => 'text',
+                    'position' => ['x' => 25, 'y' => 90],
+                    'width' => 230,
+                    'height' => 18,
+                    'fontSize' => 30,
+                    'fontName' => 'GreatVibes',
+                    'alignment' => 'center',
+                    'binding' => '{{trainee_name}}',
+                    'content' => '{{trainee_name}}',
+                ],
+                [
+                    'name' => 'program_text',
+                    'type' => 'text',
+                    'position' => ['x' => 25, 'y' => 118],
+                    'width' => 230,
+                    'height' => 10,
+                    'fontSize' => 16,
+                    'fontName' => 'Cinzel-Bold',
+                    'alignment' => 'center',
+                    'binding' => '{{training_program}}',
+                    'content' => '{{training_program}}',
+                ],
+                [
+                    'name' => 'release_date_text',
+                    'type' => 'text',
+                    'position' => ['x' => 25, 'y' => 145],
+                    'width' => 230,
+                    'height' => 6,
+                    'fontSize' => 8.5,
+                    'fontName' => 'Montserrat',
+                    'alignment' => 'center',
+                    'binding' => '{{release_date}}',
+                    'content' => '{{release_date}}',
+                ],
+            ]],
+        ];
+
+        $this->service->saveDraft($nc2Cotc, $customState, $nc2Cotc->draft_revision, $this->admin);
+        $nc2Cotc->refresh();
+        $this->assertSame('GreatVibes', $nc2Cotc->draft_state['schemas'][0][0]['fontName']);
+
+        $pdfBinary = app(\App\Services\DocumentStudio\DocumentStudioRenderer::class)->renderPayloadToPdf([
+            ...$nc2Cotc->draft_state,
+            'values' => [
+                'trainee_name' => 'Maria Reyes Santos',
+                'training_program' => 'CAREGIVING NC II',
+                'release_date' => 'November 25, 2026',
+            ],
+        ]);
+
+        $this->assertStringStartsWith('%PDF-', $pdfBinary);
+        $this->assertGreaterThan(10000, strlen($pdfBinary));
     }
 }

@@ -294,6 +294,16 @@ class DocumentStudioApp {
             this.adapter?.deleteSelected?.();
         });
 
+        // Certificate typography presets (pdfme)
+        document.querySelectorAll('.btn-typography-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = btn.getAttribute('data-typography-preset');
+                if (this.adapter?.applyTypographyPreset?.(preset)) {
+                    notifyStudio('Certificate font pairing applied. Save or Preview to inspect the PDF.', 'success', 'Typography updated');
+                }
+            });
+        });
+
         // Property panel live inputs
         document.getElementById('prop-text')?.addEventListener('input', (e) => {
             this.adapter?.updateActiveObject?.({ text: e.target.value });
