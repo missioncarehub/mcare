@@ -109,6 +109,12 @@ class AppServiceProvider extends ServiceProvider
                 ->by('sensitive-mutation:'.$actorKey($request));
         });
 
+        // Allow smooth interactive debounced autosaves in Document Studio.
+        RateLimiter::for('studio-autosave', function (Request $request) use ($actorKey) {
+            return Limit::perMinute(120)
+                ->by('studio-autosave:'.$actorKey($request));
+        });
+
         // Limit bulk extraction attempts against protected applicant documents.
         RateLimiter::for('document-downloads', function (Request $request) use ($actorKey) {
             return Limit::perMinute(15)

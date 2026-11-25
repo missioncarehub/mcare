@@ -639,8 +639,8 @@ Route::middleware('throttle:global-web')->group(function () {
                         ->middleware('throttle:sensitive-mutation')->name('start-draft');
                     Route::post('/{template}/import-docx', [DocumentStudioController::class, 'importDocx'])
                         ->middleware('throttle:sensitive-mutation')->name('import-docx');
-                    Route::patch('/{template}/draft', [DocumentStudioController::class, 'saveDraft'])
-                        ->middleware('throttle:sensitive-mutation')
+                    Route::match(['patch', 'post'], '/{template}/draft', [DocumentStudioController::class, 'saveDraft'])
+                        ->middleware('throttle:studio-autosave')
                         ->name('draft.save');
                     Route::post('/{template}/publish', [DocumentStudioController::class, 'publish'])
                         ->middleware('throttle:sensitive-mutation')

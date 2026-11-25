@@ -1,4 +1,4 @@
-import { previewDocument } from './preview.js';
+import { previewDocument, previewPdfBytes } from './preview.js';
 import { notifyStudio } from './feedback.js';
 import { CERTIFICATE_FONTS } from './fonts.js';
 class DocumentStudioApp {
@@ -66,8 +66,12 @@ class DocumentStudioApp {
         // Debounce autosave
         clearTimeout(this.autosaveTimer);
         this.autosaveTimer = setTimeout(() => {
-            if (!this.isPublishing) this.saveDraft().catch(() => {});
-        }, 2500);
+            if (!this.isPublishing) {
+                this.saveDraft(false).catch((err) => {
+                    notifyStudio(err.message || 'Autosave failed', 'error', 'Autosave error');
+                });
+            }
+        }, 1800);
     }
 
     handleObjectSelection(props) {
@@ -94,11 +98,16 @@ class DocumentStudioApp {
         if (colorInput) colorInput.value = props.color || '#000000';
     }
 
-    async saveDraft() {
+    async saveDraft(force = false) {
         if (this.savingPromise) {
-            return this.savingPromise;
+            await this.savingPromise;
+            if (!force && !this.isDirty) return;
         }
-        if (!this.isDirty) {
+        if (force && this.adapter?.getState) {
+            this.draftState = this.adapter.getState();
+            this.isDirty = true;
+        }
+        if (!this.isDirty && !force) {
             return Promise.resolve();
         }
 
@@ -106,43 +115,66 @@ class DocumentStudioApp {
         this.updateSaveStatus('saving');
 
         this.savingPromise = (async () => {
-            const snapshotState = JSON.parse(JSON.stringify(this.draftState));
+            const snapshotState = JSON.parse(JSON.stringify(this.adapter?.getState ? this.adapter.getState() : this.draftState));
+            this.draftState = snapshotState;
             const snapshotRevision = this.draftRevision;
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             try {
-                const response = await fetch(this.config.endpoints.saveDraft, {
+                const payloadBody = JSON.stringify({
+                    draft_state: snapshotState,
+                    draft_revision: snapshotRevision,
+                });
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || '',
+                };
+
+                let response = await fetch(this.config.endpoints.saveDraft, {
                     method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken || '',
-                    },
-                    body: JSON.stringify({
-                        draft_state: snapshotState,
-                        draft_revision: snapshotRevision,
-                    }),
+                    credentials: 'same-origin',
+                    headers,
+                    body: payloadBody,
                 });
 
-                const data = await response.json();
+                // Shared hosts/WAFs that block PATCH accept our explicit POST fallback on the same route
+                if (response.status === 405) {
+                    response = await fetch(this.config.endpoints.saveDraft, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers,
+                        body: payloadBody,
+                    });
+                }
+
+                const contentType = response.headers.get('content-type') || '';
+                const data = contentType.includes('application/json')
+                    ? await response.json()
+                    : { message: `Server returned HTTP ${response.status}` };
 
                 if (!response.ok) {
                     if (response.status === 409 || data.errors?.revision) {
-                        notifyStudio(data.message || 'Another session updated this template. Reload its latest draft before saving again.', 'error', 'Draft changed elsewhere');
-                        this.updateSaveStatus('conflict');
-                        throw new Error(data.message || 'Revision conflict');
+                        const conflictMsg = data.errors?.revision?.[0] || data.message || 'Another session updated this template. Reload before saving again.';
+                        notifyStudio(conflictMsg, 'error', 'Draft changed elsewhere');
+                        this.updateSaveStatus('conflict', 'Conflict — reload needed');
+                        throw new Error(conflictMsg);
                     }
-                    throw new Error(data.message || 'Save failed');
+                    if (response.status === 419) {
+                        throw new Error('Your session expired. Refresh the page and sign in again.');
+                    }
+                    const firstValidation = data.errors ? Object.values(data.errors).flat()[0] : null;
+                    throw new Error(firstValidation || data.message || 'Save failed');
                 }
 
                 this.draftRevision = data.draft_revision;
                 if (data.audit) {
                     this.updateAuditBanner(data.audit);
                 }
-                // Only clear isDirty if no new changes arrived while network save was in flight
-                if (JSON.stringify(this.draftState) === JSON.stringify(snapshotState)) {
+                const savedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                if (JSON.stringify(this.adapter?.getState ? this.adapter.getState() : this.draftState) === JSON.stringify(snapshotState)) {
                     this.isDirty = false;
-                    this.updateSaveStatus('saved');
+                    this.updateSaveStatus('saved', `Saved ${savedTime} (rev ${this.draftRevision})`);
                 } else {
                     this.updateSaveStatus('dirty');
                 }
@@ -151,7 +183,7 @@ class DocumentStudioApp {
             } catch (err) {
                 console.error('Autosave error:', err);
                 if (this.saveStatus !== 'conflict') {
-                    this.updateSaveStatus('error');
+                    this.updateSaveStatus('error', err.message ? `Save failed: ${err.message.slice(0, 40)}` : 'Save failed');
                 }
                 throw err;
             } finally {
@@ -215,7 +247,7 @@ class DocumentStudioApp {
         }
     }
 
-    updateSaveStatus(status) {
+    updateSaveStatus(status, customLabel = null) {
         this.saveStatus = status;
         const label = document.getElementById('save-status-label');
         const dot = document.getElementById('save-status-dot');
@@ -226,7 +258,7 @@ class DocumentStudioApp {
         switch (status) {
             case 'saved':
                 dot.classList.add('bg-emerald-500');
-                label.textContent = `Saved (rev ${this.draftRevision})`;
+                label.textContent = customLabel || `Saved (rev ${this.draftRevision})`;
                 break;
             case 'saving':
                 dot.classList.add('bg-amber-500', 'animate-pulse');
@@ -239,23 +271,37 @@ class DocumentStudioApp {
             case 'conflict':
             case 'error':
                 dot.classList.add('bg-red-500');
-                label.textContent = 'Save error / conflict';
+                label.textContent = customLabel || 'Save error / conflict';
                 break;
         }
     }
 
     bindUiEvents() {
         // Manual save button
-        document.getElementById('btn-save-draft')?.addEventListener('click', (e) => {
+        document.getElementById('btn-save-draft')?.addEventListener('click', async (e) => {
             e.preventDefault();
-            if (!this.isPublishing) this.saveDraft().catch(() => {});
+            if (this.isPublishing) return;
+            clearTimeout(this.autosaveTimer);
+            try {
+                await this.saveDraft(true);
+                notifyStudio(`Draft saved cleanly (revision ${this.draftRevision}).`, 'success', 'Draft Saved');
+            } catch (err) {
+                notifyStudio(err.message || 'Could not save draft.', 'error', 'Save Failed');
+            }
         });
 
         // Keyboard shortcut: Ctrl+S / Cmd+S
-        window.addEventListener('keydown', (e) => {
+        window.addEventListener('keydown', async (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
-                if (!this.isPublishing) this.saveDraft().catch(() => {});
+                if (this.isPublishing) return;
+                clearTimeout(this.autosaveTimer);
+                try {
+                    await this.saveDraft(true);
+                    notifyStudio(`Draft saved cleanly (revision ${this.draftRevision}).`, 'success', 'Draft Saved');
+                } catch (err) {
+                    notifyStudio(err.message || 'Could not save draft.', 'error', 'Save Failed');
+                }
             }
         });
 
@@ -322,19 +368,34 @@ class DocumentStudioApp {
 
         // Preview button
         document.getElementById('btn-preview')?.addEventListener('click', async () => {
+            clearTimeout(this.autosaveTimer);
             try {
-                if (this.isPublishing) return;
-                while (this.isDirty || this.savingPromise) {
-                    if (this.savingPromise) {
-                        await this.savingPromise;
-                    }
-                    if (this.isDirty) {
-                        await this.saveDraft();
+                if (!this.isPublishing && (this.isDirty || this.savingPromise)) {
+                    await this.saveDraft(true);
+                }
+            } catch (err) {
+                notifyStudio('Could not save latest draft before preview: ' + (err.message || 'Save failed'), 'error', 'Preview unavailable');
+                return;
+            }
+
+            try {
+                const result = await previewDocument(this.config.endpoints.preview);
+                if (result?.usedServerFallback && this.adapter?.renderPreviewPdf) {
+                    const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                    await previewPdfBytes(bytes, 'PDFme Certificate Preview');
+                }
+            } catch (serverErr) {
+                if (this.adapter?.renderPreviewPdf) {
+                    try {
+                        const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                        await previewPdfBytes(bytes, 'Live Browser PDFme Preview');
+                        return;
+                    } catch (clientErr) {
+                        notifyStudio('Could not preview: ' + (clientErr.message || serverErr.message || 'Preview failed'), 'error', 'Preview unavailable');
+                        return;
                     }
                 }
-                await previewDocument(this.config.endpoints.preview);
-            } catch (err) {
-                notifyStudio('Could not preview: ' + (err.message || 'Save failed'), 'error', 'Preview unavailable');
+                notifyStudio('Could not preview: ' + (serverErr.message || 'Preview failed'), 'error', 'Preview unavailable');
             }
         });
 

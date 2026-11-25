@@ -510,9 +510,13 @@ class AssetSecurityService
 
                     continue;
                 }
-                // Sanitize HTML in rk_word state (html, content, body)
+                // Only sanitize HTML on rich-text document bodies (rk_word), never on typed PDFme/Fabric elements (e.g. table JSON or asset URLs)
                 if (in_array($lowerKey, ['html', 'content', 'body'], true) && is_string($value)) {
-                    $clean[$strKey] = $this->sanitizeHtml($value);
+                    if ($lowerKey === 'content' && isset($data['type']) && is_string($data['type'])) {
+                        $clean[$strKey] = $value;
+                    } else {
+                        $clean[$strKey] = $this->sanitizeHtml($value);
+                    }
 
                     continue;
                 }
@@ -634,8 +638,16 @@ class AssetSecurityService
             return null;
         }
         $host = parse_url($url, PHP_URL_HOST);
+        if (! $host) {
+            return (int) $match[1];
+        }
 
-        return $host && $host !== parse_url(config('app.url'), PHP_URL_HOST) ? null : (int) $match[1];
+        $allowedHosts = array_filter([
+            parse_url((string) config('app.url'), PHP_URL_HOST),
+            app()->runningInConsole() ? null : request()?->getHost(),
+        ]);
+
+        return in_array($host, $allowedHosts, true) ? (int) $match[1] : null;
     }
 
     /** Exact references, including Word image URLs; never search JSON by substring. */

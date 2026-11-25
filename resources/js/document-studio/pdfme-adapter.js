@@ -1,7 +1,8 @@
 import { installTextFields } from './text-fields.js';
 import { Designer } from '@pdfme/ui';
+import { generate } from '@pdfme/generator';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
-import { normalizeStudioSchema } from './tables.js';
+import { normalizeStudioSchema, studioTables, tableBinding } from './tables.js';
 import { getBrowserPdfmeFonts, CERTIFICATE_STYLE_PRESETS } from './fonts.js';
 
 export class PdfmeAdapter {
@@ -294,6 +295,117 @@ export class PdfmeAdapter {
         this.designer.updateTemplate(current);
         this.options.onChange?.(this.getState(current));
         return true;
+    }
+
+    async renderPreviewPdf(values = {}) {
+        const current = structuredClone(this.designer ? this.designer.getTemplate() : this.template);
+        let basePdf = current.basePdf;
+        if (!basePdf && this.template.base_pdf_asset_id) {
+            const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
+            if (asset?.url) {
+                const res = await fetch(asset.url, { credentials: 'same-origin' });
+                if (res.ok) basePdf = new Uint8Array(await res.arrayBuffer());
+            }
+        }
+        if (!basePdf && this.template.base_pdf_url) {
+            const res = await fetch(this.template.base_pdf_url, { credentials: 'same-origin' });
+            if (res.ok) basePdf = new Uint8Array(await res.arrayBuffer());
+        }
+        if (!basePdf) {
+            const page = this.template.page || { width_mm: 279.4, height_mm: 215.9 };
+            basePdf = { width: page.width_mm || 279.4, height: page.height_mm || 215.9, padding: [10, 10, 10, 10] };
+        }
+
+        const schemas = (current.schemas || [[]]).map(page => page.map(field => normalizeStudioSchema(field, this.plugins)));
+        const inputRow = {};
+
+        for (const page of schemas) {
+            for (const field of page) {
+                let val = undefined;
+                if (['image', 'signature'].includes(field.type)) {
+                    const src = field.content || field.src || field.url || '';
+                    if (src && !src.startsWith('data:')) {
+                        try {
+                            const imgRes = await fetch(src, { credentials: 'same-origin' });
+                            if (imgRes.ok) {
+                                const blob = await imgRes.blob();
+                                val = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(blob);
+                                });
+                            }
+                        } catch {
+                            val = '';
+                        }
+                    } else {
+                        val = src;
+                    }
+                }
+                if (val === undefined && values[field.name] !== undefined) {
+                    val = values[field.name];
+                }
+                if (val === undefined && field.binding) {
+                    const cleanKey = field.binding.replace(/[{}]/g, '').trim();
+                    if (values[cleanKey] !== undefined) val = values[cleanKey];
+                    else if (values[field.binding] !== undefined) val = values[field.binding];
+                    else val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
+                }
+                const rawContent = field.content || field.text;
+                if (val === undefined && rawContent) {
+                    let interpolated = String(rawContent);
+                    for (const [k, v] of Object.entries(values)) {
+                        if (v !== undefined && v !== null && typeof v !== 'object') {
+                            interpolated = interpolated.replaceAll(`{{${k}}}`, String(v));
+                        }
+                    }
+                    val = interpolated;
+                }
+                if (val === undefined) val = field.content || field.text || '';
+
+                if (field.type === 'table' && Array.isArray(val)) {
+                    if (val.length > 0 && typeof val[0] === 'object' && !Array.isArray(val[0])) {
+                        const keys = studioTables[tableBinding(field)]?.keys || Object.keys(val[0]);
+                        val = JSON.stringify(val.map(row => keys.map(k => String(row[k] ?? ''))));
+                    } else {
+                        val = JSON.stringify(val);
+                    }
+                } else if (typeof val !== 'string') {
+                    val = String(val);
+                }
+
+                inputRow[field.name] = val;
+            }
+        }
+
+        const fontEntries = Object.entries(getBrowserPdfmeFonts());
+        const font = {};
+        await Promise.all(fontEntries.map(async ([key, cfg]) => {
+            try {
+                const res = await fetch(cfg.data, { credentials: 'same-origin' });
+                if (res.ok) {
+                    font[key] = { data: new Uint8Array(await res.arrayBuffer()), ...(cfg.fallback ? { fallback: true } : {}) };
+                }
+            } catch {
+                // Skip unavailable font cleanly
+            }
+        }));
+
+        for (const page of schemas) {
+            for (const field of page) {
+                if (field.fontName && !font[field.fontName]) {
+                    field.fontName = font.NotoSans ? 'NotoSans' : undefined;
+                }
+            }
+        }
+
+        return generate({
+            template: { basePdf, schemas },
+            inputs: [inputRow],
+            plugins: this.plugins,
+            options: Object.keys(font).length ? { font } : undefined,
+        });
     }
 
     destroy() {

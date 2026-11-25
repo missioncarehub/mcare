@@ -112,7 +112,7 @@
                     $previewTemplate = $effective ?? $info['global'];
                     $previewVersionId = $ver?->id ?? $info['global']?->active_version_id;
                     $previewUrl = $previewTemplate
-                        ? route('admin.document-studio.preview', array_filter(['template' => $previewTemplate, 'version_id' => $previewVersionId]))
+                        ? route('admin.document-studio.preview', array_filter(['template' => $previewTemplate, 'version_id' => $previewVersionId]), false)
                         : '#';
                 @endphp
                 <div class="bg-white dark:bg-gray-850 rounded-2xl border {{ $isCotc ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-blue-200 dark:border-blue-900/50' }} shadow-xs flex flex-col justify-between overflow-hidden">
@@ -394,7 +394,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($templates as $tmpl)
                         @php
-                            $draftPreviewUrl = route('admin.document-studio.preview', ['template' => $tmpl, 'mode' => 'draft']);
+                            $draftPreviewUrl = route('admin.document-studio.preview', ['template' => $tmpl, 'mode' => 'draft'], false);
                         @endphp
                         <div class="bg-white dark:bg-gray-850 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col justify-between overflow-hidden">
                             <div class="p-5">

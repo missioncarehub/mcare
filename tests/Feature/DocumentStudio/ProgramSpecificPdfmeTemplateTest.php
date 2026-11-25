@@ -194,4 +194,63 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $torPreview->assertHeader('content-type', 'application/pdf');
         $this->assertStringStartsWith('%PDF-', $torPreview->getContent());
     }
+
+    public function test_legacy_program_templates_upgrade_and_save_fallback_and_preview_fallback_work(): void
+    {
+        $program = TrainingProgram::firstOrCreate(
+            ['code' => 'CAREGIVING-NC-II'],
+            [
+                'name' => 'Caregiving NC II',
+                'description' => 'Caregiving NC II Program',
+                'total_program_fee' => 25000,
+                'downpayment_amount' => 3000,
+                'is_active' => true,
+            ]
+        );
+
+        // Seed an unedited legacy fabric baseline for this program
+        $legacyCotc = DocumentTemplate::create([
+            'name' => "Certificate of Training Completion - {$program->name}",
+            'slug' => "cotc-program-{$program->id}",
+            'document_kind' => DocumentTemplate::KIND_COTC,
+            'engine' => DocumentTemplate::ENGINE_FABRIC,
+            'training_program_id' => $program->id,
+            'is_active' => true,
+            'is_system_default' => false,
+            'draft_revision' => 1,
+            'draft_state' => [
+                'engine' => DocumentTemplate::ENGINE_FABRIC,
+                'elements' => [['id' => 'old_name', 'type' => 'text', 'content' => '{{trainee_name}}']],
+            ],
+        ]);
+        $this->service->publishVersion($legacyCotc, 'Legacy baseline', true);
+
+        $this->service->ensureDefaultTemplates();
+        $legacyCotc->refresh();
+        $this->assertSame(DocumentTemplate::ENGINE_PDFME, $legacyCotc->engine);
+        $this->assertSame('PlayfairDisplay-Bold', collect($legacyCotc->draft_state['elements'] ?? [])->pluck('fontName', 'id')->get('name_text'));
+
+        // Verify POST save fallback works in addition to PATCH
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.document-studio.draft.save', $legacyCotc), [
+                'draft_state' => $legacyCotc->draft_state,
+                'draft_revision' => $legacyCotc->draft_revision,
+            ])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        // Verify preview falls back cleanly if server Node process fails
+        $mockRenderer = \Mockery::mock(\App\Services\DocumentStudio\DocumentStudioRenderer::class);
+        $mockRenderer->shouldReceive('renderPayloadToPdf')
+            ->once()
+            ->andThrow(new \RuntimeException('Document Studio rendering process failed: node not found'));
+        $this->app->instance(\App\Services\DocumentStudio\DocumentStudioRenderer::class, $mockRenderer);
+
+        $fallbackPreview = $this->actingAs($this->admin)
+            ->get(route('admin.document-studio.preview', ['template' => $legacyCotc, 'mode' => 'draft']));
+        $fallbackPreview->assertOk();
+        $fallbackPreview->assertHeader('content-type', 'application/pdf');
+        $fallbackPreview->assertHeader('x-mcare-preview-fallback', 'fpdf');
+        $this->assertStringStartsWith('%PDF-', $fallbackPreview->getContent());
+    }
 }

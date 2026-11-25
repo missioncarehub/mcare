@@ -631,23 +631,24 @@ class DocumentStudioService
             ->where('training_program_id', $program->id)
             ->first();
 
-        if (! $existingCotc && ! DocumentTemplate::where('slug', $cotcSlug)->exists()) {
-            $cotcState = [
-                'schema_version' => '1.0',
-                'engine' => DocumentTemplate::ENGINE_PDFME,
-                'page' => [
-                    'size' => 'letter',
-                    'orientation' => 'landscape',
-                    'width_mm' => 279.4,
-                    'height_mm' => 215.9,
-                ],
-                'base_pdf_url' => '/assets/cotc-base-template.pdf',
-                'elements' => $this->defaultCotcElements(
-                    mb_strtoupper($program->name),
-                    str_contains(mb_strtoupper($program->name), 'NC III') ? 'GreatVibes' : 'PlayfairDisplay-Bold'
-                ),
-            ];
+        $cotcElements = $this->defaultCotcElements(
+            mb_strtoupper($program->name),
+            str_contains(mb_strtoupper($program->name), 'NC III') ? 'GreatVibes' : 'PlayfairDisplay-Bold'
+        );
+        $cotcState = [
+            'schema_version' => '1.0',
+            'engine' => DocumentTemplate::ENGINE_PDFME,
+            'page' => [
+                'size' => 'letter',
+                'orientation' => 'landscape',
+                'width_mm' => 279.4,
+                'height_mm' => 215.9,
+            ],
+            'base_pdf_url' => '/assets/cotc-base-template.pdf',
+            'elements' => $cotcElements,
+        ];
 
+        if (! $existingCotc && ! DocumentTemplate::where('slug', $cotcSlug)->exists()) {
             $cotc = DocumentTemplate::create([
                 'name' => "Certificate of Training Completion - {$program->name}",
                 'slug' => $cotcSlug,
@@ -661,6 +662,8 @@ class DocumentStudioService
                 'draft_updated_at' => now(),
             ]);
             $this->publishVersion($cotc, "Initial release for {$program->name}", true);
+        } elseif ($existingCotc && $this->shouldUpgradeBaselineTemplate($existingCotc, $cotcSlug)) {
+            $this->upgradeBaselineTemplate($existingCotc, $cotcState, "Updated PDFme certificate layout for {$program->name}");
         }
 
         // 2. Program-Specific TOR Template (PDFme)
@@ -669,96 +672,102 @@ class DocumentStudioService
             ->where('training_program_id', $program->id)
             ->first();
 
-        if (! $existingTor && ! DocumentTemplate::where('slug', $torSlug)->exists()) {
-            $torState = [
-                'schema_version' => '1.0',
-                'engine' => DocumentTemplate::ENGINE_PDFME,
-                'page' => [
-                    'size' => 'a4',
-                    'orientation' => 'portrait',
-                    'width_mm' => 210.0,
-                    'height_mm' => 297.0,
+        $torState = [
+            'schema_version' => '1.0',
+            'engine' => DocumentTemplate::ENGINE_PDFME,
+            'page' => [
+                'size' => 'a4',
+                'orientation' => 'portrait',
+                'width_mm' => 210.0,
+                'height_mm' => 297.0,
+            ],
+            'elements' => [
+                [
+                    'id' => 'title',
+                    'type' => 'text',
+                    'x' => 15.0,
+                    'y' => 20.0,
+                    'width' => 180.0,
+                    'height' => 8.0,
+                    'fontSize' => 16,
+                    'fontName' => 'Cinzel-Bold',
+                    'fontWeight' => 'bold',
+                    'textAlign' => 'center',
+                    'content' => 'OFFICIAL TRANSCRIPT OF RECORDS',
                 ],
-                'elements' => [
-                    [
-                        'id' => 'title',
-                        'type' => 'text',
-                        'x' => 15.0,
-                        'y' => 20.0,
-                        'width' => 180.0,
-                        'height' => 8.0,
-                        'fontSize' => 16,
-                        'fontWeight' => 'bold',
-                        'textAlign' => 'center',
-                        'content' => 'OFFICIAL TRANSCRIPT OF RECORDS',
-                    ],
-                    [
-                        'id' => 'trainee_name',
-                        'type' => 'text',
-                        'x' => 15.0,
-                        'y' => 38.0,
-                        'width' => 180.0,
-                        'height' => 7.0,
-                        'fontSize' => 12,
-                        'fontWeight' => 'bold',
-                        'binding' => 'Name: {{trainee_name}}',
-                        'content' => 'Name: MARIA REYES SANTOS',
-                    ],
-                    [
-                        'id' => 'program_name',
-                        'type' => 'text',
-                        'x' => 15.0,
-                        'y' => 46.0,
-                        'width' => 180.0,
-                        'height' => 7.0,
-                        'fontSize' => 11,
-                        'binding' => 'Course: {{training_program}}',
-                        'content' => 'Course: ' . $program->name,
-                    ],
-                    [
-                        'id' => 'release_date',
-                        'type' => 'text',
-                        'x' => 15.0,
-                        'y' => 54.0,
-                        'width' => 180.0,
-                        'height' => 6.0,
-                        'fontSize' => 9,
-                        'binding' => 'Date Released: {{release_date}}',
-                        'content' => 'Date Released: ' . now()->format('F j, Y'),
-                    ],
-                    [
-                        'id' => 'competencies_table',
-                        'type' => 'table',
-                        'x' => 15.0,
-                        'y' => 64.0,
-                        'width' => 180.0,
-                        'binding' => 'tor_competencies',
-                    ],
-                    [
-                        'id' => 'trainer_signatory',
-                        'type' => 'text',
-                        'x' => 15.0,
-                        'y' => 245.0,
-                        'width' => 80.0,
-                        'height' => 12.0,
-                        'fontSize' => 9,
-                        'binding' => 'Lead Trainer: {{trainer_name}}',
-                        'content' => 'Lead Trainer: ' . (string) config('official_documents.organization.trainer_name', 'Maricris N. Collao'),
-                    ],
-                    [
-                        'id' => 'registrar_signatory',
-                        'type' => 'text',
-                        'x' => 115.0,
-                        'y' => 245.0,
-                        'width' => 80.0,
-                        'height' => 12.0,
-                        'fontSize' => 9,
-                        'binding' => 'Registrar: {{registrar_name}}',
-                        'content' => 'Registrar: ' . (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
-                    ],
+                [
+                    'id' => 'trainee_name',
+                    'type' => 'text',
+                    'x' => 15.0,
+                    'y' => 38.0,
+                    'width' => 180.0,
+                    'height' => 7.0,
+                    'fontSize' => 12,
+                    'fontName' => 'PlayfairDisplay-Bold',
+                    'fontWeight' => 'bold',
+                    'binding' => 'Name: {{trainee_name}}',
+                    'content' => 'Name: MARIA REYES SANTOS',
                 ],
-            ];
+                [
+                    'id' => 'program_name',
+                    'type' => 'text',
+                    'x' => 15.0,
+                    'y' => 46.0,
+                    'width' => 180.0,
+                    'height' => 7.0,
+                    'fontSize' => 11,
+                    'fontName' => 'Montserrat',
+                    'binding' => 'Course: {{training_program}}',
+                    'content' => 'Course: ' . $program->name,
+                ],
+                [
+                    'id' => 'release_date',
+                    'type' => 'text',
+                    'x' => 15.0,
+                    'y' => 54.0,
+                    'width' => 180.0,
+                    'height' => 6.0,
+                    'fontSize' => 9,
+                    'fontName' => 'Montserrat',
+                    'binding' => 'Date Released: {{release_date}}',
+                    'content' => 'Date Released: ' . now()->format('F j, Y'),
+                ],
+                [
+                    'id' => 'competencies_table',
+                    'type' => 'table',
+                    'x' => 15.0,
+                    'y' => 64.0,
+                    'width' => 180.0,
+                    'binding' => 'tor_competencies',
+                ],
+                [
+                    'id' => 'trainer_signatory',
+                    'type' => 'text',
+                    'x' => 15.0,
+                    'y' => 245.0,
+                    'width' => 80.0,
+                    'height' => 12.0,
+                    'fontSize' => 9,
+                    'fontName' => 'Montserrat',
+                    'binding' => 'Lead Trainer: {{trainer_name}}',
+                    'content' => 'Lead Trainer: ' . (string) config('official_documents.organization.trainer_name', 'Maricris N. Collao'),
+                ],
+                [
+                    'id' => 'registrar_signatory',
+                    'type' => 'text',
+                    'x' => 115.0,
+                    'y' => 245.0,
+                    'width' => 80.0,
+                    'height' => 12.0,
+                    'fontSize' => 9,
+                    'fontName' => 'Montserrat',
+                    'binding' => 'Registrar: {{registrar_name}}',
+                    'content' => 'Registrar: ' . (string) config('official_documents.organization.registrar_name', 'Salvacion A. Collao'),
+                ],
+            ],
+        ];
 
+        if (! $existingTor && ! DocumentTemplate::where('slug', $torSlug)->exists()) {
             $tor = DocumentTemplate::create([
                 'name' => "Official Transcript of Records - {$program->name}",
                 'slug' => $torSlug,
@@ -772,7 +781,38 @@ class DocumentStudioService
                 'draft_updated_at' => now(),
             ]);
             $this->publishVersion($tor, "Initial release for {$program->name}", true);
+        } elseif ($existingTor && $this->shouldUpgradeBaselineTemplate($existingTor, $torSlug)) {
+            $this->upgradeBaselineTemplate($existingTor, $torState, "Updated PDFme transcript layout for {$program->name}");
         }
+    }
+
+    private function shouldUpgradeBaselineTemplate(DocumentTemplate $template, string $expectedSlug): bool
+    {
+        if ($template->slug !== $expectedSlug || (int) $template->draft_revision !== 1) {
+            return false;
+        }
+        if ($template->versions()->count() > 1) {
+            return false;
+        }
+        $state = $template->draft_state ?? [];
+        if (! empty($state['schemas'])) {
+            return false;
+        }
+        if ($template->engine !== DocumentTemplate::ENGINE_PDFME) {
+            return true;
+        }
+
+        return ! collect($state['elements'] ?? [])->contains(fn ($el) => ! empty($el['fontName']));
+    }
+
+    private function upgradeBaselineTemplate(DocumentTemplate $template, array $state, string $changelog): void
+    {
+        $template->update([
+            'engine' => DocumentTemplate::ENGINE_PDFME,
+            'draft_state' => $state,
+            'draft_updated_at' => now(),
+        ]);
+        $this->publishVersion($template->fresh(), $changelog, true);
     }
 
     public function hasActualContent(array $state): bool

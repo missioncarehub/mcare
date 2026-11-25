@@ -181,7 +181,11 @@ class DocumentStudioRenderer implements OfficialDocumentRenderer
             $process->run();
 
             if (! $process->isSuccessful() || ! File::exists($outputFile)) {
-                $errorOutput = $process->getErrorOutput() ?: $process->getOutput();
+                $errorOutput = trim($process->getErrorOutput() ?: $process->getOutput());
+                Log::error('Document Studio Node render process failed.', [
+                    'exit_code' => $process->getExitCode(),
+                    'error' => mb_substr($errorOutput, 0, 1000),
+                ]);
                 throw new RuntimeException('Document Studio rendering process failed: '.$errorOutput);
             }
 

@@ -123,7 +123,7 @@
         </div>
 
         <!-- Middle: Save Status Pill -->
-        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300">
             <span id="save-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span id="save-status-label">Saved (rev {{ $template->draft_revision }})</span>
         </div>
@@ -216,7 +216,7 @@
                             <x-dashboard-icon name="file-text" class="w-3.5 h-3.5 text-emerald-500" />
                             Image / Logo
                         </button>
-                        @if($template->engine === 'pdfme')
+                        @if(in_array($template->engine, ['pdfme', 'fabric'], true))
                         <button type="button" onclick="document.getElementById('asset-type-select').value='template_picture'; document.getElementById('asset-modal').classList.remove('hidden')" class="col-span-2 flex items-center justify-center gap-1.5 p-2 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-xs font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors">
                             <x-dashboard-icon name="cloud-arrow-up" class="w-3.5 h-3.5" />
                             Upload Template Picture (PNG / JPG)
@@ -225,7 +225,7 @@
                     </div>
                 </div>
 
-                @if($template->engine === 'pdfme')
+                @if(in_array($template->engine, ['pdfme', 'fabric'], true))
                 <!-- Font & Typography Editor -->
                 <div class="space-y-2.5 pt-2 border-t border-gray-200 dark:border-gray-800">
                     <div class="flex items-center justify-between">
@@ -509,12 +509,12 @@
         capabilities: @json($capabilities),
         assets: @json($assetUrls),
         endpoints: {
-            saveDraft: @json(route('admin.document-studio.draft.save', $template)),
-            publish: @json(route('admin.document-studio.publish', $template)),
-            preview: @json(route('admin.document-studio.preview', ['template' => $template, 'mode' => 'draft'])),
-            export: @json(route('admin.document-studio.export', $template)),
-            uploadAsset: @json(route('admin.document-studio.assets.upload')),
-            importDocx: @json(route('admin.document-studio.import-docx', $template)),
+            saveDraft: {{ \Illuminate\Support\Js::from(route('admin.document-studio.draft.save', $template, false)) }},
+            publish: {{ \Illuminate\Support\Js::from(route('admin.document-studio.publish', $template, false)) }},
+            preview: {{ \Illuminate\Support\Js::from(route('admin.document-studio.preview', ['template' => $template, 'mode' => 'draft'], false)) }},
+            export: {{ \Illuminate\Support\Js::from(route('admin.document-studio.export', $template, false)) }},
+            uploadAsset: {{ \Illuminate\Support\Js::from(route('admin.document-studio.assets.upload', [], false)) }},
+            importDocx: {{ \Illuminate\Support\Js::from(route('admin.document-studio.import-docx', $template, false)) }}
         }
     };
 </script>

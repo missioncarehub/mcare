@@ -1,4 +1,5 @@
 import { Canvas, Textbox, Rect, Circle, FabricImage } from 'fabric';
+import { CERTIFICATE_FONTS, CERTIFICATE_STYLE_PRESETS } from './fonts.js';
 
 export class FabricAdapter {
     constructor(canvasElement, options = {}) {
@@ -11,6 +12,17 @@ export class FabricAdapter {
 
     async mount() {
         if (!this.canvasElement) return;
+
+        // Preload self-hosted certificate fonts for HTML5 canvas rendering
+        if (typeof document !== 'undefined' && document.fonts) {
+            await Promise.allSettled(
+                CERTIFICATE_FONTS.map(f => {
+                    const face = new FontFace(f.key, `url(/fonts/certificate/${f.file})`);
+                    document.fonts.add(face);
+                    return face.load();
+                })
+            );
+        }
 
         const page = this.template.page || { width_mm: 279.4, height_mm: 215.9 };
         const canvasW = (page.width_mm || 279.4) * this.scale;
@@ -135,9 +147,11 @@ export class FabricAdapter {
         }
 
         this.canvas.renderAll();
+        this.options.onFieldsChange?.(this.getTextFields());
 
         // Bind modification events
         const triggerChange = () => {
+            this.options.onFieldsChange?.(this.getTextFields());
             if (this.options.onChange) {
                 this.options.onChange(this.getState());
             }
@@ -398,6 +412,84 @@ export class FabricAdapter {
             background: this.template.background || null,
             elements,
         };
+    }
+
+    async setBackgroundImage(url, assetId) {
+        if (!this.canvas) return;
+        const canvasW = this.canvas.getWidth();
+        const canvasH = this.canvas.getHeight();
+        const img = await FabricImage.fromURL(url);
+        img.set({
+            originX: 'left',
+            originY: 'top',
+            left: 0,
+            top: 0,
+            scaleX: canvasW / img.width,
+            scaleY: canvasH / img.height,
+            selectable: false,
+            evented: false,
+        });
+        this.template.background_asset_id = assetId;
+        this.canvas.backgroundImage = img;
+        this.canvas.renderAll();
+        this.options.onChange?.(this.getState());
+    }
+
+    getTextFields() {
+        if (!this.canvas) return [];
+        const fields = [];
+        this.canvas.getObjects().forEach((obj, idx) => {
+            if (!['textbox', 'text', 'i-text'].includes(obj.type)) return;
+            const id = obj.elementId || `text_${idx}`;
+            obj.elementId = id;
+            const cleanLabel = String(obj.binding || obj.text || id).replace(/\s+/g, ' ').slice(0, 34);
+            fields.push({
+                key: id,
+                name: id,
+                type: 'text',
+                label: `${id} (${cleanLabel})`,
+                fontName: obj.fontFamily || 'NotoSans',
+                fontSize: Math.round((obj.fontSize || 14) / (this.scale / (72 / 25.4))),
+                fontColor: obj.fill || '#111827',
+                alignment: obj.textAlign || 'left',
+            });
+        });
+        return fields;
+    }
+
+    updateFieldStyle(fieldKey, style = {}) {
+        if (!this.canvas || !fieldKey) return false;
+        const obj = this.canvas.getObjects().find(item => item.elementId === fieldKey);
+        if (!obj) return false;
+        if (style.fontName !== undefined) obj.set('fontFamily', style.fontName);
+        if (style.fontSize !== undefined) obj.set('fontSize', Number(style.fontSize) * (this.scale / (72 / 25.4)));
+        if (style.fontColor !== undefined) obj.set('fill', style.fontColor);
+        if (style.alignment !== undefined) obj.set('textAlign', style.alignment);
+        this.canvas.renderAll();
+        this.options.onChange?.(this.getState());
+        return true;
+    }
+
+    applyTypographyPreset(presetKey) {
+        if (!this.canvas) return false;
+        const preset = CERTIFICATE_STYLE_PRESETS[presetKey];
+        if (!preset) return false;
+        const roles = preset.roles;
+        this.canvas.getObjects().forEach((obj) => {
+            if (!['textbox', 'text', 'i-text'].includes(obj.type)) return;
+            const key = `${obj.elementId || ''} ${obj.binding || ''}`.toLowerCase();
+            let fontName = roles.default;
+            if (key.includes('trainee_name') || key.includes('name_text')) fontName = roles.name;
+            else if (key.includes('training_program') || key.includes('program_text')) fontName = roles.program;
+            else if (key.includes('statement')) fontName = roles.statement;
+            else if (key.includes('release_date') || key.includes('certificate_number') || key.includes('doc_number') || key.includes('role')) fontName = roles.meta;
+            else if (key.includes('date')) fontName = roles.date;
+            else if (key.includes('registrar') || key.includes('trainer') || key.includes('signatory')) fontName = roles.signatory;
+            obj.set('fontFamily', fontName);
+        });
+        this.canvas.renderAll();
+        this.options.onChange?.(this.getState());
+        return true;
     }
 
     destroy() {

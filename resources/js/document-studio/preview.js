@@ -78,6 +78,7 @@ export class StudioPreview {
             }
             if (!response.ok) throw new Error(response.status === 403 ? 'You do not have permission to preview this document.' : 'Preview could not be generated. Please retry.');
             if (!response.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) throw new Error('The server did not return a PDF. Sign in again or retry.');
+            const usedServerFallback = response.headers.get('x-mcare-preview-fallback') === 'fpdf';
             const limit = 50 * 1024 * 1024;
             const reader = response.body.getReader(); const chunks = []; let size = 0;
             while (true) {
@@ -90,20 +91,46 @@ export class StudioPreview {
             const blob = new Blob(chunks, { type: 'application/pdf' });
             const bytes = new Uint8Array(await blob.arrayBuffer());
             if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('The preview is not a valid PDF.');
-            const pdfjs = await loadPdfJs();
-            if (epoch !== this.epoch) return;
-            const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
-            this.loading = task;
-            const pdf = await task.promise;
-            if (epoch !== this.epoch) { await task.destroy(); return; }
-            if (pdf.numPages > 200) throw new Error('This preview exceeds 200 pages.');
-            this.pdf = pdf; this.blob = blob;
-            await this.render();
+            await this.loadPdfBytes(bytes, blob, epoch);
+            return { usedServerFallback };
         } catch (error) {
             if (epoch !== this.epoch) return;
             this.release();
             this.status.textContent = error.name === 'AbortError' ? 'Preview timed out. Please retry.' : error.message;
+            throw error;
         } finally { if (epoch === this.epoch) clearTimeout(this.timeout); }
+    }
+
+    async openBytes(bytes, label = 'Live template preview') {
+        this.release();
+        const epoch = this.epoch;
+        this.page = 1; this.zoom = 1;
+        this.status.textContent = `Rendering ${label}…`;
+        if (this.inline) this.dialog.hidden = false;
+        else if (!this.dialog.open) this.dialog.showModal();
+        try {
+            const pdfBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+            if (new TextDecoder().decode(pdfBytes.slice(0, 5)) !== '%PDF-') throw new Error('Generated preview is not a valid PDF.');
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            await this.loadPdfBytes(pdfBytes, blob, epoch);
+        } catch (error) {
+            if (epoch !== this.epoch) return;
+            this.release();
+            this.status.textContent = error.message || 'Could not display generated preview.';
+            throw error;
+        }
+    }
+
+    async loadPdfBytes(bytes, blob, epoch) {
+        const pdfjs = await loadPdfJs();
+        if (epoch !== this.epoch) return;
+        const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
+        this.loading = task;
+        const pdf = await task.promise;
+        if (epoch !== this.epoch) { await task.destroy(); return; }
+        if (pdf.numPages > 200) throw new Error('This preview exceeds 200 pages.');
+        this.pdf = pdf; this.blob = blob;
+        await this.render();
     }
 
     async render() {
@@ -139,9 +166,13 @@ export function previewDocument(endpoint) {
     viewer ??= new StudioPreview(document.getElementById('preview-modal'));
     return viewer.open(endpoint);
 }
+export function previewPdfBytes(bytes, label) {
+    viewer ??= new StudioPreview(document.getElementById('preview-modal'));
+    return viewer.openBytes(bytes, label);
+}
 document.addEventListener('click', event => {
     const button = event.target.closest('[data-document-preview]');
-    if (button) { event.preventDefault(); previewDocument(button.dataset.documentPreview); }
+    if (button) { event.preventDefault(); previewDocument(button.dataset.documentPreview).catch(() => {}); }
 });
 
 const original = document.getElementById('studio-original');

@@ -310,7 +310,7 @@ class DocumentStudioController extends Controller
             'activeVersion' => $template->activeVersion,
             'versions' => $template->versions,
             'assets' => $template->assets->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE),
-            'assetUrls' => $template->assets->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE)->values()->map(fn ($asset) => ['id' => $asset->id, 'url' => route('admin.document-studio.assets.stream', $asset)]),
+            'assetUrls' => $template->assets->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE)->values()->map(fn ($asset) => ['id' => $asset->id, 'url' => route('admin.document-studio.assets.stream', $asset, false)]),
             'placeholders' => $placeholders,
             'samplePayload' => $samplePayload,
             'capabilities' => $capabilities,
@@ -500,6 +500,33 @@ class DocumentStudioController extends Controller
             $pdfBinary = $this->renderer->renderPayloadToPdf($payload);
         } catch (\Throwable $exception) {
             report($exception);
+
+            if (str_contains($exception->getMessage(), 'rendering process failed')
+                && in_array($template->document_kind, [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR], true)) {
+                try {
+                    if (isset($enrollment)) {
+                        $doc = new OfficialDocument([
+                            'type' => $template->document_kind,
+                            'document_number' => 'PREVIEW-SAMPLE',
+                            'version' => 1,
+                            'generated_at' => now(),
+                        ]);
+                        $doc->setRelation('application', $enrollment);
+                        $fallbackPdf = app(\App\Services\FpdfOfficialDocumentRenderer::class)->render($doc);
+                    } else {
+                        [, $fallbackPdf] = app(ExistingDesignService::class)->record($template->document_kind, $template->trainingProgram);
+                    }
+
+                    return response($fallbackPdf, 200, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'inline; filename="'.$template->slug.'-preview.pdf"',
+                        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                        'X-MCARE-Preview-Fallback' => 'fpdf',
+                    ]);
+                } catch (\Throwable $fallbackException) {
+                    report($fallbackException);
+                }
+            }
 
             return response()->json([
                 'message' => 'This layout could not be previewed. Check its fonts, tables and uploaded assets, then try again.',
