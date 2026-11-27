@@ -389,6 +389,9 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('admin.document-studio.index', ['program_id' => $program->id]))
             ->assertOk()
-            ->assertSee($expectedTorPreviewUrl, false);
+            ->assertSee($expectedTorPreviewUrl, false)
+            ->assertSee('DOCUMENT_STUDIO_PREVIEW_FALLBACKS', false)
+            ->assertSee('data-pdfme-fallback-key="cotc"', false)
+            ->assertSee('data-pdfme-fallback-key="tor"', false);
     }
 }

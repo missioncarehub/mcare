@@ -102,6 +102,32 @@ class DocumentStudioController extends Controller
             ->whereIn('document_kind', [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR])
             ->count();
 
+        $previewFallbacks = [];
+        foreach ($publishedDesigns as $kind => $info) {
+            $previewTarget = $info['latest_draft'] ?? $info['effective'] ?? $info['global'];
+            if (! $previewTarget || $previewTarget->engine !== DocumentTemplate::ENGINE_PDFME) {
+                continue;
+            }
+            $state = $info['latest_draft']
+                ? ($previewTarget->draft_state ?? $previewTarget->activeVersion?->editor_state ?? [])
+                : ($previewTarget->activeVersion?->editor_state ?? $previewTarget->draft_state ?? []);
+            if (is_array($state)) {
+                unset($state['_asset_integrity']);
+            }
+            $assets = $previewTarget->assets()
+                ->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE)
+                ->get(['id'])
+                ->map(fn (DocumentAsset $asset) => ['id' => $asset->id, 'url' => route('admin.document-studio.assets.stream', $asset, false)])
+                ->values()
+                ->all();
+
+            $previewFallbacks[$kind] = [
+                'state' => $state,
+                'samplePayload' => PlaceholderRegistry::samplePayload($kind),
+                'assets' => $assets,
+            ];
+        }
+
         return view('admin.document-studio.index', [
             'templates' => $templates,
             'programs' => $programs,
@@ -109,6 +135,7 @@ class DocumentStudioController extends Controller
             'selectedProgramId' => $selectedProgramId,
             'kinds' => [DocumentTemplate::KIND_COTC, DocumentTemplate::KIND_TOR],
             'publishedDesigns' => $publishedDesigns,
+            'previewFallbacks' => $previewFallbacks,
             'draftCount' => $draftCount,
             'activeView' => $request->query('view', 'published'),
         ]);

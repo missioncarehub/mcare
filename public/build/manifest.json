@@ -111,7 +111,7 @@
     ]
   },
   "resources/js/document-studio/fabric-adapter.js": {
-    "file": "assets/fabric-adapter-DSiNPD5j.js",
+    "file": "assets/fabric-adapter-C3faTtO-.js",
     "name": "fabric-adapter",
     "src": "resources/js/document-studio/fabric-adapter.js",
     "isDynamicEntry": true,
@@ -130,9 +130,26 @@
     ]
   },
   "resources/js/document-studio/pdfme-adapter.js": {
-    "file": "assets/pdfme-adapter-9yfcrFrk.js",
+    "file": "assets/pdfme-adapter-r5R15vkT.js",
     "name": "pdfme-adapter",
     "src": "resources/js/document-studio/pdfme-adapter.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_pdf-DKsKPeEk.js",
+      "resources/js/document-studio/studio.js",
+      "resources/js/document-studio/pdfme-render.js"
+    ],
+    "dynamicImports": [
+      "node_modules/clawpdf/dist/browser.js"
+    ],
+    "assets": [
+      "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js"
+    ]
+  },
+  "resources/js/document-studio/pdfme-render.js": {
+    "file": "assets/pdfme-render-B4ua8-06.js",
+    "name": "pdfme-render",
+    "src": "resources/js/document-studio/pdfme-render.js",
     "isDynamicEntry": true,
     "imports": [
       "_pdf-DKsKPeEk.js",
@@ -140,24 +157,24 @@
       "_base64-js-C3K5tRKj.js"
     ],
     "dynamicImports": [
-      "node_modules/clawpdf/dist/browser.js",
       "node_modules/signature_pad/dist/signature_pad.js"
-    ],
-    "assets": [
-      "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js"
     ]
   },
   "resources/js/document-studio/preview.js": {
-    "file": "assets/preview-BAk0_C7X.js",
+    "file": "assets/preview-Dc-uTwB2.js",
     "name": "preview",
     "src": "resources/js/document-studio/preview.js",
     "isEntry": true,
     "imports": [
+      "_pdf-DKsKPeEk.js",
       "_pdf-loader-BBprxQxg.js"
+    ],
+    "dynamicImports": [
+      "resources/js/document-studio/pdfme-render.js"
     ]
   },
   "resources/js/document-studio/rkword-adapter.js": {
-    "file": "assets/rkword-adapter-D6Pqm1P3.js",
+    "file": "assets/rkword-adapter-BdG1bUDQ.js",
     "name": "rkword-adapter",
     "src": "resources/js/document-studio/rkword-adapter.js",
     "isDynamicEntry": true,
@@ -173,7 +190,7 @@
     ]
   },
   "resources/js/document-studio/studio.js": {
-    "file": "assets/studio-BXwykCRS.js",
+    "file": "assets/studio-CxRgqEWj.js",
     "name": "studio",
     "src": "resources/js/document-studio/studio.js",
     "isEntry": true,

@@ -6,6 +6,9 @@
     @vite(['resources/css/document-studio.css'])
 @endpush
 @push('scripts')
+    <script>
+        window.DOCUMENT_STUDIO_PREVIEW_FALLBACKS = @json($previewFallbacks ?? []);
+    </script>
     @vite(['resources/js/document-studio/preview.js'])
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -160,11 +163,11 @@
                         <!-- LIVE CERTIFICATE / TRANSCRIPT DIRECT PREVIEW FRAME -->
                         <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-stone-100/80 dark:bg-gray-900/60 p-3 sm:p-4">
                             <div class="mx-auto w-full flex items-center justify-center {{ $isCotc ? 'max-w-[460px]' : 'max-w-[268px]' }}">
-                                <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}"
+                                <a href="{{ $previewUrl }}" target="_blank" data-document-preview="{{ $previewUrl }}" data-pdfme-fallback-key="{{ $kind }}"
                                    class="group relative w-full {{ $isCotc ? '' : 'min-h-[350px] sm:min-h-[380px]' }} overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-slate-900/10 transition-all hover:shadow-lg hover:ring-indigo-500/50 block cursor-pointer"
                                    style="aspect-ratio: {{ $isCotc ? '11 / 8.5' : '210 / 297' }}"
                                    title="Click to preview {{ strtoupper($kind) }} PDF">
-                                    <canvas data-live-pdf-thumbnail="{{ $previewUrl }}" class="w-full h-full block bg-white"></canvas>
+                                    <canvas data-live-pdf-thumbnail="{{ $previewUrl }}" data-pdfme-fallback-key="{{ $kind }}" class="w-full h-full block bg-white"></canvas>
 
                                     <div data-live-pdf-loading class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-stone-50/90 dark:bg-gray-900/85 text-xs text-gray-500 dark:text-gray-400">
                                         <span class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></span>
@@ -246,6 +249,7 @@
                             <div class="flex items-center gap-2 w-full sm:w-auto flex-1">
                                 <a href="{{ $previewUrl }}" target="_blank"
                                    data-document-preview="{{ $previewUrl }}"
+                                   data-pdfme-fallback-key="{{ $kind }}"
                                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-xl text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors min-h-[44px] cursor-pointer">
                                     <x-dashboard-icon name="eye" class="w-4 h-4 text-gray-500" />
                                     <span>Preview PDF</span>

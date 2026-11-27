@@ -51,7 +51,7 @@ export class StudioPreview {
 
     close() { this.release(); if (this.inline) this.dialog.hidden = true; else this.dialog.close(); }
 
-    async open(endpoint) {
+    async open(endpoint, fallbackKey = null) {
         this.release();
         const epoch = this.epoch;
         this.page = 1; this.zoom = 1;
@@ -79,6 +79,14 @@ export class StudioPreview {
             if (!response.ok) throw new Error(response.status === 403 ? 'You do not have permission to preview this document.' : 'Preview could not be generated. Please retry.');
             if (!response.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) throw new Error('The server did not return a PDF. Sign in again or retry.');
             const usedServerFallback = response.headers.get('x-mcare-preview-fallback') === 'fpdf';
+            if (usedServerFallback && fallbackKey) {
+                const localBytes = await renderFallbackPdfBytes(fallbackKey);
+                if (localBytes && epoch === this.epoch) {
+                    const blob = new Blob([localBytes], { type: 'application/pdf' });
+                    await this.loadPdfBytes(localBytes, blob, epoch);
+                    return { usedServerFallback: false, usedClientFallback: true };
+                }
+            }
             const limit = 50 * 1024 * 1024;
             const reader = response.body.getReader(); const chunks = []; let size = 0;
             while (true) {
@@ -95,6 +103,18 @@ export class StudioPreview {
             return { usedServerFallback };
         } catch (error) {
             if (epoch !== this.epoch) return;
+            if (fallbackKey && error.name !== 'AbortError') {
+                try {
+                    const localBytes = await renderFallbackPdfBytes(fallbackKey);
+                    if (localBytes && epoch === this.epoch) {
+                        const blob = new Blob([localBytes], { type: 'application/pdf' });
+                        await this.loadPdfBytes(localBytes, blob, epoch);
+                        return { usedServerFallback: false, usedClientFallback: true };
+                    }
+                } catch {
+                    // Fall through to error status
+                }
+            }
             this.release();
             this.status.textContent = error.name === 'AbortError' ? 'Preview timed out. Please retry.' : error.message;
             throw error;
@@ -166,10 +186,22 @@ export class StudioPreview {
     }
 }
 
+async function renderFallbackPdfBytes(fallbackKey) {
+    if (!fallbackKey) return null;
+    const config = window.DOCUMENT_STUDIO_PREVIEW_FALLBACKS?.[fallbackKey];
+    if (!config || !config.state) return null;
+    const { renderPdfmeTemplateToBytes } = await import('./pdfme-render.js');
+    return renderPdfmeTemplateToBytes({
+        templateState: config.state,
+        values: config.samplePayload || {},
+        assets: config.assets || [],
+    });
+}
+
 let viewer;
-export function previewDocument(endpoint) {
+export function previewDocument(endpoint, fallbackKey = null) {
     viewer ??= new StudioPreview(document.getElementById('preview-modal'));
-    return viewer.open(endpoint);
+    return viewer.open(endpoint, fallbackKey);
 }
 export function previewPdfBytes(bytes, label) {
     viewer ??= new StudioPreview(document.getElementById('preview-modal'));
@@ -177,7 +209,7 @@ export function previewPdfBytes(bytes, label) {
 }
 document.addEventListener('click', event => {
     const button = event.target.closest('[data-document-preview]');
-    if (button) { event.preventDefault(); previewDocument(button.dataset.documentPreview).catch(() => {}); }
+    if (button) { event.preventDefault(); previewDocument(button.dataset.documentPreview, button.dataset.pdfmeFallbackKey || null).catch(() => {}); }
 });
 
 const original = document.getElementById('studio-original');
@@ -199,6 +231,7 @@ async function renderLiveThumbnails() {
 
     for (const canvas of canvases) {
         const endpoint = canvas.dataset.livePdfThumbnail;
+        const fallbackKey = canvas.dataset.pdfmeFallbackKey || null;
         const container = canvas.parentElement;
         const loader = container?.querySelector('[data-live-pdf-loading]');
         if (!endpoint || endpoint === '#') {
@@ -206,13 +239,28 @@ async function renderLiveThumbnails() {
             continue;
         }
         try {
-            const url = new URL(endpoint, location.href);
-            if (url.origin !== location.origin) continue;
-            const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
-            if (!res.ok || !res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
+            let bytes = null;
+            try {
+                const url = new URL(endpoint, location.href);
+                if (url.origin !== location.origin) continue;
+                const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
+                if (res.ok && res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
+                    if (res.headers.get('x-mcare-preview-fallback') === 'fpdf' && fallbackKey) {
+                        bytes = await renderFallbackPdfBytes(fallbackKey);
+                    }
+                    if (!bytes) {
+                        bytes = new Uint8Array(await res.arrayBuffer());
+                    }
+                }
+            } catch {
+                // Fall back to client PDFme generator when available
+            }
+            if (!bytes && fallbackKey) {
+                bytes = await renderFallbackPdfBytes(fallbackKey);
+            }
+            if (!bytes) {
                 throw new Error('Unavailable');
             }
-            const bytes = new Uint8Array(await res.arrayBuffer());
             const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
             const pdf = await task.promise;
             const page = await pdf.getPage(1);
