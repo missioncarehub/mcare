@@ -255,14 +255,22 @@
                                     <span>Preview PDF</span>
                                 </a>
 
-                                <form action="{{ route('admin.document-studio.start-draft', $latestDraft ?? $effective) }}" method="POST" class="flex-1">
-                                    @csrf
-                                    <button type="submit"
-                                            class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors min-h-[44px]">
+                                @if($latestDraft)
+                                    <a href="{{ route('admin.document-studio.edit', $latestDraft) }}"
+                                       class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors min-h-[44px]">
                                         <x-dashboard-icon name="pencil" class="w-4 h-4" />
                                         <span>Open PDFme Designer</span>
-                                    </button>
-                                </form>
+                                    </a>
+                                @else
+                                    <form action="{{ route('admin.document-studio.start-draft', $effective) }}" method="POST" class="flex-1">
+                                        @csrf
+                                        <button type="submit"
+                                                class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors min-h-[44px]">
+                                            <x-dashboard-icon name="pencil" class="w-4 h-4" />
+                                            <span>Open PDFme Designer</span>
+                                        </button>
+                                    </form>
+                                @endif
                             </div>
                             <div class="flex items-center gap-1">
                                 <a href="{{ route('admin.document-studio.versions', $effective) }}"

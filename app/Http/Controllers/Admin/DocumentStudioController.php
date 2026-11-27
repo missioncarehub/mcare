@@ -320,7 +320,22 @@ class DocumentStudioController extends Controller
     {
         $this->authorize('update', $template);
 
-        $template->loadMissing(['activeVersion', 'versions.createdBy', 'assets', 'trainingProgram']);
+        $template->loadMissing([
+            'activeVersion:id,document_template_id,version_number,sha256,created_at,published_at',
+            'assets:id,document_template_id,type',
+            'trainingProgram:id,name,code',
+        ]);
+
+        // Prevent accidental inline numeric-keyed byte maps from bloating inline Blade JSON
+        // when an authoritative external PDF/background asset reference already exists.
+        $state = $template->draft_state ?? [];
+        if (is_array($state)
+            && (! empty($state['background_asset_id']) || ! empty($state['base_pdf_asset_id']) || ! empty($state['base_pdf_url']))
+            && is_array($state['basePdf'] ?? null)
+            && ! isset($state['basePdf']['width'])) {
+            unset($state['basePdf']);
+            $template->setAttribute('draft_state', $state);
+        }
 
         $placeholders = PlaceholderRegistry::forKind($template->document_kind);
         $samplePayload = PlaceholderRegistry::samplePayload($template->document_kind);
@@ -337,7 +352,6 @@ class DocumentStudioController extends Controller
         return view('admin.document-studio.editor', [
             'template' => $template,
             'activeVersion' => $template->activeVersion,
-            'versions' => $template->versions,
             'assets' => $template->assets->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE),
             'assetUrls' => $template->assets->where('type', '!=', DocumentAsset::TYPE_PDF_SOURCE)->values()->map(fn ($asset) => ['id' => $asset->id, 'url' => route('admin.document-studio.assets.stream', $asset, false)]),
             'placeholders' => $placeholders,
@@ -528,6 +542,7 @@ class DocumentStudioController extends Controller
         ];
 
         $previewCacheKey = null;
+        $previewPayloadHash = null;
         if (! $request->filled('enrollment_id')
             && ! $request->boolean('fresh')
             && $this->renderer::class === DocumentStudioRenderer::class) {
@@ -535,14 +550,19 @@ class DocumentStudioController extends Controller
             if (! empty($payload['base_pdf_url']) && file_exists(public_path(ltrim($payload['base_pdf_url'], '/')))) {
                 $basePdfMtime = @filemtime(public_path(ltrim($payload['base_pdf_url'], '/')));
             }
-            $previewCacheKey = 'document-studio:preview:v1:'.sha1(json_encode([
+            $variant = $version ? 'v'.$version->id : 'draft';
+            $previewCacheKey = "document-studio:preview:tpl:{$template->id}:{$variant}";
+            $previewPayloadHash = sha1(json_encode([
                 'payload' => $payload,
                 'base_pdf_mtime' => $basePdfMtime,
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-            $cachedPdf = Cache::store('file')->get($previewCacheKey);
-            if (is_string($cachedPdf) && str_starts_with($cachedPdf, '%PDF-')) {
-                return response($cachedPdf, 200, [
+            $cachedEntry = Cache::store('file')->get($previewCacheKey);
+            if (is_array($cachedEntry)
+                && ($cachedEntry['hash'] ?? null) === $previewPayloadHash
+                && is_string($cachedEntry['pdf'] ?? null)
+                && str_starts_with($cachedEntry['pdf'], '%PDF-')) {
+                return response($cachedEntry['pdf'], 200, [
                     'Content-Type' => 'application/pdf',
                     'Content-Disposition' => 'inline; filename="'.$template->slug.'-preview.pdf"',
                     'Cache-Control' => 'no-cache, no-store, must-revalidate',
@@ -553,8 +573,11 @@ class DocumentStudioController extends Controller
 
         try {
             $pdfBinary = $this->renderer->renderPayloadToPdf($payload);
-            if ($previewCacheKey && str_starts_with($pdfBinary, '%PDF-')) {
-                Cache::store('file')->put($previewCacheKey, $pdfBinary, now()->addMinutes(15));
+            if ($previewCacheKey && $previewPayloadHash && str_starts_with($pdfBinary, '%PDF-')) {
+                Cache::store('file')->put($previewCacheKey, [
+                    'hash' => $previewPayloadHash,
+                    'pdf' => $pdfBinary,
+                ], now()->addMinutes(15));
             }
         } catch (\Throwable $exception) {
             report($exception);
