@@ -2,7 +2,7 @@ import { installTextFields } from './text-fields.js';
 import { Designer } from '@pdfme/ui';
 import { normalizeStudioSchema } from './tables.js';
 import { CERTIFICATE_STYLE_PRESETS } from './fonts.js';
-import { PDFME_PLUGINS, loadBrowserFonts, renderPdfmeTemplateToBytes } from './pdfme-render.js';
+import { PDFME_PLUGINS, buildBasePdfFromImageUrl, loadBrowserFonts, renderPdfmeTemplateToBytes } from './pdfme-render.js';
 
 export class PdfmeAdapter {
     constructor(container, options = {}) {
@@ -18,35 +18,6 @@ export class PdfmeAdapter {
 
     async mount() {
         if (!this.container) return;
-
-        // Normalize template structure for pdfme
-        let basePdf = this.template.basePdf;
-        if (this.template.base_pdf_asset_id) {
-            const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
-            if (!asset) throw new Error('The base PDF is unavailable.');
-            const response = await fetch(asset.url, { credentials: 'same-origin' });
-            if (!response.ok) throw new Error('Could not load the base PDF.');
-            basePdf = new Uint8Array(await response.arrayBuffer());
-        }
-        if (!basePdf && (this.template.base_pdf_url || this.template.basePdfUrl)) {
-            try {
-                const url = this.template.base_pdf_url || this.template.basePdfUrl;
-                const response = await fetch(url, { credentials: 'same-origin' });
-                if (response.ok) {
-                    basePdf = new Uint8Array(await response.arrayBuffer());
-                }
-            } catch (err) {
-                console.warn('Could not load base_pdf_url, falling back to dimensions', err);
-            }
-        }
-        if (!basePdf) {
-            const page = this.template.page || { width_mm: 210, height_mm: 297 };
-            basePdf = {
-                width: page.width_mm || 210,
-                height: page.height_mm || 297,
-                padding: [10, 10, 10, 10],
-            };
-        }
 
         let schemas = this.template.schemas;
         if (!schemas && this.template.elements) {
@@ -66,6 +37,65 @@ export class PdfmeAdapter {
         }
         if (!schemas || schemas.length === 0) {
             schemas = [[]];
+        }
+
+        // Promote any legacy full-canvas template_bg_* image schema into the underlying basePdf layer
+        // so uploaded backgrounds never cover text boxes or steal clicks.
+        let legacyBgUrl = null;
+        if (Array.isArray(schemas[0])) {
+            const bgField = schemas[0].find(f => String(f?.name || '').startsWith('template_bg_'));
+            if (bgField) {
+                if (bgField.asset_id && !this.template.background_asset_id) {
+                    this.template.background_asset_id = bgField.asset_id;
+                }
+                const matched = bgField.asset_id ? this.options.assets?.find(item => Number(item.id) === Number(bgField.asset_id)) : null;
+                legacyBgUrl = matched?.url || bgField.content || (bgField.asset_id ? `/admin/document-studio/assets/${bgField.asset_id}` : null);
+                schemas = [schemas[0].filter(f => !String(f?.name || '').startsWith('template_bg_')), ...schemas.slice(1)];
+            }
+        }
+
+        const pageWidthMm = this.template.page?.width_mm || (this.template.document_kind === 'cotc' ? 279.4 : 210);
+        const pageHeightMm = this.template.page?.height_mm || (this.template.document_kind === 'cotc' ? 215.9 : 297);
+
+        // Normalize template structure for pdfme
+        let basePdf = this.template.basePdf;
+        if (!basePdf && (this.template.background_asset_id || legacyBgUrl)) {
+            const bgAsset = this.template.background_asset_id
+                ? this.options.assets?.find(item => Number(item.id) === Number(this.template.background_asset_id))
+                : null;
+            const bgUrl = bgAsset?.url || (this.template.background_asset_id ? `/admin/document-studio/assets/${this.template.background_asset_id}` : legacyBgUrl);
+            if (bgUrl) {
+                try {
+                    basePdf = await buildBasePdfFromImageUrl(bgUrl, pageWidthMm, pageHeightMm);
+                } catch (err) {
+                    console.warn('Could not build basePdf from background picture:', err);
+                }
+            }
+        }
+        if (!basePdf && this.template.base_pdf_asset_id) {
+            const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
+            if (!asset) throw new Error('The base PDF is unavailable.');
+            const response = await fetch(asset.url, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Could not load the base PDF.');
+            basePdf = new Uint8Array(await response.arrayBuffer());
+        }
+        if (!basePdf && (this.template.base_pdf_url || this.template.basePdfUrl)) {
+            try {
+                const url = this.template.base_pdf_url || this.template.basePdfUrl;
+                const response = await fetch(url, { credentials: 'same-origin' });
+                if (response.ok) {
+                    basePdf = new Uint8Array(await response.arrayBuffer());
+                }
+            } catch (err) {
+                console.warn('Could not load base_pdf_url, falling back to dimensions', err);
+            }
+        }
+        if (!basePdf) {
+            basePdf = {
+                width: pageWidthMm,
+                height: pageHeightMm,
+                padding: [10, 10, 10, 10],
+            };
         }
 
         const designerFonts = await loadBrowserFonts();
@@ -176,7 +206,7 @@ export class PdfmeAdapter {
 
     getState(currentTemplate = null) {
         const tmpl = currentTemplate || (this.designer ? this.designer.getTemplate() : this.template);
-        const hasExternalBase = Boolean(this.template.base_pdf_asset_id || this.template.base_pdf_url);
+        const hasExternalBase = Boolean(this.template.background_asset_id || this.template.base_pdf_asset_id || this.template.base_pdf_url);
         const isBinaryBase = tmpl.basePdf instanceof Uint8Array || ArrayBuffer.isView(tmpl.basePdf);
         const cleanBasePdf = hasExternalBase || isBinaryBase
             ? undefined
@@ -197,8 +227,9 @@ export class PdfmeAdapter {
                 height_mm: (!isBinaryBase && tmpl.basePdf?.height) || this.template.page?.height_mm || 297,
             },
             basePdf: cleanBasePdf,
+            background_asset_id: this.template.background_asset_id || undefined,
             base_pdf_asset_id: this.template.base_pdf_asset_id || undefined,
-            base_pdf_url: this.template.base_pdf_asset_id ? undefined : (this.template.base_pdf_url || undefined),
+            base_pdf_url: (this.template.base_pdf_asset_id || this.template.background_asset_id) ? undefined : (this.template.base_pdf_url || undefined),
             schemas: tmpl.schemas,
         };
     }
@@ -230,6 +261,7 @@ export class PdfmeAdapter {
         const response = await fetch(asset.url, { credentials: 'same-origin' });
         if (!response.ok) throw new Error('Could not load the base PDF.');
         this.template.base_pdf_asset_id = asset.id;
+        this.template.background_asset_id = undefined;
         this.template.base_pdf_url = undefined;
         this.designer.updateTemplate({ ...this.designer.getTemplate(), basePdf: new Uint8Array(await response.arrayBuffer()) });
         this.options.onChange?.(this.getState());
@@ -241,26 +273,15 @@ export class PdfmeAdapter {
         const width = this.template.page?.width_mm || (this.template.document_kind === 'cotc' ? 279.4 : 210);
         const height = this.template.page?.height_mm || (this.template.document_kind === 'cotc' ? 215.9 : 297);
 
+        this.template.background_asset_id = assetId;
         this.template.base_pdf_asset_id = undefined;
         this.template.base_pdf_url = undefined;
 
-        const cleanBasePdf = { width, height, padding: [0, 0, 0, 0] };
+        const basePdf = await buildBasePdfFromImageUrl(url, width, height);
         const schemas = current.schemas && current.schemas.length > 0 ? [...current.schemas] : [[]];
-        const page0 = (schemas[0] || []).filter(field => !String(field.name || '').startsWith('template_bg_'));
+        schemas[0] = (schemas[0] || []).filter(field => !String(field.name || '').startsWith('template_bg_'));
 
-        page0.unshift(normalizeStudioSchema({
-            name: `template_bg_${assetId}`,
-            type: 'image',
-            position: { x: 0, y: 0 },
-            width,
-            height,
-            content: url,
-            asset_id: assetId,
-            readOnly: true,
-        }, this.plugins));
-
-        schemas[0] = page0;
-        const updated = { ...current, basePdf: cleanBasePdf, schemas };
+        const updated = { ...current, basePdf, schemas };
         this.designer.updateTemplate(updated);
         this.options.onChange?.(this.getState(updated));
         this.options.onFieldsChange?.(this.getTextFields(updated));

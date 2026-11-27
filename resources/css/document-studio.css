@@ -31,7 +31,7 @@
     outline-offset: 0;
 }
 
-#studio-editor-viewport.show-field-labels .selectable:hover {
+#studio-editor-viewport.show-field-labels .selectable:not([data-label-inside="true"]):hover {
     outline: 1.5px solid rgba(79, 70, 229, 0.9);
     z-index: 20 !important;
 }

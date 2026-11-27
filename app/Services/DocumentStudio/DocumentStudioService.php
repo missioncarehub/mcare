@@ -1091,7 +1091,7 @@ class DocumentStudioService
             return true;
         }
 
-        if ($engine === DocumentTemplate::ENGINE_FABRIC && ! empty($state['background_asset_id'])) {
+        if (in_array($engine, [DocumentTemplate::ENGINE_FABRIC, DocumentTemplate::ENGINE_PDFME], true) && ! empty($state['background_asset_id'])) {
             return true;
         }
 

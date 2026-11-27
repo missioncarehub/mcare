@@ -497,6 +497,8 @@ class DocumentStudioApp {
                 if (!res.ok) throw new Error(data.message || 'Asset upload failed');
 
                 if (data.asset?.url) {
+                    this.config.assets = [...(this.config.assets || []), data.asset];
+                    this.adapter?.options?.assets?.push?.(data.asset);
                     if (selectedType === 'pdf_base') {
                         await this.adapter.setBasePdf(data.asset);
                     } else if (isTemplatePicture) {

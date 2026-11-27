@@ -146,6 +146,35 @@ async function renderPdfme(payload) {
 
     // Convert Studio elements to pdfme schemas if necessary
     let schemas = payload.schemas;
+    let legacyBgFile = null;
+    if (Array.isArray(schemas?.[0])) {
+        const bgField = schemas[0].find(f => String(f?.name || '').startsWith('template_bg_'));
+        if (bgField) {
+            let bgAssetId = bgField.asset_id;
+            if (!bgAssetId && typeof bgField.content === 'string') {
+                const m = bgField.content.match(/\/admin\/document-studio\/assets\/(\d+)$/);
+                if (m) bgAssetId = Number(m[1]);
+            }
+            if (bgAssetId && payload.asset_paths?.[bgAssetId]) {
+                legacyBgFile = payload.asset_paths[bgAssetId];
+            }
+            schemas = [schemas[0].filter(f => !String(f?.name || '').startsWith('template_bg_')), ...schemas.slice(1)];
+        }
+    }
+
+    const bgFile = payload.backgroundVerifiedPath || legacyBgFile;
+    if (bgFile) {
+        const mmToPt = 72 / 25.4;
+        const ptW = Number(pageSettings.width_mm || 279.4) * mmToPt;
+        const ptH = Number(pageSettings.height_mm || 215.9) * mmToPt;
+        const doc = await PDFDocument.create();
+        const page = doc.addPage([ptW, ptH]);
+        const bytes = await fs.readFile(bgFile);
+        const embedded = await embedStudioImage(doc, bytes, ptW, ptH);
+        drawStudioImage(page, embedded, { x: 0, y: 0, width: ptW, height: ptH });
+        basePdf = new Uint8Array(await doc.save());
+    }
+
     if (!schemas && payload.elements) {
         const pageSchema = [];
         for (const el of payload.elements) {

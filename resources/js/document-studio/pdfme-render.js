@@ -1,4 +1,5 @@
 import { generate } from '@pdfme/generator';
+import { PDFDocument } from 'pdf-lib';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
 import { normalizeStudioSchema, studioTables, tableBinding } from './tables.js';
 import { getBrowserPdfmeFonts } from './fonts.js';
@@ -54,6 +55,56 @@ async function fetchAsDataUrl(url) {
     }
 }
 
+async function convertToPngBytesIfNeeded(bytes, mime) {
+    if (mime === 'image/png' || mime === 'image/jpeg') {
+        return { bytes, isPng: mime === 'image/png' };
+    }
+    const blob = new Blob([bytes], { type: mime || 'image/png' });
+    const imgUrl = URL.createObjectURL(blob);
+    try {
+        const img = await new Promise((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = reject;
+            el.src = imgUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 1600;
+        canvas.height = img.naturalHeight || img.height || 1200;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        return { bytes: new Uint8Array(await pngBlob.arrayBuffer()), isPng: true };
+    } finally {
+        URL.revokeObjectURL(imgUrl);
+    }
+}
+
+export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 215.9) {
+    if (!url) return null;
+    const res = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Could not load template background picture.');
+    const rawBytes = new Uint8Array(await res.arrayBuffer());
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const isJpeg = contentType.includes('jpeg') || contentType.includes('jpg') || (rawBytes[0] === 0xff && rawBytes[1] === 0xd8);
+    const isPng = contentType.includes('png') || (rawBytes[0] === 0x89 && rawBytes[1] === 0x50);
+    const mime = isJpeg ? 'image/jpeg' : (isPng ? 'image/png' : (contentType || 'image/png'));
+
+    const normalized = await convertToPngBytesIfNeeded(rawBytes, mime);
+    const ptPerMm = 72 / 25.4;
+    const widthPt = Number(widthMm) * ptPerMm;
+    const heightPt = Number(heightMm) * ptPerMm;
+
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([widthPt, heightPt]);
+    const embedded = normalized.isPng
+        ? await doc.embedPng(normalized.bytes)
+        : await doc.embedJpg(normalized.bytes);
+    page.drawImage(embedded, { x: 0, y: 0, width: widthPt, height: heightPt });
+
+    return new Uint8Array(await doc.save());
+}
+
 export async function renderPdfmeTemplateToBytes({ templateState = {}, designerTemplate = null, values = {}, assets = [], plugins = PDFME_PLUGINS } = {}) {
     const source = designerTemplate ? structuredClone(designerTemplate) : structuredClone(templateState);
     let basePdf = source.basePdf;
@@ -63,9 +114,30 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
         basePdf = new Uint8Array(basePdf.slice(0));
     }
 
+    let rawSchemas = source.schemas;
+    let legacyBgUrl = null;
+    if (Array.isArray(rawSchemas?.[0])) {
+        const bgField = rawSchemas[0].find(f => String(f?.name || '').startsWith('template_bg_'));
+        if (bgField) {
+            const matched = bgField.asset_id ? assets.find(item => Number(item.id) === Number(bgField.asset_id)) : null;
+            legacyBgUrl = matched?.url || bgField.content || (bgField.asset_id ? `/admin/document-studio/assets/${bgField.asset_id}` : null);
+            rawSchemas = [rawSchemas[0].filter(f => !String(f?.name || '').startsWith('template_bg_')), ...rawSchemas.slice(1)];
+        }
+    }
+
+    const pageWidthMm = templateState.page?.width_mm || (templateState.document_kind === 'cotc' ? 279.4 : 210);
+    const pageHeightMm = templateState.page?.height_mm || (templateState.document_kind === 'cotc' ? 215.9 : 297);
+    const bgAssetId = templateState.background_asset_id || source.background_asset_id;
     const basePdfAssetId = templateState.base_pdf_asset_id || source.base_pdf_asset_id;
     const basePdfUrl = templateState.base_pdf_url || templateState.basePdfUrl || source.base_pdf_url;
 
+    if (!(basePdf instanceof Uint8Array) && (bgAssetId || legacyBgUrl)) {
+        const matchedBg = bgAssetId ? assets.find(item => Number(item.id) === Number(bgAssetId)) : null;
+        const bgUrl = matchedBg?.url || (bgAssetId ? `/admin/document-studio/assets/${bgAssetId}` : legacyBgUrl);
+        if (bgUrl) {
+            basePdf = await buildBasePdfFromImageUrl(bgUrl, pageWidthMm, pageHeightMm);
+        }
+    }
     if (!basePdf && basePdfAssetId) {
         const matched = assets.find(item => Number(item.id) === Number(basePdfAssetId));
         const url = matched?.url || `/admin/document-studio/assets/${basePdfAssetId}`;
@@ -77,11 +149,8 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
         if (res.ok) basePdf = new Uint8Array(await res.arrayBuffer());
     }
     if (!basePdf) {
-        const page = templateState.page || { width_mm: 279.4, height_mm: 215.9 };
-        basePdf = { width: page.width_mm || 279.4, height: page.height_mm || 215.9, padding: [10, 10, 10, 10] };
+        basePdf = { width: pageWidthMm, height: pageHeightMm, padding: [10, 10, 10, 10] };
     }
-
-    let rawSchemas = source.schemas;
     if (!rawSchemas && templateState.elements) {
         rawSchemas = [templateState.elements.map((el, idx) => ({
             name: el.id || el.binding || `field_${idx}`,

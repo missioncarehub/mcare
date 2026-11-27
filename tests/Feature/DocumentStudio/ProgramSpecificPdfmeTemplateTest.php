@@ -352,6 +352,27 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->assertNull($cotcBgPreview->headers->get('x-mcare-preview-fallback'));
         $this->assertStringStartsWith('%PDF-', $cotcBgPreview->getContent());
 
+        // Verify background_asset_id on PDFme state renders cleanly underneath fields via Node
+        $bgAssetState = $workingDraft->draft_state;
+        unset($bgAssetState['base_pdf_url'], $bgAssetState['base_pdf_asset_id']);
+        $bgAssetState['background_asset_id'] = $asset->id;
+        $bgAssetState['schemas'][0] = array_values(array_filter(
+            $bgAssetState['schemas'][0],
+            fn ($f) => ! str_starts_with((string) ($f['name'] ?? ''), 'template_bg_')
+        ));
+
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.document-studio.draft.save', $workingDraft), [
+                'draft_state' => $bgAssetState,
+                'draft_revision' => $workingDraft->fresh()->draft_revision,
+            ])
+            ->assertOk();
+
+        $bgAssetPreview = $this->actingAs($this->admin)->get($expectedDraftPreviewUrl);
+        $bgAssetPreview->assertOk();
+        $this->assertNull($bgAssetPreview->headers->get('x-mcare-preview-fallback'));
+        $this->assertStringStartsWith('%PDF-', $bgAssetPreview->getContent());
+
         // Verify TOR draft preview also matches latest edited draft
         $publishedTor = DocumentTemplate::query()
             ->where('document_kind', DocumentTemplate::KIND_TOR)
