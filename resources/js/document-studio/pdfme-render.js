@@ -122,6 +122,13 @@ export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 
     return new Uint8Array(await doc.save());
 }
 
+function interpolateStudioTokens(text, values = {}) {
+    return String(text).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
+        const value = values[key];
+        return value !== undefined && value !== null && typeof value !== 'object' ? String(value) : match;
+    });
+}
+
 export async function renderPdfmeTemplateToBytes({ templateState = {}, designerTemplate = null, values = {}, assets = [], plugins = PDFME_PLUGINS } = {}) {
     const source = designerTemplate ? structuredClone(designerTemplate) : structuredClone(templateState);
     let basePdf = source.basePdf;
@@ -201,16 +208,10 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
             }
 
             const rawContent = field.content ?? field.text;
-            const hasInlineToken = typeof rawContent === 'string' && /\{\{\w+\}\}/.test(rawContent);
+            const hasInlineToken = typeof rawContent === 'string' && /\{\{\s*[a-zA-Z0-9_]+\s*\}\}/.test(rawContent);
 
             if (val === undefined && hasInlineToken) {
-                let interpolated = rawContent;
-                for (const [k, v] of Object.entries(values)) {
-                    if (v !== undefined && v !== null && typeof v !== 'object') {
-                        interpolated = interpolated.replaceAll(`{{${k}}}`, String(v));
-                    }
-                }
-                val = interpolated;
+                val = interpolateStudioTokens(rawContent, values);
             }
             if (val === undefined && (field.type === 'table' || !rawContent)) {
                 if (values[field.name] !== undefined) val = values[field.name];
@@ -218,7 +219,7 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
                     const cleanKey = field.binding.replace(/[{}]/g, '').trim();
                     if (values[cleanKey] !== undefined) val = values[cleanKey];
                     else if (values[field.binding] !== undefined) val = values[field.binding];
-                    else val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
+                    else val = interpolateStudioTokens(field.binding, values);
                 }
             }
             if (val === undefined && typeof rawContent === 'string' && rawContent !== '') {

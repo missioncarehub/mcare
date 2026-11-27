@@ -3,12 +3,19 @@
 namespace Tests\Feature\DocumentStudio;
 
 use App\Models\DocumentTemplate;
+use App\Models\EnrollmentApplication;
+use App\Models\OfficialDocument;
+use App\Models\PublicSiteSetting;
+use App\Models\TrainingBatch;
 use App\Models\TrainingProgram;
 use App\Models\User;
 use App\Services\DocumentStudio\DocumentStudioService;
+use App\Services\DocumentStudio\PlaceholderRegistry;
+use App\Services\OfficialDocumentManager;
 use App\Support\RolePermissionMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -424,5 +431,129 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
             ->assertSee('DOCUMENT_STUDIO_PREVIEW_FALLBACKS', false)
             ->assertSee('data-pdfme-fallback-key="cotc"', false)
             ->assertSee('data-pdfme-fallback-key="tor"', false);
+
+        // Verify Document Studio Designer renders the official textless logo + spinner loading overlay
+        $editorHtml = $this->actingAs($this->admin)
+            ->get(route('admin.document-studio.edit', $workingDraft))
+            ->assertOk()
+            ->assertSee('id="studio-loading-overlay"', false)
+            ->assertSee('studio-loader-spinner', false)
+            ->assertSee('assets/mcare-mark-cropped.png', false)
+            ->getContent();
+        $this->assertMatchesRegularExpression('/id="studio-loading-overlay"[^>]*studio-loader-overlay/s', $editorHtml);
+        $this->assertStringNotContainsString('hidden id="studio-loading-overlay"', $editorHtml);
+    }
+
+    public function test_dynamic_bindings_adapt_to_release_action_public_settings_batch_trainer_and_spaced_tokens(): void
+    {
+        $trainer = User::factory()->create(['name' => 'Elena Mendoza, RN', 'role' => 'trainer']);
+        RolePermissionMatrix::syncUser($trainer);
+
+        $program = TrainingProgram::create([
+            'name' => 'Health Care Services NC II',
+            'code' => 'HCS-NCII',
+            'total_program_fee' => 28000,
+            'is_active' => true,
+        ]);
+
+        $batch = TrainingBatch::create([
+            'training_program_id' => $program->id,
+            'trainer_id' => $trainer->id,
+            'name' => 'Batch 9',
+            'year' => 2026,
+            'is_active' => true,
+            'training_starts_at' => '2026-08-01',
+            'training_ends_at' => '2026-11-15',
+        ]);
+
+        $trainee = User::factory()->create(['name' => 'Carlo Bautista', 'role' => 'trainee']);
+        $application = EnrollmentApplication::create([
+            'user_id' => $trainee->id,
+            'training_program_id' => $program->id,
+            'training_batch_id' => $batch->id,
+            'email' => 'carlo@example.com',
+            'first_name' => 'Carlo',
+            'last_name' => 'Bautista',
+            'birth_date' => '2001-05-12',
+            'gender' => 'Male',
+            'contact_number' => '09171234567',
+            'schedule_preference' => 'AM',
+            'street' => '10 Rizal Ave',
+            'barangay' => 'San Isidro',
+            'city' => 'Pili',
+            'province' => 'Camarines Sur',
+            'zip_code' => '4418',
+            'educational_attainment' => 'College Graduate',
+            'school_name' => 'MCARE School',
+            'year_graduated' => 2022,
+            'status' => EnrollmentApplication::STATUS_APPROVED,
+            'learning_status' => EnrollmentApplication::LEARNING_GRADUATED,
+            'payment_status' => EnrollmentApplication::PAYMENT_PAID,
+            'graduated_at' => '2026-11-18',
+        ]);
+
+        $template = $this->service->createTemplate([
+            'name' => 'Dynamic Release Test COTC',
+            'document_kind' => DocumentTemplate::KIND_COTC,
+            'engine' => DocumentTemplate::ENGINE_PDFME,
+            'training_program_id' => $program->id,
+            'initial_state' => [
+                'schema_version' => '1.0',
+                'engine' => DocumentTemplate::ENGINE_PDFME,
+                'page' => ['width_mm' => 279.4, 'height_mm' => 215.9],
+                'schemas' => [[
+                    [
+                        'name' => 'trainee_name',
+                        'type' => 'text',
+                        'position' => ['x' => 20, 'y' => 60],
+                        'width' => 160,
+                        'height' => 12,
+                        'fontSize' => 18,
+                        'content' => '{{ trainee_name }}',
+                    ],
+                    [
+                        'name' => 'release_line',
+                        'type' => 'text',
+                        'position' => ['x' => 20, 'y' => 90],
+                        'width' => 180,
+                        'height' => 10,
+                        'fontSize' => 11,
+                        'content' => 'Released {{ release_date }} | Issued {{issued_date}} | {{program_code}} ({{course_hours}} hrs)',
+                    ],
+                    [
+                        'name' => 'signatories',
+                        'type' => 'text',
+                        'position' => ['x' => 20, 'y' => 130],
+                        'width' => 180,
+                        'height' => 10,
+                        'fontSize' => 11,
+                        'content' => '{{ trainer_name }} / {{ registrar_name }}',
+                    ],
+                ]],
+            ],
+        ], $this->admin);
+        $this->service->publishVersion($template, 'Dynamic bindings layout', true, $this->admin);
+
+        Carbon::setTestNow('2026-11-20 10:00:00');
+        $docManager = app(OfficialDocumentManager::class);
+        $generated = $docManager->generate($application, OfficialDocument::TYPE_COTC, $this->admin);
+        $preReleaseSha = $generated->sha256;
+
+        // Change action context before release: later date & updated Public Site Registrar signatory
+        Carbon::setTestNow('2026-11-27 14:30:00');
+        PublicSiteSetting::instance()->update(['registrar_name' => 'Dr. Marisol D. Navarro']);
+
+        $released = $docManager->releaseCotc($generated, $this->admin);
+        Carbon::setTestNow();
+
+        $resolved = PlaceholderRegistry::resolveForEnrollment($application, OfficialDocument::TYPE_COTC, $released);
+        $this->assertSame('November 27, 2026', $resolved['release_date']);
+        $this->assertSame('November 27, 2026', $resolved['issued_date']);
+        $this->assertSame('Elena Mendoza, RN', $resolved['trainer_name']);
+        $this->assertSame('Dr. Marisol D. Navarro', $resolved['registrar_name']);
+        $this->assertSame('HCS-NCII', $resolved['program_code']);
+        $this->assertNotSame($preReleaseSha, $released->sha256, 'Releasing COTC must re-render custom Studio PDF with the actual release date and live settings.');
+        $pdfBytes = Storage::disk($released->storage_disk)->get($released->file_path);
+        $this->assertStringStartsWith('%PDF-', $pdfBytes);
     }
 }

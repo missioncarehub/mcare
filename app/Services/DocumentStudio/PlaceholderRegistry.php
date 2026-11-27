@@ -5,6 +5,7 @@ namespace App\Services\DocumentStudio;
 use App\Models\EnrollmentApplication;
 use App\Models\OfficialDocument;
 use App\Models\PaymentTransaction;
+use App\Models\PublicSiteSetting;
 use Carbon\Carbon;
 
 class PlaceholderRegistry
@@ -23,6 +24,11 @@ class PlaceholderRegistry
             'education_category' => ['token' => '{{education_category}}', 'label' => 'Education category', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => 'College', 'description' => 'Saved record value'],
             'document_version' => ['token' => '{{document_version}}', 'label' => 'Document version', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => '1', 'description' => 'Saved record value'],
             'entrance_date' => ['token' => '{{entrance_date}}', 'label' => 'Entrance date', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => 'June 1, 2026', 'description' => 'Saved record value'],
+            'training_end_date' => ['token' => '{{training_end_date}}', 'label' => 'Training end date', 'type' => 'date', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => 'August 28, 2026', 'description' => 'Batch scheduled training end date'],
+            'current_date' => ['token' => '{{current_date}}', 'label' => 'Current Date', 'type' => 'date', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => now()->format('F j, Y'), 'description' => 'Date the document is rendered or generated'],
+            'program_code' => ['token' => '{{program_code}}', 'label' => 'Program Code', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => 'CG-NCII', 'description' => 'Official qualification / program code'],
+            'course_hours' => ['token' => '{{course_hours}}', 'label' => 'Training Hours', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'general'], 'sample_value' => (string) config('official_documents.organization.course_hours', 786), 'description' => 'Total accredited training hours'],
+            'organization_address' => ['token' => '{{organization_address}}', 'label' => 'Organization Address', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => (string) config('official_documents.organization.address', 'San Isidro Poblacion, Pili, Camarines Sur'), 'description' => 'Official center address'],
             'completion_line' => ['token' => '{{completion_line}}', 'label' => 'Completion sentence', 'type' => 'text', 'applicable_kinds' => ['cotc', 'tor', 'soa', 'general'], 'sample_value' => 'Given this 28th of August, 2026 at Mission Care Training Center', 'description' => 'Saved record value'],
             'soa_ledger' => ['token' => '{{soa_ledger}}', 'label' => 'Payment ledger with balance', 'type' => 'table', 'applicable_kinds' => ['soa'], 'sample_value' => [], 'description' => 'Verified payments and running balance'],
             'tor_competencies' => ['token' => '{{tor_competencies}}', 'label' => 'Competencies and grades', 'type' => 'table', 'applicable_kinds' => ['tor'], 'sample_value' => [], 'description' => 'Saved competency records'],
@@ -234,6 +240,18 @@ class PlaceholderRegistry
             $payload[$key] = $def['sample_value'];
         }
 
+        $dynamicRegistrar = PublicSiteSetting::current()->registrarName();
+        if ($dynamicRegistrar !== '') {
+            $payload['registrar_name'] = $dynamicRegistrar;
+        }
+        $today = now()->format('F j, Y');
+        $payload['release_date'] = $today;
+        $payload['issued_date'] = $today;
+        $payload['current_date'] = $today;
+        if (isset($payload['statement_date'])) {
+            $payload['statement_date'] = $today;
+        }
+
         // Add table repeaters
         if ($documentKind === 'tor') {
             $payload['tor_competencies'] = [
@@ -317,6 +335,7 @@ class PlaceholderRegistry
     ): array {
         $application->loadMissing([
             'batch.program',
+            'batch.trainer',
             'trainingProgram',
             'user',
             'competencyRecords.unit',
@@ -324,9 +343,12 @@ class PlaceholderRegistry
         ]);
 
         $organization = config('official_documents.organization', []);
-        $trainerName = (string) ($organization['trainer_name'] ?? 'Maricris N. Collao');
-        $registrarName = (string) ($organization['registrar_name'] ?? 'Salvacion A. Collao');
+        $publicSettings = PublicSiteSetting::current();
+        $trainerName = $application->batch?->trainer?->name ?: (string) ($organization['trainer_name'] ?? 'Maricris N. Collao');
+        $registrarName = $publicSettings->registrarName() ?: (string) ($organization['registrar_name'] ?? 'Salvacion A. Collao');
         $orgName = (string) ($organization['name'] ?? 'Mission Care Training Center');
+        $orgAddress = (string) ($organization['address'] ?? 'San Isidro Poblacion, Pili, Camarines Sur');
+        $courseHours = (string) ($organization['course_hours'] ?? 786);
 
         $traineeFullName = trim(mb_strtoupper(
             trim(($application->first_name ?? '').' '.($application->middle_name ? $application->middle_name.' ' : '').($application->last_name ?? ''))
@@ -338,6 +360,9 @@ class PlaceholderRegistry
         $programName = $application->trainingProgram?->name
             ?: $application->batch?->program?->name
             ?: ($application->program ?: 'Caregiving NC II');
+        $programCode = $application->trainingProgram?->code
+            ?: $application->batch?->program?->code
+            ?: '-';
 
         $batchName = $application->batch?->name
             ? $application->batch->name.($application->batch->year ? ' ('.$application->batch->year.')' : '')
@@ -346,9 +371,15 @@ class PlaceholderRegistry
         $completionDate = $application->graduated_at
             ?? $application->learning_status_changed_at
             ?? $application->batch?->training_ends_at
+            ?? $officialDocument?->released_at
             ?? $officialDocument?->generated_at
             ?? now();
         $formattedDate = $completionDate instanceof Carbon ? $completionDate->format('F j, Y') : (string) $completionDate;
+
+        $releaseMoment = $officialDocument?->released_at
+            ?? $officialDocument?->generated_at
+            ?? now();
+        $formattedReleaseDate = $releaseMoment instanceof Carbon ? $releaseMoment->format('F j, Y') : (string) $releaseMoment;
 
         $docNumber = $officialDocument?->document_number
             ?? sprintf('MCARE-%s-%s-%05d-V1', strtoupper($documentKind), now()->year, $application->id);
@@ -360,13 +391,18 @@ class PlaceholderRegistry
             'education_category' => $application->classification ?: '-',
             'document_version' => (string) ($officialDocument?->version ?? 1),
             'entrance_date' => $application->batch?->training_starts_at?->format('F j, Y') ?? '-',
+            'training_end_date' => $application->batch?->training_ends_at?->format('F j, Y') ?? $formattedDate,
+            'current_date' => now()->format('F j, Y'),
+            'program_code' => $programCode,
+            'course_hours' => $courseHours,
+            'organization_address' => $orgAddress,
             'completion_line' => 'Given this '.($completionDate instanceof Carbon ? $completionDate->format('jS \o\f F, Y') : $formattedDate).' at '.$orgName,
             'trainee_name' => $traineeFullName,
             'training_program' => $programName,
             'batch_name' => $batchName,
             'completion_date' => $formattedDate,
-            'release_date' => ($officialDocument?->generated_at ?? now())->format('F j, Y'),
-            'issued_date' => ($officialDocument?->generated_at ?? now())->format('F j, Y'),
+            'release_date' => $formattedReleaseDate,
+            'issued_date' => $formattedReleaseDate,
             'certificate_number' => $docNumber,
             'trainer_name' => $trainerName,
             'trainer_role' => (string) ($organization['trainer_role'] ?? 'Lead Trainer'),

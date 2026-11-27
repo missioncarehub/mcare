@@ -1,6 +1,23 @@
 import { previewDocument, previewPdfBytes } from './preview.js';
 import { notifyStudio } from './feedback.js';
 import { CERTIFICATE_FONTS } from './fonts.js';
+let supportsDisplayTransition;
+function canTransitionDisplay() {
+    if (supportsDisplayTransition !== undefined) return supportsDisplayTransition;
+    if (!window.CSS?.supports?.('transition-behavior', 'allow-discrete') || !document.body) {
+        supportsDisplayTransition = false;
+        return false;
+    }
+    const probe = document.createElement('div');
+    probe.style.cssText = 'transition: display 1s allow-discrete !important; display: block;';
+    document.body.appendChild(probe);
+    getComputedStyle(probe).display;
+    probe.style.display = 'none';
+    supportsDisplayTransition = getComputedStyle(probe).display === 'block';
+    probe.remove();
+    return supportsDisplayTransition;
+}
+
 class DocumentStudioApp {
     constructor() {
         this.config = window.DOCUMENT_STUDIO_CONFIG || {};
@@ -10,8 +27,56 @@ class DocumentStudioApp {
         this.isDirty = false;
         this.isSaving = false;
         this.autosaveTimer = null;
+        this.loaderDepth = document.getElementById('studio-loading-overlay') ? 1 : 0;
 
         this.init();
+    }
+
+    showStudioLoader(title = 'Preparing Document Designer', subtitle = 'Loading fonts, canvas artwork, and dynamic bindings...') {
+        const overlay = document.getElementById('studio-loading-overlay');
+        if (!overlay) return;
+        this.loaderDepth = (this.loaderDepth || 0) + 1;
+        const titleEl = document.getElementById('studio-loader-title');
+        const subtitleEl = document.getElementById('studio-loader-subtitle');
+        if (titleEl && title) titleEl.textContent = title;
+        if (subtitleEl && subtitle) subtitleEl.textContent = subtitle;
+        overlay.removeAttribute('data-closing');
+        overlay.setAttribute('aria-busy', 'true');
+        overlay.hidden = false;
+    }
+
+    updateStudioLoader(title, subtitle) {
+        const titleEl = document.getElementById('studio-loader-title');
+        const subtitleEl = document.getElementById('studio-loader-subtitle');
+        if (titleEl && title) titleEl.textContent = title;
+        if (subtitleEl && subtitle) subtitleEl.textContent = subtitle;
+    }
+
+    async hideStudioLoader(force = false) {
+        const overlay = document.getElementById('studio-loading-overlay');
+        if (!overlay) return;
+        this.loaderDepth = force ? 0 : Math.max(0, (this.loaderDepth || 1) - 1);
+        if (this.loaderDepth > 0) return;
+
+        overlay.setAttribute('aria-busy', 'false');
+        if (canTransitionDisplay()) {
+            overlay.hidden = true;
+        } else {
+            overlay.setAttribute('data-closing', '');
+        }
+
+        const animations = typeof overlay.getAnimations === 'function' ? overlay.getAnimations() : [];
+        if (animations.length > 0) {
+            await Promise.race([
+                Promise.allSettled(animations.map(a => a.finished)),
+                new Promise(resolve => setTimeout(resolve, 600)),
+            ]);
+        }
+
+        if (this.loaderDepth === 0 && overlay.hasAttribute('data-closing')) {
+            overlay.removeAttribute('data-closing');
+            overlay.hidden = true;
+        }
     }
 
     async init() {
@@ -22,6 +87,12 @@ class DocumentStudioApp {
         } catch (err) {
             console.error('Document Studio mount failed:', err);
             notifyStudio(err.message || 'Could not load the document designer. Refresh or retry.', 'error', 'Editor failed to load');
+        } finally {
+            await Promise.race([
+                new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))),
+                new Promise(resolve => setTimeout(resolve, 300)),
+            ]);
+            this.hideStudioLoader(true);
         }
     }
 
@@ -208,15 +279,18 @@ class DocumentStudioApp {
         if (this.savingPromise) {
             await this.savingPromise;
         }
-        // Publish the visible snapshot under one server revision lock. Keep
+        // Publish the live canvas snapshot under one server revision lock. Keep
         // unsaved changes marked dirty until the server confirms success.
-        const snapshotState = JSON.parse(JSON.stringify(this.draftState));
+        const currentLiveState = this.adapter?.getState ? this.adapter.getState() : this.draftState;
+        const snapshotState = JSON.parse(JSON.stringify(currentLiveState));
+        this.draftState = snapshotState;
         const snapshotRevision = this.draftRevision;
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             const response = await fetch(this.config.endpoints.publish, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -230,13 +304,20 @@ class DocumentStudioApp {
                 }),
             });
 
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json')
+                ? await response.json()
+                : { message: `Server returned HTTP ${response.status}` };
             if (!response.ok) {
-                throw new Error(data.message || 'Publishing failed');
+                const firstValidation = data.errors ? Object.values(data.errors).flat()[0] : null;
+                throw new Error(firstValidation || data.message || 'Publishing failed');
             }
             this.draftRevision = data.draft_revision;
-            this.isDirty = JSON.stringify(this.draftState) !== JSON.stringify(snapshotState);
+            this.isDirty = JSON.stringify(this.adapter?.getState ? this.adapter.getState() : this.draftState) !== JSON.stringify(snapshotState);
             this.updateSaveStatus(this.isDirty ? 'dirty' : 'saved');
+            if (data.audit) {
+                this.updateAuditBanner(data.audit);
+            }
             const versionLabel = document.getElementById('active-version-number');
             if (makeActive && versionLabel) versionLabel.textContent = `v${data.version.version_number}`;
             document.getElementById('publish-modal')?.classList.add('hidden');
@@ -279,6 +360,17 @@ class DocumentStudioApp {
                 label.textContent = customLabel || 'Save error / conflict';
                 break;
         }
+    }
+
+    liveSamplePayload() {
+        const today = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date());
+        return {
+            ...(this.config.samplePayload || {}),
+            release_date: today,
+            issued_date: today,
+            current_date: today,
+            statement_date: today,
+        };
     }
 
     bindUiEvents() {
@@ -387,7 +479,7 @@ class DocumentStudioApp {
             // so the preview is guaranteed to mirror what is currently on screen.
             if (this.config.engine === 'pdfme' && this.adapter?.renderPreviewPdf) {
                 try {
-                    const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                    const bytes = await this.adapter.renderPreviewPdf(this.liveSamplePayload());
                     await previewPdfBytes(bytes, 'Live PDFme Editor Preview');
                     return;
                 } catch (clientErr) {
@@ -398,13 +490,13 @@ class DocumentStudioApp {
             try {
                 const result = await previewDocument(this.config.endpoints.preview);
                 if (result?.usedServerFallback && this.adapter?.renderPreviewPdf) {
-                    const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                    const bytes = await this.adapter.renderPreviewPdf(this.liveSamplePayload());
                     await previewPdfBytes(bytes, 'PDFme Certificate Preview');
                 }
             } catch (serverErr) {
                 if (this.adapter?.renderPreviewPdf) {
                     try {
-                        const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                        const bytes = await this.adapter.renderPreviewPdf(this.liveSamplePayload());
                         await previewPdfBytes(bytes, 'Live Browser PDFme Preview');
                         return;
                     } catch (clientErr) {
@@ -466,6 +558,7 @@ class DocumentStudioApp {
             e.preventDefault();
             const fileInput = document.getElementById('asset-file-input');
             const typeSelect = document.getElementById('asset-type-select');
+            const submitBtn = e.currentTarget.querySelector('button[type="submit"]');
             if (!fileInput?.files[0]) return;
             const selectedType = typeSelect.value;
             const isTemplatePicture = selectedType === 'template_picture';
@@ -483,6 +576,13 @@ class DocumentStudioApp {
             formData.append('document_template_id', this.config.templateId);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            if (submitBtn) submitBtn.disabled = true;
+            document.getElementById('asset-modal')?.classList.add('hidden');
+            this.showStudioLoader(
+                isTemplatePicture ? 'Uploading Template Picture...' : 'Uploading Image to Designer...',
+                'Sending high-resolution artwork securely to the designer...'
+            );
 
             try {
                 const res = await fetch(this.config.endpoints.uploadAsset, {
@@ -506,6 +606,10 @@ class DocumentStudioApp {
                 if (data.asset?.url) {
                     this.config.assets = [...(this.config.assets || []), data.asset];
                     this.adapter?.options?.assets?.push?.(data.asset);
+                    this.updateStudioLoader(
+                        isTemplatePicture ? 'Applying Background Layer...' : 'Inserting Image onto Canvas...',
+                        'Rendering artwork onto the designer workspace...'
+                    );
                     if (selectedType === 'pdf_base') {
                         await this.adapter.setBasePdf(data.asset);
                     } else if (isTemplatePicture) {
@@ -514,11 +618,18 @@ class DocumentStudioApp {
                     } else if (this.adapter?.addImage) {
                         await this.adapter.addImage(data.asset.url, data.asset.id);
                     }
+                    await Promise.race([
+                        new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))),
+                        new Promise(resolve => setTimeout(resolve, 300)),
+                    ]);
                 }
-                document.getElementById('asset-modal')?.classList.add('hidden');
                 fileInput.value = '';
             } catch (err) {
+                document.getElementById('asset-modal')?.classList.remove('hidden');
                 notifyStudio('Upload failed: ' + err.message, 'error', 'Upload failed');
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+                this.hideStudioLoader();
             }
         });
     }

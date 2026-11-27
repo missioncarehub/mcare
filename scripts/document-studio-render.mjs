@@ -106,6 +106,13 @@ async function getNodePdfmeFonts() {
     return fontMap;
 }
 
+function interpolateStudioTokens(text, values = {}) {
+    return String(text).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
+        const value = values[key];
+        return value !== undefined && value !== null && typeof value !== 'object' ? String(value) : match;
+    });
+}
+
 async function renderPdfme(payload) {
     const nodeFonts = await getNodePdfmeFonts();
     const plugins = {
@@ -240,17 +247,11 @@ async function renderPdfme(payload) {
             }
 
             const rawContent = field.content ?? field.text;
-            const hasInlineToken = typeof rawContent === 'string' && /\{\{\w+\}\}/.test(rawContent);
+            const hasInlineToken = typeof rawContent === 'string' && /\{\{\s*[a-zA-Z0-9_]+\s*\}\}/.test(rawContent);
 
             // 1. If content itself contains {{tokens}} (e.g. edited directly in PDFme Designer), interpolate it verbatim
             if (val === undefined && hasInlineToken) {
-                let interpolated = rawContent;
-                for (const [k, v] of Object.entries(values)) {
-                    if (v !== undefined && v !== null && typeof v !== 'object') {
-                        interpolated = interpolated.replaceAll(`{{${k}}}`, String(v));
-                    }
-                }
-                val = interpolated;
+                val = interpolateStudioTokens(rawContent, values);
             }
 
             // 2. For table fields or empty/legacy-bound fields, resolve via field.name or field.binding
@@ -264,7 +265,7 @@ async function renderPdfme(payload) {
                     } else if (values[field.binding] !== undefined) {
                         val = values[field.binding];
                     } else {
-                        val = field.binding.replace(/\{\{(\w+)\}\}/g, (token, key) => values[key] === undefined || typeof values[key] === 'object' ? token : String(values[key]));
+                        val = interpolateStudioTokens(field.binding, values);
                     }
                 }
             }

@@ -3,6 +3,7 @@
 @section('title', 'Editor — '.$template->name)
 
 @push('styles')
+    <link rel="preload" as="image" href="{{ asset('assets/mcare-mark-cropped.png') }}">
     @vite(['resources/css/document-studio.css'])
 @endpush
 
@@ -69,7 +70,34 @@
         </div>
     </details>
 @endif
-<div class="studio-workspace flex flex-col w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+<div class="studio-workspace relative flex flex-col w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+    <!-- Designer Loading Screen (Refresh & Image Upload Processing) -->
+    <div id="studio-loading-overlay"
+         class="studio-loader-overlay"
+         role="region"
+         aria-label="Document Designer Loading"
+         aria-busy="true">
+        <div class="studio-loader-card">
+            <div class="studio-loader-emblem">
+                <progress aria-label="Loading Document Designer" class="studio-loader-spinner"></progress>
+                <div class="studio-loader-logo-frame" aria-hidden="true">
+                    <img src="{{ asset('assets/mcare-mark-cropped.png') }}"
+                         alt=""
+                         width="64"
+                         height="64"
+                         fetchpriority="high"
+                         decoding="sync"
+                         class="studio-loader-logo"
+                         onerror="this.onerror=null;this.src='{{ asset('assets/images/logoicon.png') }}';">
+                </div>
+            </div>
+            <div class="studio-loader-copy" role="status" aria-live="polite">
+                <p id="studio-loader-title" class="studio-loader-title">Preparing Document Designer</p>
+                <p id="studio-loader-subtitle" class="studio-loader-subtitle">Loading fonts, canvas artwork, and dynamic bindings...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Action Bar -->
     <header class="min-h-14 bg-white dark:bg-gray-850 border-b border-gray-200 dark:border-gray-800 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
         <!-- Left: Back & Title -->

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\DocumentStudio\DocumentStudioRenderer;
 use App\Services\DocumentStudio\DocumentStudioService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -308,6 +309,23 @@ class OfficialDocumentManager
 
             return $locked->fresh();
         });
+
+        // Re-render custom Studio templates upon release so {{release_date}}, {{issued_date}}, and live signatory fields match the exact release action timestamp.
+        if ($released->document_template_version_id !== null && filled($released->file_path)) {
+            try {
+                $refreshedPdf = app(DocumentStudioRenderer::class)->render($released);
+                if (str_starts_with($refreshedPdf, '%PDF-')
+                    && Storage::disk($released->storage_disk)->put($released->file_path, $refreshedPdf)) {
+                    $released->forceFill(['sha256' => hash('sha256', $refreshedPdf)])->save();
+                    $released = $released->fresh();
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Could not refresh custom Studio PDF upon COTC release.', [
+                    'document_id' => $released->id,
+                    'reason' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         AdminActivityLog::record($admin, 'admin.cotc.released', $released, [
             'application_id' => $released->enrollment_application_id,

@@ -81,6 +81,244 @@
     transform: translateY(-1px);
 }
 
+/* Designer Loading Overlay with Official Logo Mark & Native Progress Spinner */
+@property --arc-start {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@property --arc-end {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 158deg;
+}
+
+@property --progress-dash-animation {
+    syntax: "*";
+    inherits: false;
+    initial-value: , studio-progress-dash 2.6s ease-in-out infinite;
+}
+
+.studio-loader-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background: rgb(248 250 252 / 0.88);
+    backdrop-filter: blur(8px);
+    opacity: 1;
+    scale: 1;
+    transition:
+        display ease-out,
+        opacity ease-out,
+        scale ease-out;
+    transition-duration: 0.28s;
+    transition-behavior: allow-discrete;
+}
+
+.dark .studio-loader-overlay {
+    background: rgb(15 23 42 / 0.88);
+}
+
+@starting-style {
+    .studio-loader-overlay {
+        opacity: 0;
+        scale: 0.985;
+    }
+}
+
+.studio-loader-overlay:where([hidden], [data-closing]) {
+    opacity: 0;
+    scale: 0.985;
+}
+
+.studio-loader-overlay[hidden] {
+    display: none;
+}
+
+.studio-loader-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.125rem;
+    max-width: 22rem;
+    padding: 1.75rem 2rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(109, 40, 217, 0.14);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 20px 40px -12px rgba(30, 27, 75, 0.16);
+    text-align: center;
+}
+
+.dark .studio-loader-card {
+    border-color: rgba(167, 139, 250, 0.2);
+    background: rgba(17, 24, 39, 0.96);
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.55);
+}
+
+.studio-loader-emblem {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 108px;
+    height: 108px;
+}
+
+progress.studio-loader-spinner:indeterminate::-webkit-progress-bar {
+    display: none;
+    background: none;
+}
+
+progress.studio-loader-spinner:indeterminate::-webkit-progress-value {
+    display: none;
+    background: none;
+}
+
+progress.studio-loader-spinner:indeterminate::-moz-progress-bar {
+    display: none;
+    background: none;
+}
+
+progress.studio-loader-spinner:indeterminate {
+    --_from: calc(90deg + var(--arc-start, 0deg));
+    --_to: calc(90deg + var(--arc-end, 158deg));
+    --size: 108px;
+    --thickness: 5px;
+    --spinner-color: #6d28d9;
+    --track-color: rgba(109, 40, 217, 0.14);
+    --spinner-duration: 1.35s;
+    --_used-spinner-duration: var(--spinner-duration);
+
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    appearance: none;
+    background: conic-gradient(
+            from var(--_from),
+            var(--spinner-color) calc(var(--_to) - var(--_from)),
+            transparent 0
+        )
+        var(--track-color);
+
+    @supports (background-clip: border-area) {
+        background-clip: border-area;
+        border: var(--thickness) solid transparent;
+        background-origin: border-box;
+    }
+
+    @supports not (background-clip: border-area) {
+        --clip-boundary: calc(50% - var(--thickness));
+        mask-image: radial-gradient(
+            farthest-side,
+            transparent var(--clip-boundary),
+            black calc(var(--clip-boundary) + 0.5px)
+        );
+        border: 0;
+    }
+
+    @media (forced-colors: active) {
+        forced-color-adjust: none;
+        --spinner-color: CanvasText;
+        --track-color: Canvas;
+    }
+
+    animation:
+        studio-progress-spin var(--_used-spinner-duration) linear infinite
+        var(--progress-dash-animation, );
+}
+
+.dark progress.studio-loader-spinner:indeterminate {
+    --spinner-color: #a78bfa;
+    --track-color: rgba(167, 139, 250, 0.18);
+}
+
+.studio-loader-logo-frame {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 80px;
+    height: 80px;
+    padding: 10px;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(30, 27, 75, 0.1);
+}
+
+.studio-loader-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.studio-loader-title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #1e1b4b;
+    letter-spacing: -0.01em;
+}
+
+.dark .studio-loader-title {
+    color: #f8fafc;
+}
+
+.studio-loader-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.dark .studio-loader-subtitle {
+    color: #94a3b8;
+}
+
+@keyframes studio-progress-spin {
+    to {
+        rotate: 1turn;
+    }
+}
+
+@keyframes studio-progress-dash {
+    from {
+        --arc-start: 0deg;
+        --arc-end: 18deg;
+    }
+    50% {
+        --arc-start: 95deg;
+        --arc-end: 345deg;
+    }
+    to {
+        --arc-start: 360deg;
+        --arc-end: 378deg;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .studio-loader-overlay,
+    .studio-loader-overlay:where([hidden], [data-closing]) {
+        scale: none;
+        transition-duration: 0.12s;
+    }
+
+    @starting-style {
+        .studio-loader-overlay {
+            scale: none;
+        }
+    }
+
+    progress.studio-loader-spinner:indeterminate {
+        --_used-spinner-duration: 6s;
+        --progress-dash-animation: ;
+        --arc-end: 158deg;
+    }
+}
+
 .rk-word-shell { height:100%; display:flex; flex-direction:column; min-width:0; }
 .rk-toolbar { display:flex; flex-wrap:wrap; gap:4px; padding:8px; background:var(--dashboard-surface, #f9fafb); }
 .rk-toolbar button, .rk-import { min-height:44px; min-width:44px; padding:8px; cursor:pointer; border:1px solid #9ca3af; border-radius:6px; }

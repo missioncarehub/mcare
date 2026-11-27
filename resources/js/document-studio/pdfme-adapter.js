@@ -144,6 +144,28 @@ export class PdfmeAdapter {
                 this.options.onChange(this.getState(updated));
             }
         });
+        await this.waitForCanvasReady();
+    }
+
+    waitForCanvasReady() {
+        if (!this.container || this.container.querySelector('canvas, .selectable')) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            let done = false;
+            const obs = new MutationObserver(() => {
+                if (this.container.querySelector('canvas, .selectable')) finish();
+            });
+            const timer = setTimeout(() => finish(), 1500);
+            function finish() {
+                if (done) return;
+                done = true;
+                obs.disconnect();
+                clearTimeout(timer);
+                window.requestAnimationFrame(() => resolve());
+            }
+            obs.observe(this.container, { childList: true, subtree: true });
+        });
     }
 
     formatFieldLabel(name = '') {
@@ -234,16 +256,26 @@ export class PdfmeAdapter {
         };
     }
 
+    uniqueFieldName(page, rawName) {
+        const base = String(rawName || 'field').replace(/[^\w.-]/g, '_').replace(/^_+|_+$/g, '') || 'field';
+        const used = new Set((page || []).map(item => String(item?.name || '')));
+        if (!used.has(base)) return base;
+        let idx = 2;
+        while (used.has(`${base}_${idx}`)) idx++;
+        return `${base}_${idx}`;
+    }
+
     addField(field) {
         if (!this.designer) return;
         const current = this.designer.getTemplate();
         const schemas = current.schemas ? [...current.schemas] : [[]];
         const page0 = schemas[0] ? [...schemas[0]] : [];
+        const uniqueName = this.uniqueFieldName(page0, field.name || field.binding || `field_${page0.length + 1}`);
 
         page0.push(normalizeStudioSchema({
-            name: field.name || field.binding || `field_${page0.length + 1}`,
+            name: uniqueName,
             type: field.type || 'text',
-            position: { x: 20, y: 20 + (page0.length * 8) },
+            position: { x: 20, y: 20 + ((page0.length % 14) * 10) },
             width: field.width || 60,
             height: field.height || 10,
             fontSize: 12,
@@ -253,8 +285,11 @@ export class PdfmeAdapter {
         }, this.plugins));
 
         schemas[0] = page0;
-        this.designer.updateTemplate({ ...current, schemas });
-        this.options.onChange?.(this.getState());
+        const updated = { ...current, schemas };
+        this.designer.updateTemplate(updated);
+        this.syncFieldLabels();
+        this.options.onFieldsChange?.(this.getTextFields(updated));
+        this.options.onChange?.(this.getState(updated));
     }
 
     async setBasePdf(asset) {
