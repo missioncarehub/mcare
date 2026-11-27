@@ -373,6 +373,16 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->assertNull($bgAssetPreview->headers->get('x-mcare-preview-fallback'));
         $this->assertStringStartsWith('%PDF-', $bgAssetPreview->getContent());
 
+        // Verify asset upload endpoint returns a relative stream URL (never http:// mixed-content behind TLS proxy)
+        $uploadRes = $this->actingAs($this->admin)
+            ->postJson(route('admin.document-studio.assets.upload'), [
+                'file' => new UploadedFile(public_path('assets/official-logo.png'), 'bg-upload.png', 'image/png', null, true),
+                'type' => \App\Models\DocumentAsset::TYPE_IMAGE,
+                'document_template_id' => $workingDraft->id,
+            ]);
+        $uploadRes->assertOk()->assertJsonPath('success', true);
+        $this->assertStringStartsWith('/admin/document-studio/assets/', (string) $uploadRes->json('asset.url'));
+
         // Verify TOR draft preview also matches latest edited draft
         $publishedTor = DocumentTemplate::query()
             ->where('document_kind', DocumentTemplate::KIND_TOR)

@@ -487,14 +487,21 @@ class DocumentStudioApp {
             try {
                 const res = await fetch(this.config.endpoints.uploadAsset, {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': csrfToken || '',
                     },
                     body: formData,
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Asset upload failed');
+                const contentType = res.headers.get('content-type') || '';
+                const data = contentType.includes('application/json')
+                    ? await res.json()
+                    : { message: `Server returned HTTP ${res.status}` };
+                if (!res.ok) {
+                    const firstValidation = data.errors ? Object.values(data.errors).flat()[0] : null;
+                    throw new Error(firstValidation || data.message || 'Asset upload failed');
+                }
 
                 if (data.asset?.url) {
                     this.config.assets = [...(this.config.assets || []), data.asset];

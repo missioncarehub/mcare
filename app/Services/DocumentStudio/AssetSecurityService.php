@@ -19,7 +19,7 @@ class AssetSecurityService
 
     public const STORAGE_PATH = 'document-studio/assets';
 
-    public const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+    public const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
 
     public const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
 
@@ -27,9 +27,9 @@ class AssetSecurityService
 
     public const MAX_DOCX_BYTES = 10 * 1024 * 1024; // 10 MB
 
-    public const MAX_IMAGE_WIDTH = 4096;
+    public const MAX_IMAGE_WIDTH = 8192;
 
-    public const MAX_IMAGE_HEIGHT = 4096;
+    public const MAX_IMAGE_HEIGHT = 8192;
 
     /**
      * Store and validate an uploaded document asset securely.

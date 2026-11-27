@@ -55,8 +55,8 @@ async function fetchAsDataUrl(url) {
     }
 }
 
-async function convertToPngBytesIfNeeded(bytes, mime) {
-    if (mime === 'image/png' || mime === 'image/jpeg') {
+async function convertToPngBytesIfNeeded(bytes, mime, forceCanvas = false) {
+    if (!forceCanvas && (mime === 'image/png' || mime === 'image/jpeg')) {
         return { bytes, isPng: mime === 'image/png' };
     }
     const blob = new Blob([bytes], { type: mime || 'image/png' });
@@ -82,8 +82,18 @@ async function convertToPngBytesIfNeeded(bytes, mime) {
 
 export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 215.9) {
     if (!url) return null;
-    const res = await fetch(url, { credentials: 'same-origin' });
-    if (!res.ok) throw new Error('Could not load template background picture.');
+    let fetchUrl = String(url);
+    try {
+        const parsed = new URL(fetchUrl, location.href);
+        if (parsed.pathname.startsWith('/admin/document-studio/assets/')) {
+            fetchUrl = parsed.pathname + parsed.search;
+        }
+    } catch {
+        // Keep original URL string cleanly
+    }
+
+    const res = await fetch(fetchUrl, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`Could not load template background picture (HTTP ${res.status}).`);
     const rawBytes = new Uint8Array(await res.arrayBuffer());
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     const isJpeg = contentType.includes('jpeg') || contentType.includes('jpg') || (rawBytes[0] === 0xff && rawBytes[1] === 0xd8);
@@ -97,9 +107,16 @@ export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 
 
     const doc = await PDFDocument.create();
     const page = doc.addPage([widthPt, heightPt]);
-    const embedded = normalized.isPng
-        ? await doc.embedPng(normalized.bytes)
-        : await doc.embedJpg(normalized.bytes);
+    let embedded;
+    try {
+        embedded = normalized.isPng
+            ? await doc.embedPng(normalized.bytes)
+            : await doc.embedJpg(normalized.bytes);
+    } catch {
+        // Re-encode non-standard/CMYK JPEG or interlaced PNG via browser canvas
+        const safePng = await convertToPngBytesIfNeeded(rawBytes, mime, true);
+        embedded = await doc.embedPng(safePng.bytes);
+    }
     page.drawImage(embedded, { x: 0, y: 0, width: widthPt, height: heightPt });
 
     return new Uint8Array(await doc.save());

@@ -40,7 +40,7 @@ class DocumentStudioAssetController extends Controller
                 'mime_type' => $asset->mime_type,
                 'file_size' => $asset->file_size,
                 'dimensions' => $asset->dimensions,
-                'url' => route('admin.document-studio.assets.stream', $asset),
+                'url' => route('admin.document-studio.assets.stream', $asset, false),
             ],
         ]);
     }
