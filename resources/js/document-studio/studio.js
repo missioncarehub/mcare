@@ -16,8 +16,13 @@ class DocumentStudioApp {
 
     async init() {
         this.bindUiEvents();
-        await this.mountEngine();
-        this.updateSaveStatus('saved');
+        try {
+            await this.mountEngine();
+            this.updateSaveStatus('saved');
+        } catch (err) {
+            console.error('Document Studio mount failed:', err);
+            notifyStudio(err.message || 'Could not load the document designer. Refresh or retry.', 'error', 'Editor failed to load');
+        }
     }
 
     async mountEngine() {
@@ -665,8 +670,14 @@ class DocumentStudioApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+const bootStudioApp = () => {
     if (document.getElementById('studio-editor-viewport') || document.getElementById('fabric-canvas')) {
         window.studioApp = new DocumentStudioApp();
     }
-});
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootStudioApp);
+} else {
+    bootStudioApp();
+}

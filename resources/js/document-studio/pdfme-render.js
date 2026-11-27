@@ -17,7 +17,7 @@ export const PDFME_PLUGINS = {
 
 let cachedBrowserFonts = null;
 
-async function loadBrowserFonts() {
+export async function loadBrowserFonts() {
     if (cachedBrowserFonts) return cachedBrowserFonts;
     const fontEntries = Object.entries(getBrowserPdfmeFonts());
     const font = {};

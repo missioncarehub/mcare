@@ -926,7 +926,7 @@ class DocumentStudioService
                 [
                     'name' => 'title',
                     'type' => 'text',
-                    'position' => ['x' => 15.0, 'y' => 20.0],
+                    'position' => ['x' => 15.0, 'y' => 18.0],
                     'width' => 180.0,
                     'height' => 8.0,
                     'fontSize' => 16,
@@ -938,7 +938,7 @@ class DocumentStudioService
                 [
                     'name' => 'trainee_name',
                     'type' => 'text',
-                    'position' => ['x' => 15.0, 'y' => 38.0],
+                    'position' => ['x' => 15.0, 'y' => 34.0],
                     'width' => 180.0,
                     'height' => 7.0,
                     'fontSize' => 12,
@@ -964,7 +964,7 @@ class DocumentStudioService
                 [
                     'name' => 'release_date',
                     'type' => 'text',
-                    'position' => ['x' => 15.0, 'y' => 54.0],
+                    'position' => ['x' => 15.0, 'y' => 58.0],
                     'width' => 180.0,
                     'height' => 6.0,
                     'fontSize' => 9,
@@ -977,7 +977,7 @@ class DocumentStudioService
                 [
                     'name' => 'competencies_table',
                     'type' => 'table',
-                    'position' => ['x' => 15.0, 'y' => 64.0],
+                    'position' => ['x' => 15.0, 'y' => 70.0],
                     'width' => 180.0,
                     'height' => 150.0,
                     'binding' => 'tor_competencies',

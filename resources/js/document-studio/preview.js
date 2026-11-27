@@ -229,20 +229,20 @@ async function renderLiveThumbnails() {
         return;
     }
 
-    for (const canvas of canvases) {
+    await Promise.all([...canvases].map(async (canvas) => {
         const endpoint = canvas.dataset.livePdfThumbnail;
         const fallbackKey = canvas.dataset.pdfmeFallbackKey || null;
         const container = canvas.parentElement;
         const loader = container?.querySelector('[data-live-pdf-loading]');
         if (!endpoint || endpoint === '#') {
             if (loader) loader.textContent = 'No template preview available';
-            continue;
+            return;
         }
         try {
             let bytes = null;
             try {
                 const url = new URL(endpoint, location.href);
-                if (url.origin !== location.origin) continue;
+                if (url.origin !== location.origin) return;
                 const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
                 if (res.ok && res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
                     if (res.headers.get('x-mcare-preview-fallback') === 'fpdf' && fallbackKey) {
@@ -284,7 +284,7 @@ async function renderLiveThumbnails() {
                 loader.innerHTML = '<span class="px-3 text-center">Click to open full PDF preview</span>';
             }
         }
-    }
+    }));
 }
 
 if (document.readyState === 'loading') {

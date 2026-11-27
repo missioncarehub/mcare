@@ -2,7 +2,7 @@ import { installTextFields } from './text-fields.js';
 import { Designer } from '@pdfme/ui';
 import { normalizeStudioSchema } from './tables.js';
 import { CERTIFICATE_STYLE_PRESETS } from './fonts.js';
-import { PDFME_PLUGINS, renderPdfmeTemplateToBytes } from './pdfme-render.js';
+import { PDFME_PLUGINS, loadBrowserFonts, renderPdfmeTemplateToBytes } from './pdfme-render.js';
 
 export class PdfmeAdapter {
     constructor(container, options = {}) {
@@ -68,9 +68,29 @@ export class PdfmeAdapter {
             schemas = [[]];
         }
 
+        const designerFonts = await loadBrowserFonts();
+        const hasLoadedFonts = Object.keys(designerFonts).length > 0;
+        const normalizedSchemas = schemas.map(page => page.map(field => {
+            const schema = normalizeStudioSchema(field, this.plugins);
+            if (hasLoadedFonts) {
+                if (schema.fontName && !designerFonts[schema.fontName]) {
+                    schema.fontName = designerFonts.NotoSans ? 'NotoSans' : undefined;
+                }
+                if (schema.type === 'table') {
+                    if (schema.headStyles?.fontName && !designerFonts[schema.headStyles.fontName]) {
+                        schema.headStyles.fontName = designerFonts.NotoSans ? 'NotoSans' : undefined;
+                    }
+                    if (schema.bodyStyles?.fontName && !designerFonts[schema.bodyStyles.fontName]) {
+                        schema.bodyStyles.fontName = designerFonts.NotoSans ? 'NotoSans' : undefined;
+                    }
+                }
+            }
+            return schema;
+        }));
+
         const pdfmeTemplate = {
             basePdf,
-            schemas: schemas.map(page => page.map(field => normalizeStudioSchema(field, this.plugins))),
+            schemas: normalizedSchemas,
         };
 
         this.designer = new Designer({
@@ -78,8 +98,8 @@ export class PdfmeAdapter {
             template: pdfmeTemplate,
             plugins: this.plugins,
             options: {
-                sidebarOpen: true,
-                font: getBrowserPdfmeFonts(),
+                sidebarOpen: false,
+                ...(hasLoadedFonts ? { font: designerFonts } : {}),
             },
         });
 
