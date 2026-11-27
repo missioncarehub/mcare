@@ -1,0 +1,1 @@
+import{i as e}from"./preload-helper-D4aPaSvo.js";import{r as t,t as n}from"./pdf-BB7VJXIB.js";var r=e({loadPdfJs:()=>i});async function i(){return typeof window<`u`&&n&&!n.workerSrc&&(n.workerSrc=`/vendor/pdfjs/pdf.worker.min.js`),t}export{r as n,i as t};

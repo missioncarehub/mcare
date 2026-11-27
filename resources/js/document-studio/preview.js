@@ -1,5 +1,20 @@
 import { loadPdfJs } from '../pdf-loader.js';
 
+const previewBytesCache = new Map();
+
+export function invalidatePreviewCache(endpoint = null) {
+    if (!endpoint) {
+        previewBytesCache.clear();
+        return;
+    }
+    try {
+        const url = new URL(endpoint, location.href);
+        previewBytesCache.delete(url.pathname + url.search);
+    } catch {
+        previewBytesCache.delete(String(endpoint));
+    }
+}
+
 // A PDF is fetched as private data, never navigated to or embedded in a frame.
 export class StudioPreview {
     constructor(dialog) {
@@ -65,6 +80,14 @@ export class StudioPreview {
         try {
             const url = new URL(endpoint, location.href);
             if (url.origin !== location.origin) throw new Error('Preview must come from MCARE.');
+            const cacheKey = url.pathname + url.search;
+            const cached = previewBytesCache.get(cacheKey);
+            if (cached?.bytes) {
+                const cloned = new Uint8Array(cached.bytes);
+                const blob = new Blob([cloned], { type: 'application/pdf' });
+                await this.loadPdfBytes(cloned, blob, epoch);
+                return { usedServerFallback: Boolean(cached.usedServerFallback), usedClientCache: true };
+            }
             const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal: this.abort.signal, headers: { Accept: 'application/pdf' } });
             if (response.redirected || response.status === 401 || response.status === 419) throw new Error('Your session expired. Sign in again, then retry.');
             if (response.status === 429) {
@@ -82,6 +105,7 @@ export class StudioPreview {
             if (usedServerFallback && fallbackKey) {
                 const localBytes = await renderFallbackPdfBytes(fallbackKey);
                 if (localBytes && epoch === this.epoch) {
+                    previewBytesCache.set(cacheKey, { bytes: new Uint8Array(localBytes), usedServerFallback: false });
                     const blob = new Blob([localBytes], { type: 'application/pdf' });
                     await this.loadPdfBytes(localBytes, blob, epoch);
                     return { usedServerFallback: false, usedClientFallback: true };
@@ -99,6 +123,7 @@ export class StudioPreview {
             const blob = new Blob(chunks, { type: 'application/pdf' });
             const bytes = new Uint8Array(await blob.arrayBuffer());
             if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('The preview is not a valid PDF.');
+            previewBytesCache.set(cacheKey, { bytes: new Uint8Array(bytes), usedServerFallback });
             await this.loadPdfBytes(bytes, blob, epoch);
             return { usedServerFallback };
         } catch (error) {
@@ -119,6 +144,15 @@ export class StudioPreview {
             this.status.textContent = error.name === 'AbortError' ? 'Preview timed out. Please retry.' : error.message;
             throw error;
         } finally { if (epoch === this.epoch) clearTimeout(this.timeout); }
+    }
+
+    showLoading(label = 'live preview') {
+        this.release();
+        this.page = 1;
+        this.zoom = 1;
+        this.status.textContent = `Generating ${label}…`;
+        if (this.inline) this.dialog.hidden = false;
+        else if (!this.dialog.open) this.dialog.showModal();
     }
 
     async openBytes(bytes, label = 'Live template preview') {
@@ -163,7 +197,7 @@ export class StudioPreview {
             if (epoch !== this.epoch || serial !== this.renderSerial) return;
             const unit = page.getViewport({ scale: 1 });
             const scale = Math.max(.1, (this.body.clientWidth - 32) / unit.width) * this.zoom;
-            const ratio = Math.min(Math.max(devicePixelRatio || 1, 2), 3, Math.sqrt(16000000 / Math.max(1, unit.width * scale * unit.height * scale)));
+            const ratio = Math.min(Math.max(devicePixelRatio || 1, 1.5), 2, Math.sqrt(16000000 / Math.max(1, unit.width * scale * unit.height * scale)));
             const viewport = page.getViewport({ scale });
             this.canvas.width = Math.ceil(viewport.width * ratio); this.canvas.height = Math.ceil(viewport.height * ratio);
             this.canvas.style.width = `${viewport.width}px`; this.canvas.style.height = `${viewport.height}px`;
@@ -203,6 +237,10 @@ export function previewDocument(endpoint, fallbackKey = null) {
     viewer ??= new StudioPreview(document.getElementById('preview-modal'));
     return viewer.open(endpoint, fallbackKey);
 }
+export function showPreviewLoading(label = 'live preview') {
+    viewer ??= new StudioPreview(document.getElementById('preview-modal'));
+    viewer.showLoading(label);
+}
 export function previewPdfBytes(bytes, label) {
     viewer ??= new StudioPreview(document.getElementById('preview-modal'));
     return viewer.openBytes(bytes, label);
@@ -240,16 +278,23 @@ async function renderLiveThumbnails() {
         }
         try {
             let bytes = null;
+            let cacheKey = null;
             try {
                 const url = new URL(endpoint, location.href);
                 if (url.origin !== location.origin) return;
-                const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
-                if (res.ok && res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
-                    if (res.headers.get('x-mcare-preview-fallback') === 'fpdf' && fallbackKey) {
-                        bytes = await renderFallbackPdfBytes(fallbackKey);
-                    }
-                    if (!bytes) {
-                        bytes = new Uint8Array(await res.arrayBuffer());
+                cacheKey = url.pathname + url.search;
+                const cached = previewBytesCache.get(cacheKey);
+                if (cached?.bytes) {
+                    bytes = new Uint8Array(cached.bytes);
+                } else {
+                    const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' } });
+                    if (res.ok && res.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
+                        if (res.headers.get('x-mcare-preview-fallback') === 'fpdf' && fallbackKey) {
+                            bytes = await renderFallbackPdfBytes(fallbackKey);
+                        }
+                        if (!bytes) {
+                            bytes = new Uint8Array(await res.arrayBuffer());
+                        }
                     }
                 }
             } catch {
@@ -261,12 +306,15 @@ async function renderLiveThumbnails() {
             if (!bytes) {
                 throw new Error('Unavailable');
             }
+            if (cacheKey) {
+                previewBytesCache.set(cacheKey, { bytes: new Uint8Array(bytes), usedServerFallback: false });
+            }
             const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false, enableXfa: false });
             const pdf = await task.promise;
             const page = await pdf.getPage(1);
-            const targetWidth = Math.max(container?.clientWidth || 460, 760);
+            const targetWidth = Math.min(Math.max(container?.clientWidth || 440, 440), 560);
             const unit = page.getViewport({ scale: 1 });
-            const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+            const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2);
             const scale = (targetWidth / unit.width) * pixelRatio;
             const viewport = page.getViewport({ scale });
             canvas.width = Math.ceil(viewport.width);

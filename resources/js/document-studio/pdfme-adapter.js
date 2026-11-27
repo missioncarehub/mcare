@@ -2,7 +2,15 @@ import { installTextFields } from './text-fields.js';
 import { Designer } from '@pdfme/ui';
 import { normalizeStudioSchema } from './tables.js';
 import { CERTIFICATE_STYLE_PRESETS } from './fonts.js';
-import { PDFME_PLUGINS, buildBasePdfFromImageUrl, loadBrowserFonts, renderPdfmeTemplateToBytes } from './pdfme-render.js';
+import {
+    PDFME_PLUGINS,
+    buildBasePdfFromImageUrl,
+    extractTemplateFontKeys,
+    fetchBinaryCached,
+    loadBrowserFonts,
+    renderPdfmeTemplateToBytes,
+    warmPdfmePreviewRuntime,
+} from './pdfme-render.js';
 
 export class PdfmeAdapter {
     constructor(container, options = {}) {
@@ -56,49 +64,51 @@ export class PdfmeAdapter {
 
         const pageWidthMm = this.template.page?.width_mm || (this.template.document_kind === 'cotc' ? 279.4 : 210);
         const pageHeightMm = this.template.page?.height_mm || (this.template.document_kind === 'cotc' ? 215.9 : 297);
+        const neededFontKeys = extractTemplateFontKeys(schemas);
 
-        // Normalize template structure for pdfme
-        let basePdf = this.template.basePdf;
-        if (!basePdf && (this.template.background_asset_id || legacyBgUrl)) {
-            const bgAsset = this.template.background_asset_id
-                ? this.options.assets?.find(item => Number(item.id) === Number(this.template.background_asset_id))
-                : null;
-            const bgUrl = bgAsset?.url || (this.template.background_asset_id ? `/admin/document-studio/assets/${this.template.background_asset_id}` : legacyBgUrl);
-            if (bgUrl) {
+        const resolveBasePdf = async () => {
+            if (this.template.basePdf) return this.template.basePdf;
+            if (this.template.background_asset_id || legacyBgUrl) {
+                const bgAsset = this.template.background_asset_id
+                    ? this.options.assets?.find(item => Number(item.id) === Number(this.template.background_asset_id))
+                    : null;
+                const bgUrl = bgAsset?.url || (this.template.background_asset_id ? `/admin/document-studio/assets/${this.template.background_asset_id}` : legacyBgUrl);
+                if (bgUrl) {
+                    try {
+                        return await buildBasePdfFromImageUrl(bgUrl, pageWidthMm, pageHeightMm);
+                    } catch (err) {
+                        console.warn('Could not build basePdf from background picture:', err);
+                    }
+                }
+            }
+            if (this.template.base_pdf_asset_id) {
+                const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
+                if (!asset) throw new Error('The base PDF is unavailable.');
+                const bytes = await fetchBinaryCached(asset.url);
+                if (!bytes) throw new Error('Could not load the base PDF.');
+                return bytes;
+            }
+            if (this.template.base_pdf_url || this.template.basePdfUrl) {
                 try {
-                    basePdf = await buildBasePdfFromImageUrl(bgUrl, pageWidthMm, pageHeightMm);
+                    const url = this.template.base_pdf_url || this.template.basePdfUrl;
+                    const bytes = await fetchBinaryCached(url);
+                    if (bytes) return bytes;
                 } catch (err) {
-                    console.warn('Could not build basePdf from background picture:', err);
+                    console.warn('Could not load base_pdf_url, falling back to dimensions', err);
                 }
             }
-        }
-        if (!basePdf && this.template.base_pdf_asset_id) {
-            const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
-            if (!asset) throw new Error('The base PDF is unavailable.');
-            const response = await fetch(asset.url, { credentials: 'same-origin' });
-            if (!response.ok) throw new Error('Could not load the base PDF.');
-            basePdf = new Uint8Array(await response.arrayBuffer());
-        }
-        if (!basePdf && (this.template.base_pdf_url || this.template.basePdfUrl)) {
-            try {
-                const url = this.template.base_pdf_url || this.template.basePdfUrl;
-                const response = await fetch(url, { credentials: 'same-origin' });
-                if (response.ok) {
-                    basePdf = new Uint8Array(await response.arrayBuffer());
-                }
-            } catch (err) {
-                console.warn('Could not load base_pdf_url, falling back to dimensions', err);
-            }
-        }
-        if (!basePdf) {
-            basePdf = {
+            return {
                 width: pageWidthMm,
                 height: pageHeightMm,
                 padding: [10, 10, 10, 10],
             };
-        }
+        };
 
-        const designerFonts = await loadBrowserFonts();
+        // Load background PDF/artwork and required template fonts in parallel
+        const [basePdf, designerFonts] = await Promise.all([
+            resolveBasePdf(),
+            loadBrowserFonts(neededFontKeys),
+        ]);
         const hasLoadedFonts = Object.keys(designerFonts).length > 0;
         const normalizedSchemas = schemas.map(page => page.map(field => {
             const schema = normalizeStudioSchema(field, this.plugins);
@@ -145,6 +155,39 @@ export class PdfmeAdapter {
             }
         });
         await this.waitForCanvasReady();
+        this.scheduleIdleWarmup();
+    }
+
+    scheduleIdleWarmup() {
+        setTimeout(() => {
+            if (this.designer) warmPdfmePreviewRuntime();
+        }, 60);
+
+        const warmRemainingFonts = async () => {
+            if (!this.designer) return;
+            try {
+                const allFonts = await loadBrowserFonts();
+                if (this.designer && Object.keys(allFonts).length > 0 && typeof this.designer.updateOptions === 'function') {
+                    this.designer.updateOptions({ font: allFonts });
+                }
+            } catch {
+                // Non-fatal idle warmup
+            }
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => warmRemainingFonts(), { timeout: 1200 });
+        } else {
+            setTimeout(() => warmRemainingFonts(), 250);
+        }
+    }
+
+    async ensureFontsLoaded(fontNames = []) {
+        const filtered = (fontNames || []).filter(Boolean);
+        if (filtered.length === 0) return;
+        const loaded = await loadBrowserFonts(filtered);
+        if (this.designer && Object.keys(loaded).length > 0 && typeof this.designer.updateOptions === 'function') {
+            this.designer.updateOptions({ font: loaded });
+        }
     }
 
     waitForCanvasReady() {
@@ -293,12 +336,12 @@ export class PdfmeAdapter {
     }
 
     async setBasePdf(asset) {
-        const response = await fetch(asset.url, { credentials: 'same-origin' });
-        if (!response.ok) throw new Error('Could not load the base PDF.');
+        const bytes = await fetchBinaryCached(asset.url);
+        if (!bytes) throw new Error('Could not load the base PDF.');
         this.template.base_pdf_asset_id = asset.id;
         this.template.background_asset_id = undefined;
         this.template.base_pdf_url = undefined;
-        this.designer.updateTemplate({ ...this.designer.getTemplate(), basePdf: new Uint8Array(await response.arrayBuffer()) });
+        this.designer.updateTemplate({ ...this.designer.getTemplate(), basePdf: bytes });
         this.options.onChange?.(this.getState());
     }
 
@@ -346,12 +389,16 @@ export class PdfmeAdapter {
         return fields;
     }
 
-    updateFieldStyle(fieldKey, style = {}) {
+    async updateFieldStyle(fieldKey, style = {}) {
         if (!this.designer || !fieldKey) return false;
         const sep = fieldKey.indexOf(':');
         if (sep === -1) return false;
         const pageIndex = Number(fieldKey.slice(0, sep));
         const fieldName = fieldKey.slice(sep + 1);
+
+        if (style.fontName) {
+            await this.ensureFontsLoaded([style.fontName]);
+        }
 
         const current = structuredClone(this.designer.getTemplate());
         const page = current.schemas?.[pageIndex];
@@ -387,13 +434,15 @@ export class PdfmeAdapter {
         this.options.onChange?.(this.getState());
     }
 
-    applyTypographyPreset(presetKey) {
+    async applyTypographyPreset(presetKey) {
         if (!this.designer) return false;
         const preset = CERTIFICATE_STYLE_PRESETS[presetKey];
         if (!preset) return false;
 
-        const current = structuredClone(this.designer.getTemplate());
         const roles = preset.roles;
+        await this.ensureFontsLoaded(Object.values(roles));
+
+        const current = structuredClone(this.designer.getTemplate());
 
         current.schemas = (current.schemas || []).map((page) =>
             page.map((field) => {

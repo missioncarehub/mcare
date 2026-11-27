@@ -1,42 +1,77 @@
 {
   "__vite-browser-external": {
-    "file": "assets/__vite-browser-external-Mqjr6PLo.js",
+    "file": "assets/__vite-browser-external-DNcfM20L.js",
     "name": "__vite-browser-external",
     "src": "__vite-browser-external",
     "isDynamicEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js"
+      "_preload-helper-D4aPaSvo.js"
     ]
   },
-  "_base64-js-C3K5tRKj.js": {
-    "file": "assets/base64-js-C3K5tRKj.js",
+  "_base64-js-DlcUtmrj.js": {
+    "file": "assets/base64-js-DlcUtmrj.js",
     "name": "base64-js",
     "imports": [
-      "_pdf-DKsKPeEk.js"
+      "_preload-helper-D4aPaSvo.js"
     ]
   },
-  "_pdf-DKsKPeEk.js": {
-    "file": "assets/pdf-DKsKPeEk.js",
-    "name": "pdf"
+  "_fonts-CHrdxN3_.js": {
+    "file": "assets/fonts-CHrdxN3_.js",
+    "name": "fonts"
   },
-  "_pdf-loader-BBprxQxg.js": {
-    "file": "assets/pdf-loader-BBprxQxg.js",
+  "_pdf-BB7VJXIB.js": {
+    "file": "assets/pdf-BB7VJXIB.js",
+    "name": "pdf",
+    "imports": [
+      "_preload-helper-D4aPaSvo.js"
+    ]
+  },
+  "_pdf-loader-CBkUTBAe.js": {
+    "file": "assets/pdf-loader-CBkUTBAe.js",
     "name": "pdf-loader",
     "imports": [
-      "_pdf-DKsKPeEk.js"
+      "_preload-helper-D4aPaSvo.js",
+      "_pdf-BB7VJXIB.js"
     ]
+  },
+  "_pdfme-render-B-Afb8I3.js": {
+    "file": "assets/pdfme-render-B-Afb8I3.js",
+    "name": "pdfme-render",
+    "imports": [
+      "_preload-helper-D4aPaSvo.js",
+      "_fonts-CHrdxN3_.js",
+      "_base64-js-DlcUtmrj.js"
+    ],
+    "dynamicImports": [
+      "node_modules/signature_pad/dist/signature_pad.js",
+      "node_modules/@pdfme/generator/dist/index.js",
+      "_pdf-loader-CBkUTBAe.js"
+    ]
+  },
+  "_preload-helper-D4aPaSvo.js": {
+    "file": "assets/preload-helper-D4aPaSvo.js",
+    "name": "preload-helper"
   },
   "node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D8--gwJc.js": {
     "file": "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js",
     "src": "node_modules/@pdfme/converter/dist/assets/clawpdf-worker-D8--gwJc.js"
   },
+  "node_modules/@pdfme/generator/dist/index.js": {
+    "file": "assets/dist-BxgGtbVT.js",
+    "name": "dist",
+    "src": "node_modules/@pdfme/generator/dist/index.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_pdfme-render-B-Afb8I3.js"
+    ]
+  },
   "node_modules/clawpdf/dist/browser.js": {
-    "file": "assets/browser-BXZ-j5Qb.js",
+    "file": "assets/browser-Bfmg5peL.js",
     "name": "browser",
     "src": "node_modules/clawpdf/dist/browser.js",
     "isDynamicEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js"
+      "_preload-helper-D4aPaSvo.js"
     ],
     "dynamicImports": [
       "__vite-browser-external"
@@ -50,13 +85,13 @@
     "src": "node_modules/clawpdf/dist/vendor/pdfium.esm.wasm"
   },
   "node_modules/mammoth/lib/index.js": {
-    "file": "assets/lib-_tT8Q9Hr.js",
+    "file": "assets/lib-DnzCG8ja.js",
     "name": "lib",
     "src": "node_modules/mammoth/lib/index.js",
     "isDynamicEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js",
-      "_base64-js-C3K5tRKj.js"
+      "_preload-helper-D4aPaSvo.js",
+      "_base64-js-DlcUtmrj.js"
     ]
   },
   "node_modules/marked/lib/marked.esm.js": {
@@ -102,25 +137,26 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-DhM_Q4iL.js",
+    "file": "assets/app-DziGE696.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js"
+      "_preload-helper-D4aPaSvo.js",
+      "_pdf-BB7VJXIB.js"
     ]
   },
   "resources/js/document-studio/fabric-adapter.js": {
-    "file": "assets/fabric-adapter-BUWpNib6.js",
+    "file": "assets/fabric-adapter-8xU7xVOi.js",
     "name": "fabric-adapter",
     "src": "resources/js/document-studio/fabric-adapter.js",
     "isDynamicEntry": true,
     "imports": [
-      "resources/js/document-studio/studio.js"
+      "_fonts-CHrdxN3_.js"
     ]
   },
   "resources/js/document-studio/new-document.js": {
-    "file": "assets/new-document-D2lYX5o8.js",
+    "file": "assets/new-document-D6pJ7Cgg.js",
     "name": "new-document",
     "src": "resources/js/document-studio/new-document.js",
     "isEntry": true,
@@ -130,14 +166,14 @@
     ]
   },
   "resources/js/document-studio/pdfme-adapter.js": {
-    "file": "assets/pdfme-adapter-CgOqGnB2.js",
+    "file": "assets/pdfme-adapter-B9HsLIcT.js",
     "name": "pdfme-adapter",
     "src": "resources/js/document-studio/pdfme-adapter.js",
-    "isDynamicEntry": true,
+    "isEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js",
-      "resources/js/document-studio/studio.js",
-      "resources/js/document-studio/pdfme-render.js"
+      "_preload-helper-D4aPaSvo.js",
+      "_fonts-CHrdxN3_.js",
+      "_pdfme-render-B-Afb8I3.js"
     ],
     "dynamicImports": [
       "node_modules/clawpdf/dist/browser.js"
@@ -146,40 +182,26 @@
       "assets/clawpdf-worker-D8--gwJc-B6mjGktn.js"
     ]
   },
-  "resources/js/document-studio/pdfme-render.js": {
-    "file": "assets/pdfme-render-DzEg0BYd.js",
-    "name": "pdfme-render",
-    "src": "resources/js/document-studio/pdfme-render.js",
-    "isDynamicEntry": true,
-    "imports": [
-      "_pdf-DKsKPeEk.js",
-      "resources/js/document-studio/studio.js",
-      "_base64-js-C3K5tRKj.js"
-    ],
-    "dynamicImports": [
-      "node_modules/signature_pad/dist/signature_pad.js"
-    ]
-  },
   "resources/js/document-studio/preview.js": {
-    "file": "assets/preview-2XnxP78Q.js",
+    "file": "assets/preview-Bqe66cHU.js",
     "name": "preview",
     "src": "resources/js/document-studio/preview.js",
     "isEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js",
-      "_pdf-loader-BBprxQxg.js"
+      "_preload-helper-D4aPaSvo.js",
+      "_pdf-loader-CBkUTBAe.js"
     ],
     "dynamicImports": [
-      "resources/js/document-studio/pdfme-render.js"
+      "_pdfme-render-B-Afb8I3.js"
     ]
   },
   "resources/js/document-studio/rkword-adapter.js": {
-    "file": "assets/rkword-adapter-DyXCQ6L4.js",
+    "file": "assets/rkword-adapter-CKbKSg4A.js",
     "name": "rkword-adapter",
     "src": "resources/js/document-studio/rkword-adapter.js",
     "isDynamicEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js",
+      "_preload-helper-D4aPaSvo.js",
       "resources/js/document-studio/studio.js"
     ],
     "dynamicImports": [
@@ -190,14 +212,15 @@
     ]
   },
   "resources/js/document-studio/studio.js": {
-    "file": "assets/studio-KszUASI1.js",
+    "file": "assets/studio-CYhlScxw.js",
     "name": "studio",
     "src": "resources/js/document-studio/studio.js",
     "isEntry": true,
     "imports": [
-      "_pdf-DKsKPeEk.js",
+      "_preload-helper-D4aPaSvo.js",
       "resources/js/document-studio/preview.js",
-      "resources/js/document-studio/preview.js"
+      "resources/js/document-studio/preview.js",
+      "_fonts-CHrdxN3_.js"
     ],
     "dynamicImports": [
       "resources/js/document-studio/fabric-adapter.js",
@@ -206,12 +229,12 @@
     ]
   },
   "resources/js/document-studio/upload.js": {
-    "file": "assets/upload-BT2fBPFo.js",
+    "file": "assets/upload-BxvnCHQA.js",
     "name": "upload",
     "src": "resources/js/document-studio/upload.js",
     "isEntry": true,
     "imports": [
-      "_pdf-loader-BBprxQxg.js"
+      "_pdf-loader-CBkUTBAe.js"
     ]
   }
 }

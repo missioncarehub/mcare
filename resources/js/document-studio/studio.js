@@ -1,4 +1,4 @@
-import { previewDocument, previewPdfBytes } from './preview.js';
+import { invalidatePreviewCache, previewDocument, previewPdfBytes, showPreviewLoading } from './preview.js';
 import { notifyStudio } from './feedback.js';
 import { CERTIFICATE_FONTS } from './fonts.js';
 let supportsDisplayTransition;
@@ -137,6 +137,7 @@ class DocumentStudioApp {
     handleStateChange(newState) {
         this.draftState = newState;
         this.isDirty = true;
+        invalidatePreviewCache(this.config.endpoints?.preview);
         this.updateSaveStatus('dirty');
 
         // Debounce autosave
@@ -441,9 +442,9 @@ class DocumentStudioApp {
 
         // Certificate typography presets (pdfme)
         document.querySelectorAll('.btn-typography-preset').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const preset = btn.getAttribute('data-typography-preset');
-                if (this.adapter?.applyTypographyPreset?.(preset)) {
+                if (await this.adapter?.applyTypographyPreset?.(preset)) {
                     this.syncPdfmeFontEditor(this.adapter.getTextFields?.() || []);
                     notifyStudio('Certificate font pairing applied. Save or Preview to inspect the PDF.', 'success', 'Typography updated');
                 }
@@ -466,18 +467,24 @@ class DocumentStudioApp {
         // Preview button
         document.getElementById('btn-preview')?.addEventListener('click', async () => {
             clearTimeout(this.autosaveTimer);
-            try {
-                if (!this.isPublishing && (this.isDirty || this.savingPromise)) {
-                    await this.saveDraft(true);
-                }
-            } catch (err) {
-                notifyStudio('Could not save latest draft before preview: ' + (err.message || 'Save failed'), 'error', 'Preview unavailable');
-                return;
+            const savePending = (!this.isPublishing && (this.isDirty || this.savingPromise))
+                ? this.saveDraft(true)
+                : null;
+
+            const directLink = document.getElementById('preview-direct-link');
+            if (directLink && this.config.endpoints?.preview) {
+                directLink.href = this.config.endpoints.preview;
             }
 
-            // Inside PDFme editor, render directly from the active designer template in memory first
-            // so the preview is guaranteed to mirror what is currently on screen.
+            // Inside PDFme editor, open the modal immediately and render straight from the active
+            // designer template in RAM while any pending draft save finishes concurrently.
             if (this.config.engine === 'pdfme' && this.adapter?.renderPreviewPdf) {
+                showPreviewLoading('Live PDFme Editor Preview');
+                if (savePending) {
+                    savePending.catch((err) => {
+                        notifyStudio('Could not save latest draft cleanly: ' + (err.message || 'Save failed'), 'error', 'Autosave warning');
+                    });
+                }
                 try {
                     const bytes = await this.adapter.renderPreviewPdf(this.liveSamplePayload());
                     await previewPdfBytes(bytes, 'Live PDFme Editor Preview');
@@ -485,6 +492,15 @@ class DocumentStudioApp {
                 } catch (clientErr) {
                     console.warn('Direct PDFme preview fallback to server renderer:', clientErr);
                 }
+            }
+
+            try {
+                if (savePending) {
+                    await savePending;
+                }
+            } catch (err) {
+                notifyStudio('Could not save latest draft before preview: ' + (err.message || 'Save failed'), 'error', 'Preview unavailable');
+                return;
             }
 
             try {

@@ -9,14 +9,13 @@ import path from 'node:path';
 import { generate } from '@pdfme/generator';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
 import { PDFDocument, rgb, StandardFonts, degrees, pushGraphicsState, popGraphicsState, translate, rotateRadians } from 'pdf-lib';
-import bwipjs from 'bwip-js';
-import { renderWord } from './document-studio-word.mjs';
 import { embedStudioImage, drawStudioImage } from './document-studio-image.mjs';
 
 async function main() {
     const args = process.argv.slice(2);
     if (args.includes('--smoke-test')) {
         try {
+            const { renderWord } = await import('./document-studio-word.mjs');
             const pdfmeBytes = await renderPdfme({
                 page: { width_mm: 210, height_mm: 297 },
                 elements: [{ id: 'smoke', type: 'text', content: 'Smoke Test' }],
@@ -69,6 +68,7 @@ async function main() {
     if (engine === 'fabric' || engine === 'canvas') {
         pdfBytes = await renderFabric(payload);
     } else if (engine === 'rk_word') {
+        const { renderWord } = await import('./document-studio-word.mjs');
         pdfBytes = await renderWord(payload);
     } else {
         pdfBytes = await renderPdfme(payload);
@@ -85,24 +85,49 @@ async function main() {
 }
 
 let cachedNodeFonts = null;
-async function getNodePdfmeFonts() {
-    if (cachedNodeFonts) return cachedNodeFonts;
+function extractNodeFontKeys(schemas = [], elements = []) {
+    const keys = new Set(['NotoSans']);
+    for (const page of schemas || []) {
+        for (const field of page || []) {
+            if (!field || typeof field !== 'object') continue;
+            if (field.fontName) keys.add(field.fontName);
+            if (field.headStyles?.fontName) keys.add(field.headStyles.fontName);
+            if (field.bodyStyles?.fontName) keys.add(field.bodyStyles.fontName);
+        }
+    }
+    for (const el of elements || []) {
+        if (!el || typeof el !== 'object') continue;
+        if (el.fontName) keys.add(el.fontName);
+    }
+    return keys;
+}
+
+async function getNodePdfmeFonts(requiredKeys = null) {
+    if (!cachedNodeFonts) cachedNodeFonts = {};
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const fontsDir = path.resolve(__dirname, '../public/fonts/certificate');
-    const fontMap = {};
-    for (const font of CERTIFICATE_FONTS) {
+    const wanted = requiredKeys && requiredKeys.size > 0
+        ? CERTIFICATE_FONTS.filter(f => f.fallback || requiredKeys.has(f.key))
+        : CERTIFICATE_FONTS;
+
+    await Promise.all(wanted.map(async (font) => {
+        if (cachedNodeFonts[font.key]) return;
         const fontPath = path.join(fontsDir, font.file);
         try {
             const buf = await fs.readFile(fontPath);
-            fontMap[font.key] = {
+            cachedNodeFonts[font.key] = {
                 data: new Uint8Array(buf),
                 ...(font.fallback ? { fallback: true } : {}),
             };
-        } catch (err) {
+        } catch {
             // Skip missing optional font file cleanly
         }
+    }));
+
+    const fontMap = {};
+    for (const font of wanted) {
+        if (cachedNodeFonts[font.key]) fontMap[font.key] = cachedNodeFonts[font.key];
     }
-    cachedNodeFonts = fontMap;
     return fontMap;
 }
 
@@ -114,7 +139,7 @@ function interpolateStudioTokens(text, values = {}) {
 }
 
 async function renderPdfme(payload) {
-    const nodeFonts = await getNodePdfmeFonts();
+    const nodeFonts = await getNodePdfmeFonts(extractNodeFontKeys(payload.schemas, payload.elements));
     const plugins = {
         text,
         image,
@@ -382,6 +407,7 @@ async function renderFabric(payload) {
             const rx=(el.radius || 20)*mm; const ry=(el.radius_y || el.radius || 20)*mm;
             page.drawEllipse({x:rx,y:-ry,xScale:rx,yScale:ry,color:parsePdfColor(el.fill || '#f3f4f6'),borderColor:parsePdfColor(el.stroke || '#9ca3af'),borderWidth:(el.strokeWidth ?? 1)*mm/3.5});
         } else if (['qr','qrcode'].includes(el.type)) {
+            const { default: bwipjs } = await import('bwip-js');
             const bytes=await bwipjs.toBuffer({bcid:'qrcode',text:textValue(el.binding || el.text || '{{qr_code}}'),scale:3});
             drawStudioImage(page,await embedStudioImage(doc,bytes,w,h),{x:0,y:-h,width:w,height:h});
         } else if (el.type === 'image') {

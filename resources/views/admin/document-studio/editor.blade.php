@@ -8,7 +8,11 @@
 @endpush
 
 @push('scripts')
-    @vite(['resources/js/document-studio/studio.js'])
+    @if($template->engine === 'pdfme')
+        @vite(['resources/js/document-studio/studio.js', 'resources/js/document-studio/pdfme-adapter.js'])
+    @else
+        @vite(['resources/js/document-studio/studio.js'])
+    @endif
 @endpush
 
 @section('content')

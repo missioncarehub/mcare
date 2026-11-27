@@ -1,1 +1,0 @@
-import{r as e,t}from"./pdf-DKsKPeEk.js";async function n(){return typeof window<`u`&&t&&!t.workerSrc&&(t.workerSrc=`/vendor/pdfjs/pdf.worker.min.js`),e}export{n as t};

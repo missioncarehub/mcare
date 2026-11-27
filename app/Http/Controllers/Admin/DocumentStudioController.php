@@ -527,8 +527,35 @@ class DocumentStudioController extends Controller
             'values' => $values,
         ];
 
+        $previewCacheKey = null;
+        if (! $request->filled('enrollment_id')
+            && ! $request->boolean('fresh')
+            && $this->renderer::class === DocumentStudioRenderer::class) {
+            $basePdfMtime = null;
+            if (! empty($payload['base_pdf_url']) && file_exists(public_path(ltrim($payload['base_pdf_url'], '/')))) {
+                $basePdfMtime = @filemtime(public_path(ltrim($payload['base_pdf_url'], '/')));
+            }
+            $previewCacheKey = 'document-studio:preview:v1:'.sha1(json_encode([
+                'payload' => $payload,
+                'base_pdf_mtime' => $basePdfMtime,
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
+            $cachedPdf = Cache::store('file')->get($previewCacheKey);
+            if (is_string($cachedPdf) && str_starts_with($cachedPdf, '%PDF-')) {
+                return response($cachedPdf, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="'.$template->slug.'-preview.pdf"',
+                    'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                    'X-MCARE-Preview-Cache' => 'hit',
+                ]);
+            }
+        }
+
         try {
             $pdfBinary = $this->renderer->renderPayloadToPdf($payload);
+            if ($previewCacheKey && str_starts_with($pdfBinary, '%PDF-')) {
+                Cache::store('file')->put($previewCacheKey, $pdfBinary, now()->addMinutes(15));
+            }
         } catch (\Throwable $exception) {
             report($exception);
 

@@ -555,5 +555,25 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
         $this->assertNotSame($preReleaseSha, $released->sha256, 'Releasing COTC must re-render custom Studio PDF with the actual release date and live settings.');
         $pdfBytes = Storage::disk($released->storage_disk)->get($released->file_path);
         $this->assertStringStartsWith('%PDF-', $pdfBytes);
+
+        // Verify deterministic sample previews cache across repeat requests and auto-invalidate on draft updates
+        $previewUrl = route('admin.document-studio.preview', ['template' => $template, 'mode' => 'draft'], false);
+        $firstPreview = $this->actingAs($this->admin)->get($previewUrl)->assertOk();
+        $this->assertNull($firstPreview->headers->get('x-mcare-preview-cache'));
+
+        $cachedPreview = $this->actingAs($this->admin)->get($previewUrl)->assertOk();
+        $this->assertSame('hit', $cachedPreview->headers->get('x-mcare-preview-cache'));
+
+        $updatedState = $template->fresh()->draft_state;
+        $updatedState['schemas'][0][0]['fontSize'] = 22;
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.document-studio.draft.save', $template), [
+                'draft_state' => $updatedState,
+                'draft_revision' => $template->fresh()->draft_revision,
+            ])
+            ->assertOk();
+
+        $invalidatedPreview = $this->actingAs($this->admin)->get($previewUrl)->assertOk();
+        $this->assertNull($invalidatedPreview->headers->get('x-mcare-preview-cache'));
     }
 }

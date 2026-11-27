@@ -1,4 +1,3 @@
-import { generate } from '@pdfme/generator';
 import { PDFDocument } from 'pdf-lib';
 import { text, image, signature, table, barcodes, line, rectangle, ellipse, svg } from '@pdfme/schemas';
 import { normalizeStudioSchema, studioTables, tableBinding } from './tables.js';
@@ -16,43 +15,122 @@ export const PDFME_PLUGINS = {
     ...barcodes,
 };
 
-let cachedBrowserFonts = null;
+let generatorModulePromise = null;
+function loadPdfmeGenerator() {
+    if (!generatorModulePromise) {
+        generatorModulePromise = import('@pdfme/generator');
+    }
+    return generatorModulePromise;
+}
 
-export async function loadBrowserFonts() {
-    if (cachedBrowserFonts) return cachedBrowserFonts;
-    const fontEntries = Object.entries(getBrowserPdfmeFonts());
-    const font = {};
-    await Promise.all(fontEntries.map(async ([key, cfg]) => {
-        try {
-            const res = await fetch(cfg.data, { credentials: 'same-origin' });
-            if (res.ok) {
-                font[key] = { data: new Uint8Array(await res.arrayBuffer()), ...(cfg.fallback ? { fallback: true } : {}) };
-            }
-        } catch {
-            // Skip unavailable font cleanly
+export function warmPdfmePreviewRuntime() {
+    loadPdfmeGenerator().catch(() => {});
+    import('../pdf-loader.js').then(m => m.loadPdfJs()).catch(() => {});
+}
+
+export function extractTemplateFontKeys(schemas = []) {
+    const keys = new Set(['NotoSans']);
+    (schemas || []).forEach((page) => {
+        (page || []).forEach((field) => {
+            if (!field || typeof field !== 'object') return;
+            if (field.fontName) keys.add(field.fontName);
+            if (field.headStyles?.fontName) keys.add(field.headStyles.fontName);
+            if (field.bodyStyles?.fontName) keys.add(field.bodyStyles.fontName);
+        });
+    });
+    return [...keys];
+}
+
+const fontDataCache = new Map();
+const fontPromiseCache = new Map();
+const dataUrlCache = new Map();
+const dataUrlPromiseCache = new Map();
+const binaryCache = new Map();
+const binaryPromiseCache = new Map();
+const basePdfBytesCache = new Map();
+
+export async function fetchBinaryCached(url) {
+    if (!url) return null;
+    const key = String(url);
+    if (binaryCache.has(key)) {
+        return new Uint8Array(binaryCache.get(key));
+    }
+    if (!binaryPromiseCache.has(key)) {
+        binaryPromiseCache.set(key, (async () => {
+            const res = await fetch(key, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`Could not load binary resource (HTTP ${res.status}).`);
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            binaryCache.set(key, bytes);
+            return bytes;
+        })().catch((err) => {
+            binaryPromiseCache.delete(key);
+            throw err;
+        }));
+    }
+    const bytes = await binaryPromiseCache.get(key);
+    return bytes ? new Uint8Array(bytes) : null;
+}
+
+export async function loadBrowserFonts(onlyKeys = null) {
+    const allConfigs = getBrowserPdfmeFonts();
+    const targetKeys = Array.isArray(onlyKeys) && onlyKeys.length > 0
+        ? [...new Set(['NotoSans', ...onlyKeys])].filter(k => allConfigs[k])
+        : Object.keys(allConfigs);
+
+    await Promise.all(targetKeys.map(async (key) => {
+        if (fontDataCache.has(key)) return;
+        if (!fontPromiseCache.has(key)) {
+            const cfg = allConfigs[key];
+            fontPromiseCache.set(key, (async () => {
+                try {
+                    const res = await fetch(cfg.data, { credentials: 'same-origin' });
+                    if (res.ok) {
+                        fontDataCache.set(key, {
+                            data: new Uint8Array(await res.arrayBuffer()),
+                            ...(cfg.fallback ? { fallback: true } : {}),
+                        });
+                    }
+                } catch {
+                    // Skip unavailable font cleanly
+                }
+            })());
         }
+        await fontPromiseCache.get(key);
     }));
-    if (Object.keys(font).length > 0) {
-        cachedBrowserFonts = font;
+
+    const font = {};
+    for (const [key, entry] of fontDataCache.entries()) {
+        font[key] = entry;
     }
     return font;
 }
 
 async function fetchAsDataUrl(url) {
     if (!url || String(url).startsWith('data:')) return String(url || '');
-    try {
-        const res = await fetch(url, { credentials: 'same-origin' });
-        if (!res.ok) return '';
-        const blob = await res.blob();
-        return await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch {
-        return '';
+    const key = String(url);
+    if (dataUrlCache.has(key)) return dataUrlCache.get(key);
+    if (!dataUrlPromiseCache.has(key)) {
+        dataUrlPromiseCache.set(key, (async () => {
+            try {
+                const res = await fetch(key, { credentials: 'same-origin' });
+                if (!res.ok) return '';
+                const blob = await res.blob();
+                const dataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+                if (dataUrl) dataUrlCache.set(key, dataUrl);
+                return dataUrl;
+            } catch {
+                return '';
+            }
+        })().finally(() => {
+            dataUrlPromiseCache.delete(key);
+        }));
     }
+    return dataUrlPromiseCache.get(key);
 }
 
 async function convertToPngBytesIfNeeded(bytes, mime, forceCanvas = false) {
@@ -92,6 +170,11 @@ export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 
         // Keep original URL string cleanly
     }
 
+    const cacheKey = `${fetchUrl}|${widthMm}x${heightMm}`;
+    if (basePdfBytesCache.has(cacheKey)) {
+        return new Uint8Array(basePdfBytesCache.get(cacheKey));
+    }
+
     const res = await fetch(fetchUrl, { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`Could not load template background picture (HTTP ${res.status}).`);
     const rawBytes = new Uint8Array(await res.arrayBuffer());
@@ -119,7 +202,9 @@ export async function buildBasePdfFromImageUrl(url, widthMm = 279.4, heightMm = 
     }
     page.drawImage(embedded, { x: 0, y: 0, width: widthPt, height: heightPt });
 
-    return new Uint8Array(await doc.save());
+    const pdfBytes = new Uint8Array(await doc.save());
+    basePdfBytesCache.set(cacheKey, pdfBytes);
+    return new Uint8Array(pdfBytes);
 }
 
 function interpolateStudioTokens(text, values = {}) {
@@ -165,12 +250,18 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
     if (!basePdf && basePdfAssetId) {
         const matched = assets.find(item => Number(item.id) === Number(basePdfAssetId));
         const url = matched?.url || `/admin/document-studio/assets/${basePdfAssetId}`;
-        const res = await fetch(url, { credentials: 'same-origin' });
-        if (res.ok) basePdf = new Uint8Array(await res.arrayBuffer());
+        try {
+            basePdf = await fetchBinaryCached(url);
+        } catch {
+            // Fall through
+        }
     }
     if (!basePdf && basePdfUrl) {
-        const res = await fetch(basePdfUrl, { credentials: 'same-origin' });
-        if (res.ok) basePdf = new Uint8Array(await res.arrayBuffer());
+        try {
+            basePdf = await fetchBinaryCached(basePdfUrl);
+        } catch {
+            // Fall through
+        }
     }
     if (!basePdf) {
         basePdf = { width: pageWidthMm, height: pageHeightMm, padding: [10, 10, 10, 10] };
@@ -248,7 +339,11 @@ export async function renderPdfmeTemplateToBytes({ templateState = {}, designerT
         }
     }
 
-    const font = await loadBrowserFonts();
+    const neededKeys = extractTemplateFontKeys(schemas);
+    const [{ generate }, font] = await Promise.all([
+        loadPdfmeGenerator(),
+        loadBrowserFonts(neededKeys),
+    ]);
     for (const page of schemas) {
         for (const field of page) {
             if (field.fontName && !font[field.fontName]) {
