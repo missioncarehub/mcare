@@ -360,6 +360,11 @@ export class PdfmeAdapter {
     async renderPreviewPdf(values = {}) {
         const current = structuredClone(this.designer ? this.designer.getTemplate() : this.template);
         let basePdf = current.basePdf;
+        if (basePdf instanceof Uint8Array) {
+            basePdf = new Uint8Array(basePdf);
+        } else if (basePdf instanceof ArrayBuffer) {
+            basePdf = new Uint8Array(basePdf.slice(0));
+        }
         if (!basePdf && this.template.base_pdf_asset_id) {
             const asset = this.options.assets?.find(item => item.id === this.template.base_pdf_asset_id);
             if (asset?.url) {
@@ -444,6 +449,9 @@ export class PdfmeAdapter {
                 }
 
                 inputRow[field.name] = val;
+                if (field.readOnly) {
+                    field.content = val;
+                }
             }
         }
 
@@ -464,6 +472,14 @@ export class PdfmeAdapter {
             for (const field of page) {
                 if (field.fontName && !font[field.fontName]) {
                     field.fontName = font.NotoSans ? 'NotoSans' : undefined;
+                }
+                if (field.type === 'table') {
+                    if (field.headStyles?.fontName && !font[field.headStyles.fontName]) {
+                        field.headStyles.fontName = font.NotoSans ? 'NotoSans' : undefined;
+                    }
+                    if (field.bodyStyles?.fontName && !font[field.bodyStyles.fontName]) {
+                        field.bodyStyles.fontName = font.NotoSans ? 'NotoSans' : undefined;
+                    }
                 }
             }
         }

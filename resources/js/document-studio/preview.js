@@ -244,3 +244,9 @@ if (document.readyState === 'loading') {
 } else {
     renderLiveThumbnails();
 }
+
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        renderLiveThumbnails();
+    }
+});

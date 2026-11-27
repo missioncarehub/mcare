@@ -378,6 +378,18 @@ class DocumentStudioApp {
                 return;
             }
 
+            // Inside PDFme editor, render directly from the active designer template in memory first
+            // so the preview is guaranteed to mirror what is currently on screen.
+            if (this.config.engine === 'pdfme' && this.adapter?.renderPreviewPdf) {
+                try {
+                    const bytes = await this.adapter.renderPreviewPdf(this.config.samplePayload || {});
+                    await previewPdfBytes(bytes, 'Live PDFme Editor Preview');
+                    return;
+                } catch (clientErr) {
+                    console.warn('Direct PDFme preview fallback to server renderer:', clientErr);
+                }
+            }
+
             try {
                 const result = await previewDocument(this.config.endpoints.preview);
                 if (result?.usedServerFallback && this.adapter?.renderPreviewPdf) {

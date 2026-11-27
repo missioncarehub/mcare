@@ -1040,6 +1040,10 @@ class DocumentStudioService
             return false;
         }
         $state = $template->draft_state ?? [];
+        $serialized = json_encode($state);
+        if (is_string($serialized) && str_contains($serialized, 'cotc-official-template')) {
+            return true;
+        }
         if (! empty($state['schemas'])) {
             return false;
         }
@@ -1348,6 +1352,8 @@ class DocumentStudioService
                 $activeStateClean = $selectedProgramTemplate?->activeVersion?->editor_state ?? [];
                 unset($activeStateClean['_asset_integrity']);
 
+                $candidates = collect();
+
                 $candidateDraft = DocumentTemplate::query()
                     ->where('document_kind', $kind)
                     ->where('training_program_id', $programId)
@@ -1365,17 +1371,23 @@ class DocumentStudioService
                         $draftClean = $candidateDraft->draft_state ?? [];
                         unset($draftClean['_asset_integrity']);
                         if (! empty($draftClean) && $draftClean != $activeStateClean) {
-                            $latestDraft = $candidateDraft;
+                            $candidates->push($candidateDraft);
                         }
                     }
                 }
 
-                if (! $latestDraft && $selectedProgramTemplate && $selectedProgramTemplate->activeVersion) {
+                if ($selectedProgramTemplate && $selectedProgramTemplate->activeVersion) {
                     $ownDraftClean = $selectedProgramTemplate->draft_state ?? [];
                     unset($ownDraftClean['_asset_integrity']);
                     if (! empty($ownDraftClean) && $ownDraftClean != $activeStateClean) {
-                        $latestDraft = $selectedProgramTemplate;
+                        $candidates->push($selectedProgramTemplate);
                     }
+                }
+
+                if ($candidates->isNotEmpty()) {
+                    $latestDraft = $candidates
+                        ->sortByDesc(fn (DocumentTemplate $item) => ($item->draft_updated_at ?? $item->updated_at)?->getTimestamp() ?? 0)
+                        ->first();
                 }
             }
 

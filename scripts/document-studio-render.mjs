@@ -176,6 +176,14 @@ async function renderPdfme(payload) {
             if (normalized.fontName && !nodeFonts[normalized.fontName]) {
                 normalized.fontName = 'NotoSans';
             }
+            if (normalized.type === 'table') {
+                if (normalized.headStyles?.fontName && !nodeFonts[normalized.headStyles.fontName]) {
+                    normalized.headStyles.fontName = 'NotoSans';
+                }
+                if (normalized.bodyStyles?.fontName && !nodeFonts[normalized.bodyStyles.fontName]) {
+                    normalized.bodyStyles.fontName = 'NotoSans';
+                }
+            }
             return normalized;
         })),
     };
@@ -187,12 +195,19 @@ async function renderPdfme(payload) {
     for (const page of template.schemas) {
         for (const field of page) {
             let val = undefined;
-            if (['image', 'signature'].includes(field.type) && field.asset_id) {
-                const file = payload.asset_paths?.[field.asset_id];
-                if (!file) throw new Error('Image asset is unavailable.');
-                const bytes = await fs.readFile(file);
-                const mime = bytes[0] === 0xff ? 'image/jpeg' : file.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
-                val = `data:${mime};base64,${bytes.toString('base64')}`;
+            if (['image', 'signature'].includes(field.type)) {
+                let assetId = field.asset_id;
+                if (!assetId && typeof field.content === 'string') {
+                    const m = field.content.match(/\/admin\/document-studio\/assets\/(\d+)$/);
+                    if (m) assetId = Number(m[1]);
+                }
+                if (assetId) {
+                    const file = payload.asset_paths?.[assetId];
+                    if (!file) throw new Error('Image asset is unavailable.');
+                    const bytes = await fs.readFile(file);
+                    const mime = bytes[0] === 0xff ? 'image/jpeg' : file.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
+                    val = `data:${mime};base64,${bytes.toString('base64')}`;
+                }
             }
 
             const rawContent = field.content ?? field.text;
@@ -252,9 +267,8 @@ async function renderPdfme(payload) {
             }
 
             inputRow[field.name] = val;
-            // pdfme rich text uses static-content mode; values have already been
-            // resolved from Laravel's authoritative payload above.
-            if (field.type === 'text' && field.readOnly && field.textFormat === 'inline-markdown') {
+            // ReadOnly fields in @pdfme/generator read schema.content directly instead of inputs[0][name].
+            if (field.readOnly) {
                 field.content = val;
             }
         }

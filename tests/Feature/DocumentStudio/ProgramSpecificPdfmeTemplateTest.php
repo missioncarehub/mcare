@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\DocumentStudio\DocumentStudioService;
 use App\Support\RolePermissionMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -301,19 +302,93 @@ class ProgramSpecificPdfmeTemplateTest extends TestCase
             ])
             ->assertOk();
 
-        // Editor page keeps training_program_id on Back link and includes field labels button
+        // Editor page keeps program_id on Back link and includes field labels button
         $this->actingAs($this->admin)
             ->get(route('admin.document-studio.edit', $workingDraft))
             ->assertOk()
             ->assertSee('btn-toggle-field-labels', false)
-            ->assertSee('training_program_id='.$program->id, false);
+            ->assertSee('program_id='.$program->id, false);
 
         // Library index must now preview the edited draft (mode=draft) instead of stale published v1
         $expectedDraftPreviewUrl = route('admin.document-studio.preview', ['template' => $workingDraft, 'mode' => 'draft'], false);
         $this->actingAs($this->admin)
-            ->get(route('admin.document-studio.index', ['training_program_id' => $program->id]))
+            ->get(route('admin.document-studio.index', ['program_id' => $program->id]))
             ->assertOk()
             ->assertSee('Previewing Edited Draft')
             ->assertSee($expectedDraftPreviewUrl, false);
+
+        // Verify readOnly template_bg image URL renders natively for both COTC and TOR without FPDF fallback
+        $logoFile = new UploadedFile(public_path('assets/official-logo.png'), 'bg.png', 'image/png', null, true);
+        $asset = app(\App\Services\DocumentStudio\AssetSecurityService::class)->storeUploadedFile(
+            $logoFile,
+            \App\Models\DocumentAsset::TYPE_IMAGE,
+            $workingDraft->id,
+            $this->admin
+        );
+
+        $bgState = $workingDraft->draft_state;
+        array_unshift($bgState['schemas'][0], [
+            'name' => "template_bg_{$asset->id}",
+            'type' => 'image',
+            'position' => ['x' => 0, 'y' => 0],
+            'width' => 279.4,
+            'height' => 215.9,
+            'asset_id' => $asset->id,
+            'content' => route('admin.document-studio.assets.stream', $asset->id, false),
+            'readOnly' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.document-studio.draft.save', $workingDraft), [
+                'draft_state' => $bgState,
+                'draft_revision' => $workingDraft->fresh()->draft_revision,
+            ])
+            ->assertOk();
+
+        $cotcBgPreview = $this->actingAs($this->admin)
+            ->get($expectedDraftPreviewUrl);
+        $cotcBgPreview->assertOk();
+        $cotcBgPreview->assertHeader('content-type', 'application/pdf');
+        $this->assertNull($cotcBgPreview->headers->get('x-mcare-preview-fallback'));
+        $this->assertStringStartsWith('%PDF-', $cotcBgPreview->getContent());
+
+        // Verify TOR draft preview also matches latest edited draft
+        $publishedTor = DocumentTemplate::query()
+            ->where('document_kind', DocumentTemplate::KIND_TOR)
+            ->where('training_program_id', $program->id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.document-studio.start-draft', $publishedTor))
+            ->assertRedirect();
+
+        $torDraft = DocumentTemplate::query()
+            ->where('document_kind', DocumentTemplate::KIND_TOR)
+            ->where('training_program_id', $program->id)
+            ->where('is_active', false)
+            ->latest('id')
+            ->firstOrFail();
+
+        $torState = $torDraft->draft_state;
+        $torState['schemas'][0][1]['fontName'] = 'GreatVibes';
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.document-studio.draft.save', $torDraft), [
+                'draft_state' => $torState,
+                'draft_revision' => $torDraft->draft_revision,
+            ])
+            ->assertOk();
+
+        $expectedTorPreviewUrl = route('admin.document-studio.preview', ['template' => $torDraft, 'mode' => 'draft'], false);
+        $torPreview = $this->actingAs($this->admin)
+            ->get($expectedTorPreviewUrl);
+        $torPreview->assertOk();
+        $this->assertNull($torPreview->headers->get('x-mcare-preview-fallback'));
+        $this->assertStringStartsWith('%PDF-', $torPreview->getContent());
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.document-studio.index', ['program_id' => $program->id]))
+            ->assertOk()
+            ->assertSee($expectedTorPreviewUrl, false);
     }
 }

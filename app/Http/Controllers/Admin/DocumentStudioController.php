@@ -69,7 +69,9 @@ class DocumentStudioController extends Controller
         $programs = TrainingProgram::query()->orderBy('name')->get();
         $selectedProgramId = $request->filled('program_id')
             ? (int) $request->query('program_id')
-            : ($programs->first()?->id);
+            : ($request->filled('training_program_id')
+                ? (int) $request->query('training_program_id')
+                : ($programs->first()?->id));
         $selectedProgram = $selectedProgramId ? $programs->firstWhere('id', $selectedProgramId) : null;
         $publishedDesigns = $this->studioService->getPublishedDesignsSummary($selectedProgramId);
 
